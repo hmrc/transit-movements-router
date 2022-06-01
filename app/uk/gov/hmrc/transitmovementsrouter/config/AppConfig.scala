@@ -16,11 +16,12 @@
 
 package uk.gov.hmrc.transitmovementsrouter.config
 
-import javax.inject.{Inject, Singleton}
+import javax.inject.Inject
+import javax.inject.Singleton
 import play.api.Configuration
 
 @Singleton
-class AppConfig @Inject()(config: Configuration) {
+class AppConfig @Inject() (config: Configuration) {
 
   lazy val appName: String = config.get[String]("appName")
 }
