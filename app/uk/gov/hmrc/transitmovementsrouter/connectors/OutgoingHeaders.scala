@@ -14,20 +14,17 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovementsrouter.config
+package uk.gov.hmrc.transitmovementsrouter.connectors
 
-import javax.inject.Inject
-import javax.inject.Singleton
-import play.api.Configuration
-import uk.gov.hmrc.http.HeaderCarrier
+import play.api.http.HeaderNames
+import uk.gov.hmrc.http.{HeaderNames => HMRCHeaderNames}
 
-@Singleton
-class AppConfig @Inject() (config: Configuration) {
-
-  lazy val appName: String = config.get[String]("appName")
-
-  lazy val eisNi: EISInstanceConfig = config.get[EISInstanceConfig]("ni")
-  lazy val eisGb: EISInstanceConfig = config.get[EISInstanceConfig]("gb")
-
-  lazy val headerCarrierConfig: HeaderCarrier.Config = HeaderCarrier.Config.fromConfig(config.underlying)
+object OutgoingHeaders {
+  val headers = Seq(
+    HeaderNames.DATE,
+    HeaderNames.CONTENT_TYPE,
+    "X-Message-Type",
+    "X-Message-Sender",
+    HMRCHeaderNames.xRequestId
+  )
 }
