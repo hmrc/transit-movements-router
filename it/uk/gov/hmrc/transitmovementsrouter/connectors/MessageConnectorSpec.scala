@@ -103,6 +103,7 @@ class MessageConnectorSpec
     )
   )
 
+  // We construct the connector each time to avoid issues with the circuit breaker
   def noRetriesConnector = new MessageConnectorImpl("NoRetry", connectorConfig, TestHelpers.headerCarrierConfig, AhcWSClient(), NoRetries)
   def oneRetryConnector  = new MessageConnectorImpl("OneRetry", connectorConfig, TestHelpers.headerCarrierConfig, AhcWSClient(), OneRetry)
 

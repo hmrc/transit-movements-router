@@ -82,8 +82,8 @@ class MessageConnectorImpl(
 
   def onFailure(response: Either[RoutingError, Unit], retryDetails: RetryDetails): Future[Unit] = {
     val message: String = response.left.get match {
-      case Upstream(upstreamErrorResponse) => s"with status code ${upstreamErrorResponse.statusCode}"
-      case Unexpected(message, _)          => s"with error $message"
+      case RoutingError.Upstream(upstreamErrorResponse) => s"with status code ${upstreamErrorResponse.statusCode}"
+      case RoutingError.Unexpected(message, _)          => s"with error $message"
     }
     val attemptNumber = retryDetails.retriesSoFar + 1
     if (retryDetails.givingUp) {
