@@ -47,7 +47,7 @@ import uk.gov.hmrc.transitmovementsrouter.config.EISInstanceConfig
 import uk.gov.hmrc.transitmovementsrouter.config.Headers
 import uk.gov.hmrc.transitmovementsrouter.config.RetryConfig
 import uk.gov.hmrc.transitmovementsrouter.models.MessageSender
-import uk.gov.hmrc.transitmovementsrouter.service.error.RoutingError
+import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.Implicits.global

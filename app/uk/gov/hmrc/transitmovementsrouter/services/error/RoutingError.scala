@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovementsrouter.service.error
+package uk.gov.hmrc.transitmovementsrouter.services.error
 
 import uk.gov.hmrc.http.UpstreamErrorResponse
 
