@@ -23,7 +23,7 @@ import scala.concurrent.duration.FiniteDuration
 
 object RetryConfig {
 
-  implicit val configLoader: ConfigLoader[RetryConfig] = ConfigLoader {
+  implicit lazy val configLoader: ConfigLoader[RetryConfig] = ConfigLoader {
     rootConfig => path =>
       val config = Configuration(rootConfig.getConfig(path))
       RetryConfig(

@@ -21,7 +21,7 @@ import play.api.Configuration
 
 object EISInstanceConfig {
 
-  implicit val configLoader: ConfigLoader[EISInstanceConfig] =
+  implicit lazy val configLoader: ConfigLoader[EISInstanceConfig] =
     ConfigLoader {
       rootConfig => path =>
         val config = Configuration(rootConfig.getConfig(path))
@@ -37,7 +37,16 @@ object EISInstanceConfig {
     }
 
 }
-case class EISInstanceConfig(protocol: String, host: String, port: Int, uri: String, headers: Headers, circuitBreaker: CircuitBreakerConfig, retryConfig: RetryConfig) {
+
+case class EISInstanceConfig(
+  protocol: String,
+  host: String,
+  port: Int,
+  uri: String,
+  headers: Headers,
+  circuitBreaker: CircuitBreakerConfig,
+  retryConfig: RetryConfig
+) {
 
   lazy val url: String = s"$protocol://$host:$port$uri"
 

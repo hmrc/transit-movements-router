@@ -19,10 +19,7 @@ package uk.gov.hmrc.transitmovementsrouter.connectors
 import akka.pattern.CircuitBreaker
 import akka.stream.Materializer
 import play.api.Logging
-import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
-import uk.gov.hmrc.transitmovementsrouter.models.RoutingOption
-import uk.gov.hmrc.transitmovementsrouter.models.RoutingOption.Gb
-import uk.gov.hmrc.transitmovementsrouter.models.RoutingOption.Ni
+import uk.gov.hmrc.transitmovementsrouter.config.EISInstanceConfig
 
 import scala.concurrent.Future
 import scala.concurrent.duration.Duration
@@ -30,78 +27,43 @@ import scala.util.Try
 
 trait CircuitBreakers { self: Logging =>
   def materializer: Materializer
-  def appConfig: AppConfig
+  def code: String
+  def eisInstanceConfig: EISInstanceConfig
 
   private val clazz = getClass.getSimpleName
 
-  def withCircuitBreaker[T](routingOption: RoutingOption, defineFailureFn: Try[T] => Boolean)(block: => Future[T]): Future[T] =
-    (routingOption match {
-      case Gb => gbCircuitBreaker
-      case Ni => niCircuitBreaker
-    }).withCircuitBreaker(block, defineFailureFn)
+  def withCircuitBreaker[T](defineFailureFn: Try[T] => Boolean)(block: => Future[T]): Future[T] =
+    circuitBreaker.withCircuitBreaker(block, defineFailureFn)
 
-  lazy val gbCircuitBreaker = new CircuitBreaker(
+  lazy val circuitBreaker = new CircuitBreaker(
     scheduler = materializer.system.scheduler,
-    maxFailures = appConfig.eisGb.circuitBreaker.maxFailures,
-    callTimeout = appConfig.eisGb.circuitBreaker.callTimeout,
-    resetTimeout = appConfig.eisGb.circuitBreaker.resetTimeout,
-    maxResetTimeout = appConfig.eisGb.circuitBreaker.maxResetTimeout,
-    exponentialBackoffFactor = appConfig.eisGb.circuitBreaker.exponentialBackoffFactor,
-    randomFactor = appConfig.eisGb.circuitBreaker.randomFactor
+    maxFailures = eisInstanceConfig.circuitBreaker.maxFailures,
+    callTimeout = eisInstanceConfig.circuitBreaker.callTimeout,
+    resetTimeout = eisInstanceConfig.circuitBreaker.resetTimeout,
+    maxResetTimeout = eisInstanceConfig.circuitBreaker.maxResetTimeout,
+    exponentialBackoffFactor = eisInstanceConfig.circuitBreaker.exponentialBackoffFactor,
+    randomFactor = eisInstanceConfig.circuitBreaker.randomFactor
   )(materializer.executionContext)
-    .onOpen(logger.error(s"GB Circuit breaker for $clazz opening due to failures"))
-    .onHalfOpen(logger.warn(s"GB Circuit breaker for $clazz resetting after failures"))
+    .onOpen(logger.error(s"$code Circuit breaker for $clazz opening due to failures"))
+    .onHalfOpen(logger.warn(s"$code Circuit breaker for $clazz resetting after failures"))
     .onClose {
       logger.warn(
-        s"GB Circuit breaker for $clazz closing after trial connection success"
+        s"$code Circuit breaker for $clazz closing after trial connection success"
       )
     }
     .onCallFailure(
-      _ => logger.error(s"GB Circuit breaker for $clazz recorded failed call")
+      _ => logger.error(s"$code Circuit breaker for $clazz recorded failed call")
     )
     .onCallBreakerOpen {
       logger.error(
-        s"GB Circuit breaker for $clazz rejected call due to previous failures"
+        s"$code Circuit breaker for $clazz rejected call due to previous failures"
       )
     }
     .onCallTimeout {
       elapsed =>
         val duration = Duration.fromNanos(elapsed)
         logger.error(
-          s"GB Circuit breaker for $clazz recorded failed call due to timeout after ${duration.toMillis}ms"
+          s"$code Circuit breaker for $clazz recorded failed call due to timeout after ${duration.toMillis}ms"
         )
     }
-
-  lazy val niCircuitBreaker = new CircuitBreaker(
-    scheduler = materializer.system.scheduler,
-    maxFailures = appConfig.eisNi.circuitBreaker.maxFailures,
-    callTimeout = appConfig.eisNi.circuitBreaker.callTimeout,
-    resetTimeout = appConfig.eisNi.circuitBreaker.resetTimeout,
-    maxResetTimeout = appConfig.eisNi.circuitBreaker.maxResetTimeout,
-    exponentialBackoffFactor = appConfig.eisNi.circuitBreaker.exponentialBackoffFactor,
-    randomFactor = appConfig.eisNi.circuitBreaker.randomFactor
-  )(materializer.executionContext)
-    .onOpen(logger.error(s"NI Circuit breaker for $clazz opening due to failures"))
-    .onHalfOpen(logger.warn(s"NI Circuit breaker for $clazz resetting after failures"))
-    .onClose {
-      logger.warn(
-        s"NI Circuit breaker for $clazz closing after trial connection success"
-      )
-    }
-    .onCallFailure(
-      _ => logger.error(s"NI Circuit breaker for $clazz recorded failed call")
-    )
-    .onCallBreakerOpen {
-      logger.error(
-        s"NI Circuit breaker for $clazz rejected call due to previous failures"
-      )
-    }
-    .onCallTimeout {
-      elapsed =>
-        val duration = Duration.fromNanos(elapsed)
-        logger.error(
-          s"NI Circuit breaker for $clazz recorded failed call due to timeout after ${duration.toMillis}ms"
-        )
-    }
-
 }

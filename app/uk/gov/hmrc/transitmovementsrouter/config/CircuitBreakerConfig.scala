@@ -22,7 +22,8 @@ import play.api.Configuration
 import scala.concurrent.duration.FiniteDuration
 
 object CircuitBreakerConfig {
-  implicit val configLoader: ConfigLoader[CircuitBreakerConfig] = ConfigLoader {
+
+  implicit lazy val configLoader: ConfigLoader[CircuitBreakerConfig] = ConfigLoader {
     rootConfig => rootPath =>
       val config = Configuration(rootConfig.getConfig(rootPath))
       CircuitBreakerConfig(
@@ -35,11 +36,12 @@ object CircuitBreakerConfig {
       )
   }
 }
+
 case class CircuitBreakerConfig(
- maxFailures: Int,
- callTimeout: FiniteDuration,
- resetTimeout: FiniteDuration,
- maxResetTimeout: FiniteDuration,
- exponentialBackoffFactor: Double,
- randomFactor: Double
+  maxFailures: Int,
+  callTimeout: FiniteDuration,
+  resetTimeout: FiniteDuration,
+  maxResetTimeout: FiniteDuration,
+  exponentialBackoffFactor: Double,
+  randomFactor: Double
 )

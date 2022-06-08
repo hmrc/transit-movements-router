@@ -20,6 +20,7 @@ import play.api.http.HeaderNames
 import uk.gov.hmrc.http.{HeaderNames => HMRCHeaderNames}
 
 object OutgoingHeaders {
+
   val headers = Seq(
     HeaderNames.DATE,
     HeaderNames.CONTENT_TYPE,

@@ -14,11 +14,10 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovementsrouter.services
+package uk.gov.hmrc.transitmovementsrouter.connectors
 
 import cats.Applicative
 import cats.implicits.toFunctorOps
-import com.google.inject.ImplementedBy
 import retry.PolicyDecision
 import retry.PolicyDecision.DelayAndRetry
 import retry.PolicyDecision.GiveUp
@@ -27,28 +26,20 @@ import retry.RetryPolicy
 import retry.RetryStatus
 import uk.gov.hmrc.transitmovementsrouter.config.RetryConfig
 
-import javax.inject.Singleton
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
 
-@ImplementedBy(classOf[RetriesServiceImpl])
-trait RetriesService {
-  def createRetryPolicy(config: RetryConfig)(implicit ec: ExecutionContext): RetryPolicy[Future]
-}
+trait Retries {
 
-@Singleton
-class RetriesServiceImpl extends RetriesService {
-
-  override def createRetryPolicy(
+  def createRetryPolicy(
     config: RetryConfig
-  )(implicit ec: ExecutionContext): RetryPolicy[Future] = {
+  )(implicit ec: ExecutionContext): RetryPolicy[Future] =
     limitRetriesByTotalTime(
       config.timeout,
       RetryPolicies.limitRetries[Future](config.maxRetries) join RetryPolicies
         .constantDelay[Future](config.delay)
     )
-  }
 
   def limitRetriesByTotalTime[M[_]: Applicative](
     threshold: FiniteDuration,

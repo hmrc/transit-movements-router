@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovementsrouter.services
+package uk.gov.hmrc.transitmovementsrouter.connectors
 
 import cats.implicits.catsStdInstancesForFuture
 import org.scalatest.concurrent.ScalaFutures
@@ -31,13 +31,13 @@ import scala.concurrent.Future
 
 class RetriesServiceSpec extends AnyFreeSpec with Matchers with ScalaFutures {
 
-  "when provided with the RetriesServiceImpl" - {
+  object RetriesHarness extends Retries
 
-    val sut = new RetriesServiceImpl()
+  "when provided with the RetriesServiceImpl" - {
 
     "with 3 retries, 0.1s delay and 10 seconds total time should retry 3 times for 4 invocations total" in {
 
-      val policy = sut.createRetryPolicy(RetryConfig(3, 100.milliseconds, 10.seconds))
+      val policy = RetriesHarness.createRetryPolicy(RetryConfig(3, 100.milliseconds, 10.seconds))
 
       var counted = 0
       Await.result(
@@ -56,7 +56,7 @@ class RetriesServiceSpec extends AnyFreeSpec with Matchers with ScalaFutures {
 
     "with 3 retries, 0.2s delay and 0.1s total time should retry 0 times for 1 invocation total" in {
 
-      val policy = sut.createRetryPolicy(RetryConfig(3, 200.milliseconds, 100.milliseconds))
+      val policy = RetriesHarness.createRetryPolicy(RetryConfig(3, 200.milliseconds, 100.milliseconds))
 
       var counted = 0
       Await.result(
@@ -75,7 +75,7 @@ class RetriesServiceSpec extends AnyFreeSpec with Matchers with ScalaFutures {
 
     "with 3 retries, 0.16s delay and 0.3s total time should retry 1 times for 2 invocations total" in {
 
-      val policy = sut.createRetryPolicy(RetryConfig(3, 160.milliseconds, 300.milliseconds))
+      val policy = RetriesHarness.createRetryPolicy(RetryConfig(3, 160.milliseconds, 300.milliseconds))
 
       var counted = 0
       Await.result(
@@ -94,7 +94,7 @@ class RetriesServiceSpec extends AnyFreeSpec with Matchers with ScalaFutures {
 
     "with 3 retries, 0s delay and 0.2s total time with a thread sleep of 0.11 seconds should retry 1 times for 2 invocations total" in {
 
-      val policy = sut.createRetryPolicy(RetryConfig(3, 0.milliseconds, 200.milliseconds))
+      val policy = RetriesHarness.createRetryPolicy(RetryConfig(3, 0.milliseconds, 200.milliseconds))
 
       var counted = 0
       Await.result(
@@ -114,7 +114,7 @@ class RetriesServiceSpec extends AnyFreeSpec with Matchers with ScalaFutures {
 
     "with 3 retries, 0s delay and 0.1s total time with a thread sleep of 0.11 seconds should retry 0 times for 1 invocation total" in {
 
-      val policy = sut.createRetryPolicy(RetryConfig(3, 0.milliseconds, 100.milliseconds))
+      val policy = RetriesHarness.createRetryPolicy(RetryConfig(3, 0.milliseconds, 100.milliseconds))
 
       var counted = 0
       Await.result(
@@ -123,7 +123,8 @@ class RetriesServiceSpec extends AnyFreeSpec with Matchers with ScalaFutures {
           (_: Unit) => Future.successful(false),
           (_: Unit, _) => Future.unit
         ) {
-          Thread.sleep(110)         Future.successful(counted += 1)
+          Thread.sleep(110)
+          Future.successful(counted += 1)
         },
         1.seconds
       )

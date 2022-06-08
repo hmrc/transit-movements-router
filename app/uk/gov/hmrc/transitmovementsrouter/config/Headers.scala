@@ -20,7 +20,7 @@ import play.api.ConfigLoader
 
 object Headers {
 
-  implicit val configLoader: ConfigLoader[Headers] = ConfigLoader {
+  implicit lazy val configLoader: ConfigLoader[Headers] = ConfigLoader {
     rootConfig => path =>
       Headers(rootConfig.getConfig(path).getString("bearerToken"))
   }
