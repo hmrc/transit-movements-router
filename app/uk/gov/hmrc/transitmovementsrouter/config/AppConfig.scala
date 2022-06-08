@@ -26,8 +26,8 @@ class AppConfig @Inject() (config: Configuration) {
 
   lazy val appName: String = config.get[String]("appName")
 
-  lazy val eisNi: EISInstanceConfig = config.get[EISInstanceConfig]("ni")
-  lazy val eisGb: EISInstanceConfig = config.get[EISInstanceConfig]("gb")
+  lazy val eisNi: EISInstanceConfig = config.get[EISInstanceConfig]("microservice.services.eis.ni")
+  lazy val eisGb: EISInstanceConfig = config.get[EISInstanceConfig]("microservice.services.eis.gb")
 
   lazy val headerCarrierConfig: HeaderCarrier.Config = HeaderCarrier.Config.fromConfig(config.underlying)
 }

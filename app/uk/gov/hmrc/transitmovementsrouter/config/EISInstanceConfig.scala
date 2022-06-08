@@ -31,8 +31,8 @@ object EISInstanceConfig {
           config.get[Int]("port"),
           config.get[String]("uri"),
           config.get[Headers]("headers"),
-          config.get[CircuitBreakerConfig]("circuitBreaker"),
-          config.get[RetryConfig]("retryConfig")
+          config.get[CircuitBreakerConfig]("circuit-breaker"),
+          config.get[RetryConfig]("retry")
         )
     }
 
