@@ -29,7 +29,7 @@ import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
-class RetriesServiceSpec extends AnyFreeSpec with Matchers with ScalaFutures {
+class RetriesSpec extends AnyFreeSpec with Matchers with ScalaFutures {
 
   object RetriesHarness extends Retries
 
