@@ -40,7 +40,6 @@ import scala.concurrent.Future
 import scala.util.Try
 import scala.util.control.NonFatal
 
-@ImplementedBy(classOf[MessageConnectorImpl])
 trait MessageConnector {
 
   def post(messageSender: MessageSender, body: Source[ByteString, _], hc: HeaderCarrier): Future[Either[UpstreamErrorResponse, Unit]]
@@ -52,14 +51,14 @@ class MessageConnectorImpl(
   val code: String,
   val eisInstanceConfig: EISInstanceConfig,
   headerCarrierConfig: HeaderCarrier.Config,
-  ws: WSClient
+  ws: WSClient,
+  retries: Retries
 )(implicit
   ec: ExecutionContext,
   val materializer: Materializer
 ) extends MessageConnector
     with Logging
-    with CircuitBreakers
-    with Retries {
+    with CircuitBreakers {
 
   def getHeader(header: String, url: String)(implicit hc: HeaderCarrier): String =
     hc
@@ -106,7 +105,7 @@ class MessageConnectorImpl(
 
   override def post(messageSender: MessageSender, body: Source[ByteString, _], hc: HeaderCarrier): Future[Either[UpstreamErrorResponse, Unit]] =
     retryingOnFailures(
-      createRetryPolicy(eisInstanceConfig.retryConfig),
+      retries.createRetryPolicy(eisInstanceConfig.retryConfig),
       (t: Either[UpstreamErrorResponse, Unit]) => Future.successful(t.isRight),
       onFailure
     ) {

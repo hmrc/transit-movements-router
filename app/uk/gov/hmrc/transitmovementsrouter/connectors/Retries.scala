@@ -18,6 +18,7 @@ package uk.gov.hmrc.transitmovementsrouter.connectors
 
 import cats.Applicative
 import cats.implicits.toFunctorOps
+import com.google.inject.ImplementedBy
 import retry.PolicyDecision
 import retry.PolicyDecision.DelayAndRetry
 import retry.PolicyDecision.GiveUp
@@ -30,7 +31,14 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
 
+@ImplementedBy(classOf[RetriesImpl])
 trait Retries {
+
+  def createRetryPolicy(config: RetryConfig)(implicit ec: ExecutionContext): RetryPolicy[Future]
+
+}
+
+class RetriesImpl {
 
   def createRetryPolicy(
     config: RetryConfig

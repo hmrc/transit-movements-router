@@ -29,19 +29,19 @@ import scala.concurrent.ExecutionContext
 trait MessageConnectorProvider {
 
   def gb: MessageConnector
-  def ni: MessageConnector
+  def xi: MessageConnector
 
 }
 
 @Singleton // singleton as the message connectors need to be singletons for the circuit breakers.
 class MessageConnectorProviderImpl @Inject() (
   appConfig: AppConfig,
-  retriesService: Retries,
+  retries: Retries,
   ws: WSClient
 )(implicit ec: ExecutionContext, mat: Materializer)
     extends MessageConnectorProvider {
 
-  lazy val gb: MessageConnector = new MessageConnectorImpl("GB", appConfig.eisGb, appConfig.headerCarrierConfig, ws)
-  lazy val ni: MessageConnector = new MessageConnectorImpl("NI", appConfig.eisNi, appConfig.headerCarrierConfig, ws)
+  lazy val gb: MessageConnector = new MessageConnectorImpl("GB", appConfig.eisGb, appConfig.headerCarrierConfig, ws, retries)
+  lazy val xi: MessageConnector = new MessageConnectorImpl("XI", appConfig.eisNi, appConfig.headerCarrierConfig, ws, retries)
 
 }
