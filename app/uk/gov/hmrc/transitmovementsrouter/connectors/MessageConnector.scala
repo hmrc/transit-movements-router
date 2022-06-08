@@ -19,7 +19,6 @@ package uk.gov.hmrc.transitmovementsrouter.connectors
 import akka.stream.Materializer
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
-import com.google.inject.ImplementedBy
 import play.api.Logging
 import play.api.http.HeaderNames
 import play.api.http.MimeTypes
@@ -33,6 +32,9 @@ import uk.gov.hmrc.http.UpstreamErrorResponse
 import uk.gov.hmrc.http.{HeaderNames => HMRCHeaderNames}
 import uk.gov.hmrc.transitmovementsrouter.config.EISInstanceConfig
 import uk.gov.hmrc.transitmovementsrouter.models.MessageSender
+import uk.gov.hmrc.transitmovementsrouter.service.error.RoutingError
+import uk.gov.hmrc.transitmovementsrouter.service.error.RoutingError.Unexpected
+import uk.gov.hmrc.transitmovementsrouter.service.error.RoutingError.Upstream
 
 import java.util.UUID
 import scala.concurrent.ExecutionContext
@@ -42,7 +44,7 @@ import scala.util.control.NonFatal
 
 trait MessageConnector {
 
-  def post(messageSender: MessageSender, body: Source[ByteString, _], hc: HeaderCarrier): Future[Either[UpstreamErrorResponse, Unit]]
+  def post(messageSender: MessageSender, body: Source[ByteString, _], hc: HeaderCarrier): Future[Either[RoutingError, Unit]]
 
 }
 
@@ -77,15 +79,18 @@ class MessageConnectorImpl(
   private def shouldCauseRetry(status: Int): Boolean =
     Status.isServerError(status)
 
-  def shouldCauseCircuitBreakerStrike(result: Try[Either[UpstreamErrorResponse, Unit]]): Boolean =
+  def shouldCauseCircuitBreakerStrike(result: Try[Either[RoutingError, Unit]]): Boolean =
     result.map(_.isLeft).getOrElse(true)
 
-  def onFailure(response: Either[UpstreamErrorResponse, Unit], retryDetails: RetryDetails): Future[Unit] = {
-    val statusCode    = response.left.get.statusCode // we always have a left
+  def onFailure(response: Either[RoutingError, Unit], retryDetails: RetryDetails): Future[Unit] = {
+    val message: String = response.left.get match {
+      case Upstream(upstreamErrorResponse) => s"with status code ${upstreamErrorResponse.statusCode}"
+      case Unexpected(message, _)          => s"with error $message"
+    }
     val attemptNumber = retryDetails.retriesSoFar + 1
     if (retryDetails.givingUp) {
       logger.error(
-        s"Message when routing to $code failed with status code $statusCode. " +
+        s"Message when routing to $code failed $message\n" +
           s"Attempted $attemptNumber times in ${retryDetails.cumulativeDelay.toSeconds} seconds, giving up."
       )
     } else {
@@ -96,17 +101,17 @@ class MessageConnectorImpl(
           )
           .getOrElse("immediately")
       logger.warn(
-        s"Message when routing to $code failed with status code $statusCode. " +
+        s"Message when routing to $code failed with $message\n" +
           s"Attempted $attemptNumber times in ${retryDetails.cumulativeDelay.toSeconds} seconds so far, trying again $nextAttempt."
       )
     }
     Future.unit
   }
 
-  override def post(messageSender: MessageSender, body: Source[ByteString, _], hc: HeaderCarrier): Future[Either[UpstreamErrorResponse, Unit]] =
+  override def post(messageSender: MessageSender, body: Source[ByteString, _], hc: HeaderCarrier): Future[Either[RoutingError, Unit]] =
     retryingOnFailures(
       retries.createRetryPolicy(eisInstanceConfig.retryConfig),
-      (t: Either[UpstreamErrorResponse, Unit]) => Future.successful(t.isRight),
+      (t: Either[RoutingError, Unit]) => Future.successful(t.isRight),
       onFailure
     ) {
       val requestHeaders = hc.headers(OutgoingHeaders.headers) ++ Seq(
@@ -131,7 +136,7 @@ class MessageConnectorImpl(
                 |CustomProcessHost: ${getHeader("CustomProcessHost", eisInstanceConfig.url)(headerCarrier)}
                 |""".stripMargin
 
-      withCircuitBreaker[Either[UpstreamErrorResponse, Unit]](shouldCauseCircuitBreakerStrike) {
+      withCircuitBreaker[Either[RoutingError, Unit]](shouldCauseCircuitBreakerStrike) {
         ws.url(eisInstanceConfig.url)
           .addHttpHeaders(headerCarrier.headersForUrl(headerCarrierConfig)(eisInstanceConfig.url): _*)
           .post(body)
@@ -140,17 +145,20 @@ class MessageConnectorImpl(
               val logMessageWithStatus = logMessage + s"Response status: ${result.status}"
               if (statusCodeFailure(result.status)) {
                 logger.warn(logMessageWithStatus)
-                Left(UpstreamErrorResponse(s"Request Error: Routing to $code returned status code ${result.status}", result.status))
               } else {
                 logger.info(logMessageWithStatus)
-                Right(())
               }
+
+              if (result.status > 399)
+                Left(RoutingError.Upstream(UpstreamErrorResponse(s"Request Error: Routing to $code returned status code ${result.status}", result.status)))
+              else
+                Right(())
           }
           .recover {
             case NonFatal(e) =>
               val message = logMessage + s"Request Error: Routing to $code failed to retrieve data with message ${e.getMessage}"
               logger.error(message)
-              Left(UpstreamErrorResponse(message = message, statusCode = Status.INTERNAL_SERVER_ERROR))
+              Left(RoutingError.Unexpected(message, Some(e)))
           }
       }
     }

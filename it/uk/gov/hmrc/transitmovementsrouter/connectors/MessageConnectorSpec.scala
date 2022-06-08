@@ -20,6 +20,7 @@ import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.stubbing.Scenario
+import org.mockito.ArgumentMatchers
 import org.mockito.ArgumentMatchers.anyString
 import org.mockito.Mockito.when
 import org.scalacheck.Gen
@@ -33,6 +34,7 @@ import org.scalatestplus.mockito.MockitoSugar
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import play.api.http.HeaderNames
 import play.api.libs.ws.WSClient
+import play.api.libs.ws.WSRequest
 import play.api.libs.ws.ahc.AhcWSClient
 import play.api.test.Helpers._
 import retry.RetryPolicies
@@ -45,6 +47,7 @@ import uk.gov.hmrc.transitmovementsrouter.config.EISInstanceConfig
 import uk.gov.hmrc.transitmovementsrouter.config.Headers
 import uk.gov.hmrc.transitmovementsrouter.config.RetryConfig
 import uk.gov.hmrc.transitmovementsrouter.models.MessageSender
+import uk.gov.hmrc.transitmovementsrouter.service.error.RoutingError
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -87,30 +90,32 @@ class MessageConnectorSpec
     Headers("bearertokenhereGB"),
     CircuitBreakerConfig(
       3,
-      10.seconds,
-      20.seconds,
-      20.seconds,
+      1.seconds,
+      2.seconds,
+      3.seconds,
       1,
       0
     ),
     RetryConfig(
       1,
       1.second,
-      10.seconds
+      2.seconds
     )
   )
 
-  val noRetriesConnector = new MessageConnectorImpl("NoRetry", connectorConfig, TestHelpers.headerCarrierConfig, AhcWSClient(), NoRetries)
-  val oneRetryConnector  = new MessageConnectorImpl("OneRetry", connectorConfig, TestHelpers.headerCarrierConfig, AhcWSClient(), OneRetry)
+  def noRetriesConnector = new MessageConnectorImpl("NoRetry", connectorConfig, TestHelpers.headerCarrierConfig, AhcWSClient(), NoRetries)
+  def oneRetryConnector  = new MessageConnectorImpl("OneRetry", connectorConfig, TestHelpers.headerCarrierConfig, AhcWSClient(), OneRetry)
 
-  lazy val connectorGen: Gen[MessageConnector] = Gen.oneOf(noRetriesConnector, oneRetryConnector)
+  lazy val connectorGen: Gen[() => MessageConnector] = Gen.oneOf(() => noRetriesConnector, () => oneRetryConnector)
 
-  lazy val source: Source[ByteString, _] = Source.single(ByteString.fromString("<test></test>"))
+  def source: Source[ByteString, _] = Source.single(ByteString.fromString("<test></test>"))
 
   "post" should {
 
     "add CustomProcessHost and X-Correlation-Id headers to messages for GB" in forAll(connectorGen) {
       connector =>
+        server.resetAll() // Need to reset due to the forAll - it's technically the same test
+
         // Important note: while this test considers successes, as this connector has a retry function,
         // we have to ensure that any success result is not retried. To do this, we make the stub return
         // a 202 status the first time it is called, then we transition it into a state where it'll return
@@ -146,13 +151,15 @@ class MessageConnectorSpec
 
         val hc = HeaderCarrier()
 
-        whenReady(connector.post(MessageSender("sender"), source, hc)) {
+        whenReady(connector().post(MessageSender("sender"), source, hc)) {
           _.isRight mustBe true
         }
     }
 
     "return a unit when post is successful" in forAll(connectorGen) {
       connector =>
+        server.resetAll() // Need to reset due to the forAll - it's technically the same test
+
         def stub(currentState: String, targetState: String, codeToReturn: Int) =
           server.stubFor(
             post(
@@ -178,7 +185,7 @@ class MessageConnectorSpec
 
         val hc = HeaderCarrier()
 
-        whenReady(connector.post(MessageSender("sender"), source, hc)) {
+        whenReady(connector().post(MessageSender("sender"), source, hc)) {
           _.isRight mustBe true
         }
     }
@@ -225,6 +232,8 @@ class MessageConnectorSpec
 
     "pass through error status codes" in forAll(errorCodes, connectorGen) {
       (statusCode, connector) =>
+        server.resetAll() // Need to reset due to the forAll - it's technically the same test
+
         server.stubFor(
           post(
             urlEqualTo(uriStub)
@@ -241,23 +250,30 @@ class MessageConnectorSpec
 
         val hc = HeaderCarrier()
 
-        whenReady(connector.post(MessageSender("sender"), source, hc)) {
-          result =>
-            result.left.get.statusCode mustBe statusCode
+        whenReady(connector().post(MessageSender("sender"), source, hc)) {
+          case Left(x) if x.isInstanceOf[RoutingError.Upstream] =>
+            x.asInstanceOf[RoutingError.Upstream].upstreamErrorResponse.statusCode mustBe statusCode
+          case x =>
+            println(x)
+            fail("Left was not a RoutingError.Upstream")
         }
     }
   }
 
   "handle exceptions by returning an HttpResponse with status code 500" in {
     val ws = mock[WSClient]
-    when(ws.url(anyString())).thenThrow(new RuntimeException("Simulated error"))
+    val request = mock[WSRequest]
+    val error = new RuntimeException("Simulated error")
+    when(ws.url(anyString())).thenReturn(request)
+    when(request.addHttpHeaders(ArgumentMatchers.any())).thenReturn(request)
+    when(request.post(ArgumentMatchers.any[Source[ByteString, _]])(ArgumentMatchers.any())).thenReturn(Future.failed(error))
 
     val hc        = HeaderCarrier()
     val connector = new MessageConnectorImpl("Failure", connectorConfig, TestHelpers.headerCarrierConfig, ws, NoRetries)
 
     whenReady(connector.post(MessageSender("sender"), source, hc)) {
-      result =>
-        result.left.get.statusCode mustBe INTERNAL_SERVER_ERROR
+      case Left(x) if x.isInstanceOf[RoutingError.Unexpected] => x.asInstanceOf[RoutingError.Unexpected].cause mustBe Some(error)
+      case _ => fail("Left was not a RoutingError.Unexpected")
     }
   }
 }
