@@ -20,7 +20,7 @@ import uk.gov.hmrc.http.UpstreamErrorResponse
 
 object RoutingError {
   case class Upstream(upstreamErrorResponse: UpstreamErrorResponse) extends RoutingError
-  case class Unexpected(message: String, cause: Option[Throwable]) extends RoutingError
+  case class Unexpected(message: String, cause: Option[Throwable])  extends RoutingError
 }
 
 sealed trait RoutingError

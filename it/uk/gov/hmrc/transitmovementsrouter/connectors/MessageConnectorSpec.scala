@@ -261,9 +261,9 @@ class MessageConnectorSpec
   }
 
   "handle exceptions by returning an HttpResponse with status code 500" in {
-    val ws = mock[WSClient]
+    val ws      = mock[WSClient]
     val request = mock[WSRequest]
-    val error = new RuntimeException("Simulated error")
+    val error   = new RuntimeException("Simulated error")
     when(ws.url(anyString())).thenReturn(request)
     when(request.addHttpHeaders(ArgumentMatchers.any())).thenReturn(request)
     when(request.post(ArgumentMatchers.any[Source[ByteString, _]])(ArgumentMatchers.any())).thenReturn(Future.failed(error))
@@ -273,7 +273,7 @@ class MessageConnectorSpec
 
     whenReady(connector.post(MessageSender("sender"), source, hc)) {
       case Left(x) if x.isInstanceOf[RoutingError.Unexpected] => x.asInstanceOf[RoutingError.Unexpected].cause mustBe Some(error)
-      case _ => fail("Left was not a RoutingError.Unexpected")
+      case _                                                  => fail("Left was not a RoutingError.Unexpected")
     }
   }
 }
