@@ -16,7 +16,6 @@
 
 package uk.gov.hmrc.transitmovementsrouter.connectors
 
-import akka.stream.Materializer
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import com.github.tomakehurst.wiremock.client.WireMock._
@@ -28,24 +27,27 @@ import org.scalatest.concurrent.IntegrationPatience
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.prop.TableDrivenPropertyChecks
+import org.scalatest.time.SpanSugar.convertIntToGrainOfTime
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.mockito.MockitoSugar
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import play.api.http.HeaderNames
-import play.api.inject.bind
-import play.api.inject.guice.GuiceApplicationBuilder
 import play.api.libs.ws.WSClient
-import play.api.libs.ws.WSRequest
+import play.api.libs.ws.ahc.AhcWSClient
 import play.api.test.Helpers._
 import retry.RetryPolicies
 import retry.RetryPolicy
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.transitmovementsrouter.base.TestActorSystem
-import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
+import uk.gov.hmrc.transitmovementsrouter.base.TestHelpers
+import uk.gov.hmrc.transitmovementsrouter.config.CircuitBreakerConfig
+import uk.gov.hmrc.transitmovementsrouter.config.EISInstanceConfig
+import uk.gov.hmrc.transitmovementsrouter.config.Headers
 import uk.gov.hmrc.transitmovementsrouter.config.RetryConfig
 import uk.gov.hmrc.transitmovementsrouter.models.MessageSender
 
 import scala.concurrent.ExecutionContext
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 class MessageConnectorSpec
@@ -75,143 +77,139 @@ class MessageConnectorSpec
       RetryPolicies.limitRetries[Future](1)(cats.implicits.catsStdInstancesForFuture(ec))
   }
 
-  lazy val appWithNoRetries: GuiceApplicationBuilder =
-    appBuilder.bindings(bind[Retries].toInstance(NoRetries))
+  val uriStub = "/transit-movements-eis-stub/movements/messages"
 
-  lazy val appWithOneRetry: GuiceApplicationBuilder =
-    appBuilder.bindings(bind[Retries].toInstance(OneRetry))
+  val connectorConfig: EISInstanceConfig = EISInstanceConfig(
+    "http",
+    "localhost",
+    wiremockPort,
+    uriStub,
+    Headers("bearertokenhereGB"),
+    CircuitBreakerConfig(
+      3,
+      10.seconds,
+      20.seconds,
+      20.seconds,
+      1,
+      0
+    ),
+    RetryConfig(
+      1,
+      1.second,
+      10.seconds
+    )
+  )
 
-  lazy val appBuilderGen: Gen[GuiceApplicationBuilder] =
-    Gen.oneOf(appWithOneRetry, appWithNoRetries)
+  val noRetriesConnector = new MessageConnectorImpl("NoRetry", connectorConfig, TestHelpers.headerCarrierConfig, AhcWSClient(), NoRetries)
+  val oneRetryConnector  = new MessageConnectorImpl("OneRetry", connectorConfig, TestHelpers.headerCarrierConfig, AhcWSClient(), OneRetry)
+
+  lazy val connectorGen: Gen[MessageConnector] = Gen.oneOf(noRetriesConnector, oneRetryConnector)
 
   lazy val source: Source[ByteString, _] = Source.single(ByteString.fromString("<test></test>"))
 
   "post" should {
 
-    "add CustomProcessHost and X-Correlation-Id headers to messages for GB" in forAll(
-      appBuilderGen
-    ) {
-      appBuilder =>
-        server.resetAll()
-        val app = appBuilder.build()
+    "add CustomProcessHost and X-Correlation-Id headers to messages for GB" in forAll(connectorGen) {
+      connector =>
+        // Important note: while this test considers successes, as this connector has a retry function,
+        // we have to ensure that any success result is not retried. To do this, we make the stub return
+        // a 202 status the first time it is called, then we transition it into a state where it'll return
+        // an error. As the retry algorithm should not attempt a retry on a 202, the stub should only be
+        // called once - so a 500 should never be returned.
+        //
+        // If a 500 error is returned, this most likely means a retry happened, the first place to look
+        // should be the code the determines if a result is successful.
 
-        running(app) {
-
-          // Important note: while this test considers successes, as this connector has a retry function,
-          // we have to ensure that any success result is not retried. To do this, we make the stub return
-          // a 202 status the first time it is called, then we transition it into a state where it'll return
-          // an error. As the retry algorithm should not attempt a retry on a 202, the stub should only be
-          // called once - so a 500 should never be returned.
-          //
-          // If a 500 error is returned, this most likely means a retry happened, the first place to look
-          // should be the code the determines if a result is successful.
-
-          def stub(currentState: String, targetState: String, codeToReturn: Int) =
-            server.stubFor(
-              post(
-                urlEqualTo("/transit-movements-eis-stub/movements/messages")
-              )
-                .inScenario("Standard Call")
-                .whenScenarioStateIs(currentState)
-                .withHeader(
-                  "X-Correlation-Id",
-                  matching(
-                    "\\b[0-9a-f]{8}\\b-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-\\b[0-9a-f]{12}\\b"
-                  )
-                )
-                .withHeader("CustomProcessHost", equalTo("Digital"))
-                .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
-                .willReturn(aResponse().withStatus(codeToReturn))
-                .willSetStateTo(targetState)
-            )
-
-          val connector = app.injector.instanceOf[MessageConnector]
-
-          val secondState = "should now fail"
-
-          stub(Scenario.STARTED, secondState, ACCEPTED)
-          stub(secondState, secondState, INTERNAL_SERVER_ERROR)
-
-          val hc = HeaderCarrier()
-
-          whenReady(connector.post(MessageSender("sender"), source, hc)) {
-            _.isRight mustBe true
-          }
-        }
-    }
-
-    "return a unit when post is successful" in forAll(appBuilderGen) {
-      appBuilder =>
-        server.resetAll()
-        val app = appBuilder.build()
-
-        running(app) {
-          def stub(currentState: String, targetState: String, codeToReturn: Int) =
-            server.stubFor(
-              post(
-                urlEqualTo("/transit-movements-eis-stub/movements/messages")
-              ).withHeader("Authorization", equalTo("Bearer bearertokenhereGB"))
-                .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
-                .withHeader(
-                  "X-Correlation-Id",
-                  matching(
-                    "\\b[0-9a-f]{8}\\b-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-\\b[0-9a-f]{12}\\b"
-                  )
-                )
-                .inScenario("Standard Call")
-                .whenScenarioStateIs(currentState)
-                .willReturn(aResponse().withStatus(codeToReturn))
-                .willSetStateTo(targetState)
-            )
-
-          val connector = app.injector.instanceOf[MessageConnector]
-
-          val secondState = "should now fail"
-
-          stub(Scenario.STARTED, secondState, ACCEPTED)
-          stub(secondState, secondState, INTERNAL_SERVER_ERROR)
-
-          val hc = HeaderCarrier()
-
-          whenReady(connector.post(MessageSender("sender"), source, hc)) {
-            _.isRight mustBe true
-          }
-        }
-    }
-
-    "return unit when post is successful on retry if there is an initial failure" in {
-      val app = appWithOneRetry.build()
-
-      running(app) {
         def stub(currentState: String, targetState: String, codeToReturn: Int) =
           server.stubFor(
             post(
-              urlEqualTo("/transits-movements-trader-at-departure-stub/movements/departures/gb")
+              urlEqualTo(uriStub)
             )
-              .inScenario("Flaky Call")
+              .inScenario("Standard Call")
               .whenScenarioStateIs(currentState)
-              .willSetStateTo(targetState)
-              .withHeader("Authorization", equalTo("Bearer bearertokenhereGB"))
-              .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
               .withHeader(
                 "X-Correlation-Id",
-                matching("\\b[0-9a-f]{8}\\b-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-\\b[0-9a-f]{12}\\b")
+                matching(
+                  "\\b[0-9a-f]{8}\\b-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-\\b[0-9a-f]{12}\\b"
+                )
               )
+              .withHeader("CustomProcessHost", equalTo("Digital"))
+              .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
               .willReturn(aResponse().withStatus(codeToReturn))
+              .willSetStateTo(targetState)
           )
 
-        val connector = app.injector.instanceOf[MessageConnector]
+        val secondState = "should now fail"
 
-        val secondState = "should now succeed"
-
-        stub(Scenario.STARTED, secondState, INTERNAL_SERVER_ERROR)
-        stub(secondState, secondState, ACCEPTED)
+        stub(Scenario.STARTED, secondState, ACCEPTED)
+        stub(secondState, secondState, INTERNAL_SERVER_ERROR)
 
         val hc = HeaderCarrier()
 
         whenReady(connector.post(MessageSender("sender"), source, hc)) {
           _.isRight mustBe true
         }
+    }
+
+    "return a unit when post is successful" in forAll(connectorGen) {
+      connector =>
+        def stub(currentState: String, targetState: String, codeToReturn: Int) =
+          server.stubFor(
+            post(
+              urlEqualTo(uriStub)
+            ).withHeader("Authorization", equalTo("Bearer bearertokenhereGB"))
+              .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
+              .withHeader(
+                "X-Correlation-Id",
+                matching(
+                  "\\b[0-9a-f]{8}\\b-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-\\b[0-9a-f]{12}\\b"
+                )
+              )
+              .inScenario("Standard Call")
+              .whenScenarioStateIs(currentState)
+              .willReturn(aResponse().withStatus(codeToReturn))
+              .willSetStateTo(targetState)
+          )
+
+        val secondState = "should now fail"
+
+        stub(Scenario.STARTED, secondState, ACCEPTED)
+        stub(secondState, secondState, INTERNAL_SERVER_ERROR)
+
+        val hc = HeaderCarrier()
+
+        whenReady(connector.post(MessageSender("sender"), source, hc)) {
+          _.isRight mustBe true
+        }
+    }
+
+    "return unit when post is successful on retry if there is an initial failure" in {
+      def stub(currentState: String, targetState: String, codeToReturn: Int) =
+        server.stubFor(
+          post(
+            urlEqualTo(uriStub)
+          )
+            .inScenario("Flaky Call")
+            .whenScenarioStateIs(currentState)
+            .willSetStateTo(targetState)
+            .withHeader("Authorization", equalTo("Bearer bearertokenhereGB"))
+            .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
+            .withHeader(
+              "X-Correlation-Id",
+              matching("\\b[0-9a-f]{8}\\b-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-\\b[0-9a-f]{12}\\b")
+            )
+            .willReturn(aResponse().withStatus(codeToReturn))
+        )
+
+      val secondState = "should now succeed"
+
+      stub(Scenario.STARTED, secondState, INTERNAL_SERVER_ERROR)
+      stub(secondState, secondState, ACCEPTED)
+
+      val hc = HeaderCarrier()
+
+      whenReady(oneRetryConnector.post(MessageSender("sender"), source, hc)) {
+        _.isRight mustBe true
       }
     }
 
@@ -225,58 +223,41 @@ class MessageConnectorSpec
       )
     )
 
-    "pass through error status codes" in forAll(errorCodes, appBuilderGen) {
-      (statusCode, appBuilder) =>
-        val app = appBuilder.build()
-
-        running(app) {
-          val connector = app.injector.instanceOf[MessageConnector]
-
-          server.stubFor(
-            post(
-              urlEqualTo("/transits-movements-trader-at-departure-stub/movements/departures/gb")
-            ).withHeader("Authorization", equalTo("Bearer bearertokenhereGB"))
-              .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
-              .withHeader(
-                "X-Correlation-Id",
-                matching(
-                  "\\b[0-9a-f]{8}\\b-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-\\b[0-9a-f]{12}\\b"
-                )
+    "pass through error status codes" in forAll(errorCodes, connectorGen) {
+      (statusCode, connector) =>
+        server.stubFor(
+          post(
+            urlEqualTo(uriStub)
+          ).withHeader("Authorization", equalTo("Bearer bearertokenhereGB"))
+            .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
+            .withHeader(
+              "X-Correlation-Id",
+              matching(
+                "\\b[0-9a-f]{8}\\b-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-\\b[0-9a-f]{12}\\b"
               )
-              .willReturn(aResponse().withStatus(statusCode))
-          )
+            )
+            .willReturn(aResponse().withStatus(statusCode))
+        )
 
-          val hc = HeaderCarrier()
+        val hc = HeaderCarrier()
 
-          whenReady(connector.post(MessageSender("sender"), source, hc)) {
-            result =>
-              result.left.get.statusCode mustBe statusCode
-          }
+        whenReady(connector.post(MessageSender("sender"), source, hc)) {
+          result =>
+            result.left.get.statusCode mustBe statusCode
         }
     }
+  }
 
-    "handle exceptions by returning an HttpResponse with status code 500" in forAll(appBuilderGen) {
-      appBuilder =>
-        val app = appBuilder.build()
+  "handle exceptions by returning an HttpResponse with status code 500" in {
+    val ws = mock[WSClient]
+    when(ws.url(anyString())).thenThrow(new RuntimeException("Simulated error"))
 
-        running(app) {
-          implicit val ec           = app.injector.instanceOf[ExecutionContext]
-          implicit val materializer = app.injector.instanceOf[Materializer]
-          val appConfig             = app.injector.instanceOf[AppConfig]
-          val ws                    = mock[WSClient]
+    val hc        = HeaderCarrier()
+    val connector = new MessageConnectorImpl("Failure", connectorConfig, TestHelpers.headerCarrierConfig, ws, NoRetries)
 
-          val request = mock[WSRequest]
-
-          when(ws.url(anyString())).thenThrow(new RuntimeException("Simulated error"))
-
-          val connector = new MessageConnectorImpl("GB", appConfig.eisGb, appConfig.headerCarrierConfig, ws, NoRetries)
-          val hc        = HeaderCarrier()
-
-          whenReady(connector.post(MessageSender("sender"), source, hc)) {
-            result =>
-              result.left.get.statusCode mustBe INTERNAL_SERVER_ERROR
-          }
-        }
+    whenReady(connector.post(MessageSender("sender"), source, hc)) {
+      result =>
+        result.left.get.statusCode mustBe INTERNAL_SERVER_ERROR
     }
   }
 }

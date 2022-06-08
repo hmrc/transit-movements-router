@@ -34,16 +34,6 @@ trait WiremockSuite extends BeforeAndAfterAll with BeforeAndAfterEach {
 
   protected val server: WireMockServer = new WireMockServer(wiremockConfig)
 
-  protected def appBuilder: GuiceApplicationBuilder =
-    new GuiceApplicationBuilder()
-      .configure(
-        "microservice.services.eis.port"             -> server.port().toString,
-        "microservice.services.ncts-monitoring.port" -> server.port().toString
-      )
-      .overrides(bindings: _*)
-
-  protected def bindings: Seq[GuiceableModule] = Seq.empty
-
   override def beforeAll(): Unit = {
     server.start()
     super.beforeAll()
@@ -58,4 +48,19 @@ trait WiremockSuite extends BeforeAndAfterAll with BeforeAndAfterEach {
     super.afterAll()
     server.stop()
   }
+}
+
+trait WiremockSuiteWithGuice extends WiremockSuite {
+  this: Suite =>
+
+  protected def appBuilder: GuiceApplicationBuilder =
+    new GuiceApplicationBuilder()
+      .configure(
+        "microservice.services.eis.port"             -> server.port().toString,
+        "microservice.services.ncts-monitoring.port" -> server.port().toString
+      )
+      .overrides(bindings: _*)
+
+  protected def bindings: Seq[GuiceableModule] = Seq.empty
+
 }
