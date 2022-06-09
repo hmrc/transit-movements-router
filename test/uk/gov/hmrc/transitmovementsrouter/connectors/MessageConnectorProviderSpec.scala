@@ -105,6 +105,14 @@ class MessageConnectorProviderSpec extends AnyFreeSpec with Matchers with ScalaF
       verify(appConfig, times(0)).eisGb
     }
 
+    "both connectors are not the same" in {
+
+      // Given this message connector
+      val sut = new MessageConnectorProviderImpl(appConfig, retries, AhcWSClient())
+
+      sut.gb must not be sut.xi
+    }
+
   }
 
 }
