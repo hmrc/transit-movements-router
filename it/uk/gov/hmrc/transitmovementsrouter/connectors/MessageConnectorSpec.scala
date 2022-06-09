@@ -40,6 +40,7 @@ import play.api.test.Helpers._
 import retry.RetryPolicies
 import retry.RetryPolicy
 import uk.gov.hmrc.http.HeaderCarrier
+import uk.gov.hmrc.transitmovementsrouter.base.RegexPatterns
 import uk.gov.hmrc.transitmovementsrouter.base.TestActorSystem
 import uk.gov.hmrc.transitmovementsrouter.base.TestHelpers
 import uk.gov.hmrc.transitmovementsrouter.config.CircuitBreakerConfig
@@ -133,12 +134,7 @@ class MessageConnectorSpec
             )
               .inScenario("Standard Call")
               .whenScenarioStateIs(currentState)
-              .withHeader(
-                "X-Correlation-Id",
-                matching(
-                  "\\b[0-9a-f]{8}\\b-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-\\b[0-9a-f]{12}\\b"
-                )
-              )
+              .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
               .withHeader("CustomProcessHost", equalTo("Digital"))
               .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
               .willReturn(aResponse().withStatus(codeToReturn))
@@ -167,12 +163,7 @@ class MessageConnectorSpec
               urlEqualTo(uriStub)
             ).withHeader("Authorization", equalTo("Bearer bearertokenhereGB"))
               .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
-              .withHeader(
-                "X-Correlation-Id",
-                matching(
-                  "\\b[0-9a-f]{8}\\b-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-\\b[0-9a-f]{12}\\b"
-                )
-              )
+              .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
               .inScenario("Standard Call")
               .whenScenarioStateIs(currentState)
               .willReturn(aResponse().withStatus(codeToReturn))
@@ -202,10 +193,7 @@ class MessageConnectorSpec
             .willSetStateTo(targetState)
             .withHeader("Authorization", equalTo("Bearer bearertokenhereGB"))
             .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
-            .withHeader(
-              "X-Correlation-Id",
-              matching("\\b[0-9a-f]{8}\\b-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-\\b[0-9a-f]{12}\\b")
-            )
+            .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
             .willReturn(aResponse().withStatus(codeToReturn))
         )
 
@@ -240,12 +228,7 @@ class MessageConnectorSpec
             urlEqualTo(uriStub)
           ).withHeader("Authorization", equalTo("Bearer bearertokenhereGB"))
             .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
-            .withHeader(
-              "X-Correlation-Id",
-              matching(
-                "\\b[0-9a-f]{8}\\b-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-\\b[0-9a-f]{12}\\b"
-              )
-            )
+            .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
             .willReturn(aResponse().withStatus(statusCode))
         )
 
