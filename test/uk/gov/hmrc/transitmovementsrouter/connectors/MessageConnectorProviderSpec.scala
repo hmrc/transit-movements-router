@@ -44,7 +44,6 @@ class MessageConnectorProviderSpec extends AnyFreeSpec with Matchers with ScalaF
   val appConfig = mock[AppConfig]
   val retries   = new RetriesImpl()
 
-
   override def beforeEach(): Unit = {
     when(appConfig.eisGb).thenReturn(
       new EISInstanceConfig(
@@ -71,9 +70,8 @@ class MessageConnectorProviderSpec extends AnyFreeSpec with Matchers with ScalaF
     )
   }
 
-  override def afterEach(): Unit = {
+  override def afterEach(): Unit =
     reset(appConfig)
-  }
 
   "When creating the provider" - {
 
