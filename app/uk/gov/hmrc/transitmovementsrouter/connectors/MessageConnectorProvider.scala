@@ -42,6 +42,6 @@ class MessageConnectorProviderImpl @Inject() (
     extends MessageConnectorProvider {
 
   lazy val gb: MessageConnector = new MessageConnectorImpl("GB", appConfig.eisGb, appConfig.headerCarrierConfig, ws, retries)
-  lazy val xi: MessageConnector = new MessageConnectorImpl("XI", appConfig.eisNi, appConfig.headerCarrierConfig, ws, retries)
+  lazy val xi: MessageConnector = new MessageConnectorImpl("XI", appConfig.eisXi, appConfig.headerCarrierConfig, ws, retries)
 
 }

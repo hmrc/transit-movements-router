@@ -38,7 +38,7 @@ trait Retries {
 
 }
 
-class RetriesImpl {
+class RetriesImpl extends Retries {
 
   def createRetryPolicy(
     config: RetryConfig
