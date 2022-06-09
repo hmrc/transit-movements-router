@@ -238,7 +238,6 @@ class MessageConnectorSpec
           case Left(x) if x.isInstanceOf[RoutingError.Upstream] =>
             x.asInstanceOf[RoutingError.Upstream].upstreamErrorResponse.statusCode mustBe statusCode
           case x =>
-            println(x)
             fail("Left was not a RoutingError.Upstream")
         }
     }
