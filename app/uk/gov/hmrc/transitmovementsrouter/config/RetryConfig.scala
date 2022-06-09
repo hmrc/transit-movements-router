@@ -16,18 +16,22 @@
 
 package uk.gov.hmrc.transitmovementsrouter.config
 
-import javax.inject.Inject
-import javax.inject.Singleton
+import play.api.ConfigLoader
 import play.api.Configuration
-import uk.gov.hmrc.http.HeaderCarrier
 
-@Singleton
-class AppConfig @Inject() (config: Configuration) {
+import scala.concurrent.duration.FiniteDuration
 
-  lazy val appName: String = config.get[String]("appName")
+object RetryConfig {
 
-  lazy val eisXi: EISInstanceConfig = config.get[EISInstanceConfig]("microservice.services.eis.xi")
-  lazy val eisGb: EISInstanceConfig = config.get[EISInstanceConfig]("microservice.services.eis.gb")
+  implicit lazy val configLoader: ConfigLoader[RetryConfig] = ConfigLoader {
+    rootConfig => path =>
+      val config = Configuration(rootConfig.getConfig(path))
+      RetryConfig(
+        config.get[Int]("max-retries"),
+        config.get[FiniteDuration]("delay-between-retries"),
+        config.get[FiniteDuration]("timeout")
+      )
+  }
 
-  lazy val headerCarrierConfig: HeaderCarrier.Config = HeaderCarrier.Config.fromConfig(config.underlying)
 }
+case class RetryConfig(maxRetries: Int, delay: FiniteDuration, timeout: FiniteDuration)

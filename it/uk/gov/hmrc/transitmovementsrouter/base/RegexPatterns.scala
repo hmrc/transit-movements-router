@@ -14,20 +14,10 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovementsrouter.config
+package uk.gov.hmrc.transitmovementsrouter.base
 
-import javax.inject.Inject
-import javax.inject.Singleton
-import play.api.Configuration
-import uk.gov.hmrc.http.HeaderCarrier
+object RegexPatterns {
 
-@Singleton
-class AppConfig @Inject() (config: Configuration) {
+  val UUID: String = raw"\b[0-9a-f]{8}\b-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-\b[0-9a-f]{12}\b"
 
-  lazy val appName: String = config.get[String]("appName")
-
-  lazy val eisXi: EISInstanceConfig = config.get[EISInstanceConfig]("microservice.services.eis.xi")
-  lazy val eisGb: EISInstanceConfig = config.get[EISInstanceConfig]("microservice.services.eis.gb")
-
-  lazy val headerCarrierConfig: HeaderCarrier.Config = HeaderCarrier.Config.fromConfig(config.underlying)
 }

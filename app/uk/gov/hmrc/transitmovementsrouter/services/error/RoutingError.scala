@@ -14,20 +14,13 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovementsrouter.config
+package uk.gov.hmrc.transitmovementsrouter.services.error
 
-import javax.inject.Inject
-import javax.inject.Singleton
-import play.api.Configuration
-import uk.gov.hmrc.http.HeaderCarrier
+import uk.gov.hmrc.http.UpstreamErrorResponse
 
-@Singleton
-class AppConfig @Inject() (config: Configuration) {
-
-  lazy val appName: String = config.get[String]("appName")
-
-  lazy val eisXi: EISInstanceConfig = config.get[EISInstanceConfig]("microservice.services.eis.xi")
-  lazy val eisGb: EISInstanceConfig = config.get[EISInstanceConfig]("microservice.services.eis.gb")
-
-  lazy val headerCarrierConfig: HeaderCarrier.Config = HeaderCarrier.Config.fromConfig(config.underlying)
+object RoutingError {
+  case class Upstream(upstreamErrorResponse: UpstreamErrorResponse) extends RoutingError
+  case class Unexpected(message: String, cause: Option[Throwable])  extends RoutingError
 }
+
+sealed trait RoutingError

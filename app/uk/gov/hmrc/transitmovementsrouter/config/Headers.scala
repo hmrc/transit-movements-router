@@ -16,18 +16,14 @@
 
 package uk.gov.hmrc.transitmovementsrouter.config
 
-import javax.inject.Inject
-import javax.inject.Singleton
-import play.api.Configuration
-import uk.gov.hmrc.http.HeaderCarrier
+import play.api.ConfigLoader
 
-@Singleton
-class AppConfig @Inject() (config: Configuration) {
+object Headers {
 
-  lazy val appName: String = config.get[String]("appName")
+  implicit lazy val configLoader: ConfigLoader[Headers] = ConfigLoader {
+    rootConfig => path =>
+      Headers(rootConfig.getConfig(path).getString("bearerToken"))
+  }
 
-  lazy val eisXi: EISInstanceConfig = config.get[EISInstanceConfig]("microservice.services.eis.xi")
-  lazy val eisGb: EISInstanceConfig = config.get[EISInstanceConfig]("microservice.services.eis.gb")
-
-  lazy val headerCarrierConfig: HeaderCarrier.Config = HeaderCarrier.Config.fromConfig(config.underlying)
 }
+case class Headers(bearerToken: String)

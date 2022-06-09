@@ -14,20 +14,14 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovementsrouter.config
+package uk.gov.hmrc.transitmovementsrouter.base
 
-import javax.inject.Inject
-import javax.inject.Singleton
-import play.api.Configuration
+import play.api.inject.guice.GuiceApplicationBuilder
 import uk.gov.hmrc.http.HeaderCarrier
 
-@Singleton
-class AppConfig @Inject() (config: Configuration) {
+object TestHelpers {
 
-  lazy val appName: String = config.get[String]("appName")
+  lazy val headerCarrierConfig: HeaderCarrier.Config =
+    HeaderCarrier.Config.fromConfig(GuiceApplicationBuilder().build().configuration.underlying)
 
-  lazy val eisXi: EISInstanceConfig = config.get[EISInstanceConfig]("microservice.services.eis.xi")
-  lazy val eisGb: EISInstanceConfig = config.get[EISInstanceConfig]("microservice.services.eis.gb")
-
-  lazy val headerCarrierConfig: HeaderCarrier.Config = HeaderCarrier.Config.fromConfig(config.underlying)
 }
