@@ -1,6 +1,5 @@
 package uk.gov.hmrc.transitmovements.router.services
 
-import akka.NotUsed
 import akka.stream.alpakka.xml.scaladsl.XmlWriting
 import akka.stream.alpakka.xml.scaladsl.XmlParsing
 import akka.stream.scaladsl.Sink
@@ -87,7 +86,7 @@ class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers {
 
     val parsedResult = stream
       .via(XmlParsing.parser)
-      .via(XmlParser.messageSenderWriter(MovementMessageId("GB22222"))) // testing this
+      .via(XmlParser.messageSenderWriter(MovementMessageId("GB123456789"))) // testing this
       .via(XmlWriting.writer)
       .fold(ByteString())(_ ++ _)
       .map(_.utf8String)
@@ -95,6 +94,7 @@ class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers {
 
     whenReady(parsedResult) {
       result =>
+        println(trim(XML.loadString(result)))
         trim(XML.loadString(result)) shouldBe trim(cc015cWithExpectedMessageSenderNode.head)
     }
   }
@@ -134,7 +134,7 @@ class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers {
 
     val cc015cWithExpectedMessageSenderNode: NodeSeq =
       <CC015C>
-        <messageSender>messageSenderCharacters</messageSender>
+        <messageSender>GB123456789</messageSender>
         <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
       </CC015C>
 

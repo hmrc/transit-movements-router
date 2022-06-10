@@ -17,21 +17,12 @@
 package uk.gov.hmrc.transitmovementsrouter.services
 
 import akka.NotUsed
-import akka.stream.alpakka.xml.Characters
-import akka.stream.alpakka.xml.EndElement
-import akka.stream.scaladsl.Flow
-import akka.stream.scaladsl.Keep
-import akka.stream.scaladsl.Sink
-import uk.gov.hmrc.transitmovementsrouter.models.EoriNumber
-import uk.gov.hmrc.transitmovementsrouter.models.MessageSenderId
-import uk.gov.hmrc.transitmovementsrouter.models.MovementMessageId
-import akka.stream.alpakka.xml.ParseEvent
-import akka.stream.alpakka.xml.StartElement
-import akka.stream.alpakka.xml.javadsl.XmlWriting
+import akka.stream.alpakka.xml._
 import akka.stream.alpakka.xml.scaladsl.XmlParsing
+import akka.stream.scaladsl.Flow
+import akka.stream.scaladsl.Sink
 import akka.util.ByteString
-
-import scala.concurrent.Future
+import uk.gov.hmrc.transitmovementsrouter.models._
 
 object XmlParser extends XmlParsingServiceHelpers {
 
@@ -51,11 +42,11 @@ object XmlParser extends XmlParsingServiceHelpers {
 
   def messageSenderWriter(messageId: MovementMessageId): Flow[ParseEvent, ParseEvent, NotUsed] = Flow[ParseEvent]
     .mapConcat(
-      element => if (isElement("CC015C", element)) Seq(element, StartElement("messageSender"), Characters("messageSenderCharacters"), EndElement("messageSender")) else Seq(element)
+      element =>
+        if (isElement("CC015C", element))
+          Seq(element, StartElement("messageSender"), Characters(s"${messageId.message}"), EndElement("messageSender"))
+        else Seq(element)
     )
-    // .via(XmlWriting.writer)
-    //.map[String](_.utf8String)
-    //.toMat(Sink.fold[String, String]("")(_ + _))(Keep.right)
 
   def messageSenderWriter2(messageId: MovementMessageId): Sink[ByteString, NotUsed] = Flow[ByteString]
     .map[String](_.utf8String)
