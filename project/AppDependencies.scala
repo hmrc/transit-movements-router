@@ -6,12 +6,13 @@ import sbt._
 object AppDependencies {
 
   val compile = Seq(
-    "uk.gov.hmrc"             %% "bootstrap-backend-play-28"  % "5.24.0"
+    "uk.gov.hmrc"        %% "bootstrap-backend-play-28" % "5.24.0",
+    "com.typesafe.akka"  %% "akka-slf4j"                % PlayVersion.akkaVersion,
+    "com.lightbend.akka" %% "akka-stream-alpakka-xml"   % "3.0.4"
   )
 
   val test = Seq(
-    "uk.gov.hmrc"             %% "bootstrap-test-play-28"     % "5.24.0"             % "test, it",
-    
-    "com.vladsch.flexmark"    %  "flexmark-all"               % "0.36.8"            % "test, it"
+    "uk.gov.hmrc"         %% "bootstrap-test-play-28" % "5.24.0" % "test, it",
+    "com.vladsch.flexmark" % "flexmark-all"           % "0.36.8" % "test, it"
   )
 }
