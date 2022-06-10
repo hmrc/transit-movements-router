@@ -23,8 +23,10 @@ import akka.stream.ClosedShape
 import akka.stream.FlowShape
 import akka.stream.IOResult
 import akka.stream.Materializer
+import akka.stream.alpakka.xml.ParseEvent
 import akka.stream.alpakka.xml.StartElement
 import akka.stream.alpakka.xml.scaladsl.XmlParsing
+import akka.stream.alpakka.xml.scaladsl.XmlWriting
 import akka.stream.scaladsl.Flow
 import akka.stream.scaladsl.GraphDSL
 import akka.stream.scaladsl.Source
@@ -41,15 +43,16 @@ trait RoutingService {
 
 class RoutingServiceImpl @Inject() (implicit materializer: Materializer) extends RoutingService with XmlParsingServiceHelpers {
 
-  private def buildMessage(messageId: MovementMessageId, payload: Source[ByteString, _]): Flow[ByteString, ParseResult[_], NotUsed] =
+  private def buildMessage(messageId: MovementMessageId): Flow[ByteString, ParseEvent, NotUsed] =
     Flow.fromGraph(
       GraphDSL.create() {
         implicit builder =>
           import GraphDSL.Implicits._
 
-          val xmlParsing          = builder.add(XmlParsing.parser)
-          val insertSenderWriter  = builder.add(XmlParser.messageSenderWriter(messageId))  // prefer this way but unable to construct the nodes
-          val insertSenderWriter2 = builder.add(XmlParser.messageSenderWriter2(messageId)) // this way works but we should be able to improve!
+          val xmlParsing: FlowShape[ByteString, ParseEvent] = builder.add(XmlParsing.parser)
+          val insertSenderWriter: FlowShape[ParseEvent, ParseEvent]  = builder.add(XmlParser.messageSenderWriter(messageId))
+
+          xmlParsing ~> insertSenderWriter
 
           FlowShape(xmlParsing.in, insertSenderWriter.out)
       }
