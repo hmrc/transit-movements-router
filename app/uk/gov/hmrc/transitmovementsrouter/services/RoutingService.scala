@@ -17,22 +17,14 @@
 package uk.gov.hmrc.transitmovementsrouter.services
 
 import akka.NotUsed
-import akka.actor.ActorSystem
-import akka.stream.ActorMaterializer
-import akka.stream.ClosedShape
-import akka.stream.FlowShape
-import akka.stream.IOResult
-import akka.stream.Materializer
+import akka.stream._
 import akka.stream.alpakka.xml.ParseEvent
-import akka.stream.alpakka.xml.StartElement
 import akka.stream.alpakka.xml.scaladsl.XmlParsing
-import akka.stream.alpakka.xml.scaladsl.XmlWriting
 import akka.stream.scaladsl.Flow
 import akka.stream.scaladsl.GraphDSL
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
-import com.google.inject.ImplementedBy
-import com.google.inject.Inject
+import com.google.inject._
 import uk.gov.hmrc.transitmovementsrouter.models.MovementMessageId
 import uk.gov.hmrc.transitmovementsrouter.services.XmlParser.ParseResult
 
@@ -49,8 +41,8 @@ class RoutingServiceImpl @Inject() (implicit materializer: Materializer) extends
         implicit builder =>
           import GraphDSL.Implicits._
 
-          val xmlParsing: FlowShape[ByteString, ParseEvent] = builder.add(XmlParsing.parser)
-          val insertSenderWriter: FlowShape[ParseEvent, ParseEvent]  = builder.add(XmlParser.messageSenderWriter(messageId))
+          val xmlParsing: FlowShape[ByteString, ParseEvent]         = builder.add(XmlParsing.parser)
+          val insertSenderWriter: FlowShape[ParseEvent, ParseEvent] = builder.add(XmlParser.messageSenderWriter(messageId))
 
           xmlParsing ~> insertSenderWriter
 
