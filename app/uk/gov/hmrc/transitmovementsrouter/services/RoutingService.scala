@@ -22,6 +22,7 @@ import akka.stream.alpakka.xml.ParseEvent
 import akka.stream.alpakka.xml.scaladsl.XmlParsing
 import akka.stream.scaladsl.Flow
 import akka.stream.scaladsl.GraphDSL
+import akka.stream.scaladsl.Sink
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import com.google.inject._
@@ -43,7 +44,7 @@ class RoutingServiceImpl @Inject() (implicit materializer: Materializer) extends
 
           val xmlParsing: FlowShape[ByteString, ParseEvent]         = builder.add(XmlParsing.parser)
           val insertSenderWriter: FlowShape[ParseEvent, ParseEvent] = builder.add(XmlParser.messageSenderWriter(messageId))
-
+          val officeOfDestination                                   = builder.add(XmlParser.officeOfDestinationExtractor)
           xmlParsing ~> insertSenderWriter
 
           FlowShape(xmlParsing.in, insertSenderWriter.out)
@@ -51,4 +52,5 @@ class RoutingServiceImpl @Inject() (implicit materializer: Materializer) extends
     )
 
   override def submitDeclaration(messageId: MovementMessageId, payload: Source[ByteString, _]): Flow[ByteString, XmlParser.ParseResult[_], NotUsed] = ???
+//    payload.via(buildMessage(messageId)).run(Sink.head)
 }
