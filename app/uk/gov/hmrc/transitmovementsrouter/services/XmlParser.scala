@@ -33,7 +33,7 @@ object XmlParser extends XmlParsingServiceHelpers {
     }
     .single("messageSender")
 
-  val OfficeOfDestinationExtractor: Flow[ParseEvent, ParseResult[EoriNumber], NotUsed] = XmlParsing
+  val officeOfDestinationExtractor: Flow[ParseEvent, ParseResult[EoriNumber], NotUsed] = XmlParsing
     .subtree("CC015C" :: "CustomsOfficeOfDestinationDeclared" :: "referenceNumber" :: Nil)
     .collect {
       case element if element.getTextContent.nonEmpty => EoriNumber(element.getTextContent)
@@ -48,20 +48,9 @@ object XmlParser extends XmlParsingServiceHelpers {
         else Seq(element)
     )
 
-  def messageSenderWriter2(messageId: MovementMessageId): Sink[ByteString, NotUsed] = Flow[ByteString]
-    .map[String](_.utf8String)
-    .map(
-      s => s.split('>').toList.map(_ + ">")
-    )
-    .mapConcat(identity)
-    .map(buildLine(messageId.message, _))
-    .to(Sink.foreach(println))
-
   private def isElement(name: String, event: ParseEvent): Boolean = event match {
     case s: StartElement if s.localName == name => true
     case _                                      => false
   }
 
-  private def buildLine(element: String, message: String) =
-    if (element == "<CC015C>") element + "\n<messageSender>$message</messageSender>" else element
 }

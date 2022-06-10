@@ -54,7 +54,7 @@ class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers {
   "OfficeOfDestination parser" - new Setup {
     "when provided with a valid message" in {
       val stream       = createParsingEventStream(cc015cValidGB)
-      val parsedResult = stream.via(XmlParser.OfficeOfDestinationExtractor).runWith(Sink.head)
+      val parsedResult = stream.via(XmlParser.officeOfDestinationExtractor).runWith(Sink.head)
 
       whenReady(parsedResult) {
         _.right.get mustBe EoriNumber("GB6789")
@@ -63,7 +63,7 @@ class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers {
 
     "when provided with a missing OfficeOfDestination node" in {
       val stream       = createParsingEventStream(cc015cNoOfficeOfDestination)
-      val parsedResult = stream.via(XmlParser.OfficeOfDestinationExtractor).runWith(Sink.head)
+      val parsedResult = stream.via(XmlParser.officeOfDestinationExtractor).runWith(Sink.head)
 
       whenReady(parsedResult) {
         _.isLeft
@@ -72,7 +72,7 @@ class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers {
 
     "when provided with a missing ReferenceNumber node" in {
       val stream       = createParsingEventStream(cc015cNoRefNumber)
-      val parsedResult = stream.via(XmlParser.OfficeOfDestinationExtractor).runWith(Sink.head)
+      val parsedResult = stream.via(XmlParser.officeOfDestinationExtractor).runWith(Sink.head)
 
       whenReady(parsedResult) {
         _.isLeft
