@@ -1,7 +1,10 @@
 package uk.gov.hmrc.transitmovements.router.services
 
 import akka.NotUsed
+import akka.stream.alpakka.xml.scaladsl.XmlWriting
+import akka.stream.alpakka.xml.scaladsl.XmlParsing
 import akka.stream.scaladsl.Sink
+import akka.util.ByteString
 import org.scalatest.concurrent.ScalaFutures.whenReady
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
@@ -15,6 +18,8 @@ import uk.gov.hmrc.transitmovementsrouter.models.MovementMessageId
 import uk.gov.hmrc.transitmovementsrouter.services.XmlParser
 
 import scala.xml.NodeSeq
+import scala.xml.XML
+import scala.xml.Utility.trim
 
 class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers {
 
@@ -76,14 +81,22 @@ class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers {
     }
   }
 
-  "create MessageSenderElement" - new Setup {
+  "create MessageSenderElement" in new Setup {
 
     val stream = createStream(cc015cNoMessageSenderNode)
 
     val parsedResult = stream
-      .runWith(XmlParser.messageSenderWriter2(MovementMessageId("GB22222")))
+      .via(XmlParsing.parser)
+      .via(XmlParser.messageSenderWriter(MovementMessageId("GB22222"))) // testing this
+      .via(XmlWriting.writer)
+      .fold(ByteString())(_ ++ _)
+      .map(_.utf8String)
+      .runWith(Sink.head)
 
-    parsedResult shouldBe NotUsed
+    whenReady(parsedResult) {
+      result =>
+        trim(XML.loadString(result)) shouldBe trim(cc015cWithExpectedMessageSenderNode.head)
+    }
   }
 
   trait Setup {
@@ -116,6 +129,12 @@ class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers {
 
     val cc015cNoMessageSenderNode: NodeSeq =
       <CC015C>
+        <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
+      </CC015C>
+
+    val cc015cWithExpectedMessageSenderNode: NodeSeq =
+      <CC015C>
+        <messageSender>messageSenderCharacters</messageSender>
         <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
       </CC015C>
 

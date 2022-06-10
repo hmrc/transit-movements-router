@@ -17,6 +17,8 @@
 package uk.gov.hmrc.transitmovementsrouter.services
 
 import akka.NotUsed
+import akka.stream.alpakka.xml.Characters
+import akka.stream.alpakka.xml.EndElement
 import akka.stream.scaladsl.Flow
 import akka.stream.scaladsl.Keep
 import akka.stream.scaladsl.Sink
@@ -47,13 +49,13 @@ object XmlParser extends XmlParsingServiceHelpers {
     }
     .single("referenceNumber")
 
-  def messageSenderWriter(messageId: MovementMessageId): Sink[ParseEvent, Future[String]] = Flow[ParseEvent]
-    .map(
-      element => if (isElement("CC015C", element)) StartElement("messageSender") else element
+  def messageSenderWriter(messageId: MovementMessageId): Flow[ParseEvent, ParseEvent, NotUsed] = Flow[ParseEvent]
+    .mapConcat(
+      element => if (isElement("CC015C", element)) Seq(element, StartElement("messageSender"), Characters("messageSenderCharacters"), EndElement("messageSender")) else Seq(element)
     )
-    .via(XmlWriting.writer)
-    .map[String](_.utf8String)
-    .toMat(Sink.fold[String, String]("")(_ + _))(Keep.right)
+    // .via(XmlWriting.writer)
+    //.map[String](_.utf8String)
+    //.toMat(Sink.fold[String, String]("")(_ + _))(Keep.right)
 
   def messageSenderWriter2(messageId: MovementMessageId): Sink[ByteString, NotUsed] = Flow[ByteString]
     .map[String](_.utf8String)
