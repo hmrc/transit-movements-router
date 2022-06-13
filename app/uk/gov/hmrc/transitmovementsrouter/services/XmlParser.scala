@@ -20,8 +20,6 @@ import akka.NotUsed
 import akka.stream.alpakka.xml._
 import akka.stream.alpakka.xml.scaladsl.XmlParsing
 import akka.stream.scaladsl.Flow
-import akka.stream.scaladsl.Sink
-import akka.util.ByteString
 import uk.gov.hmrc.transitmovementsrouter.models._
 
 object XmlParser extends XmlParsingServiceHelpers {
@@ -33,10 +31,10 @@ object XmlParser extends XmlParsingServiceHelpers {
     }
     .single("messageSender")
 
-  val officeOfDestinationExtractor: Flow[ParseEvent, ParseResult[EoriNumber], NotUsed] = XmlParsing
+  val officeOfDestinationExtractor: Flow[ParseEvent, ParseResult[OfficeOfDestination], NotUsed] = XmlParsing
     .subtree("CC015C" :: "CustomsOfficeOfDestinationDeclared" :: "referenceNumber" :: Nil)
     .collect {
-      case element if element.getTextContent.nonEmpty => EoriNumber(element.getTextContent)
+      case element if element.getTextContent.nonEmpty => OfficeOfDestination(element.getTextContent)
     }
     .single("referenceNumber")
 
