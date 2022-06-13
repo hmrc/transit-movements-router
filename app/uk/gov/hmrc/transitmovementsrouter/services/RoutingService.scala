@@ -37,7 +37,7 @@ trait RoutingService {
   def submitDeclaration(messageId: MovementMessageId, payload: Source[ByteString, _]): (Flow[ByteString, ParseResult[_], OfficeOfDestination])
 }
 
-class RoutingServiceImpl @Inject() (implicit materializer: Materializer) extends XmlParsingServiceHelpers {
+class RoutingServiceImpl @Inject() (implicit materializer: Materializer) extends RoutingService with XmlParsingServiceHelpers {
 
   val office = Sink.head[ParseResult[OfficeOfDestination]]
 
