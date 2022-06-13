@@ -20,39 +20,64 @@ import akka.NotUsed
 import akka.stream._
 import akka.stream.alpakka.xml.ParseEvent
 import akka.stream.alpakka.xml.scaladsl.XmlParsing
-import akka.stream.scaladsl.Broadcast
 import akka.stream.scaladsl.Flow
 import akka.stream.scaladsl.GraphDSL
+import akka.stream.scaladsl.Keep
+import akka.stream.scaladsl.Sink
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import com.google.inject._
 import uk.gov.hmrc.transitmovementsrouter.models._
 import uk.gov.hmrc.transitmovementsrouter.services.XmlParser.ParseResult
 
+import scala.concurrent.Future
+
 @ImplementedBy(classOf[RoutingServiceImpl])
 trait RoutingService {
-  def submitDeclaration(messageId: MovementMessageId, payload: Source[ByteString, _]): Flow[ByteString, ParseResult[_], NotUsed]
+  def submitDeclaration(messageId: MovementMessageId, payload: Source[ByteString, _]): (Flow[ByteString, ParseResult[_], OfficeOfDestination])
 }
 
-class RoutingServiceImpl @Inject() (implicit materializer: Materializer) extends RoutingService with XmlParsingServiceHelpers {
+class RoutingServiceImpl @Inject() (implicit materializer: Materializer) extends XmlParsingServiceHelpers {
 
-  private def buildMessage(messageId: MovementMessageId): Graph[FanOutShape2[ByteString, ParseEvent, ParseResult[OfficeOfDestination]], NotUsed] =
-    GraphDSL.create() {
-      implicit builder =>
+  val office = Sink.head[ParseResult[OfficeOfDestination]]
+
+  val officeOfDestinationSink: Sink[ByteString, Future[ParseResult[OfficeOfDestination]]] = Sink.fromGraph(
+    GraphDSL.createGraph(office) {
+      implicit builder => officeShape =>
         import GraphDSL.Implicits._
 
         val xmlParsing: FlowShape[ByteString, ParseEvent]                                = builder.add(XmlParsing.parser)
         val officeOfDestination: FlowShape[ParseEvent, ParseResult[OfficeOfDestination]] = builder.add(XmlParser.officeOfDestinationExtractor)
-        val insertSenderWriter: FlowShape[ParseEvent, ParseEvent]                        = builder.add(XmlParser.messageSenderWriter(messageId))
 
-        val broadcast = builder.add(Broadcast[ParseEvent](2))
+        xmlParsing ~> officeOfDestination ~> officeShape
 
-        xmlParsing ~> broadcast
-        broadcast.out(0) ~> officeOfDestination
-        broadcast.out(1) ~> insertSenderWriter
-
-        new FanOutShape2(xmlParsing.in, insertSenderWriter.out, officeOfDestination.out)
+        SinkShape(xmlParsing.in)
     }
+  )
 
-  override def submitDeclaration(messageId: MovementMessageId, payload: Source[ByteString, _]) = ???
+  def buildMessage(messageId: MovementMessageId): Flow[ByteString, ParseEvent, NotUsed] =
+    Flow.fromGraph(
+      GraphDSL.create() {
+        implicit builder =>
+          import GraphDSL.Implicits._
+
+          val xmlParsing: FlowShape[ByteString, ParseEvent]         = builder.add(XmlParsing.parser)
+          val insertSenderWriter: FlowShape[ParseEvent, ParseEvent] = builder.add(XmlParser.messageSenderWriter(messageId))
+
+          xmlParsing ~> insertSenderWriter
+
+          FlowShape(xmlParsing.in, insertSenderWriter.out)
+      }
+    )
+
+  def submitDeclaration(
+    messageId: MovementMessageId,
+    payload: Source[ByteString, _]
+  ): (FlowShape[ByteString, ParseEvent], Future[ParseResult[OfficeOfDestination]]) = {
+
+    val officeOfDestination: Future[ParseResult[OfficeOfDestination]] = payload.toMat(officeOfDestinationSink)(Keep.right).run()
+
+    val updatedPayload = payload.via(buildMessage(messageId)).to(????)
+    (updatedPayload, officeOfDestination)
+  }
 }
