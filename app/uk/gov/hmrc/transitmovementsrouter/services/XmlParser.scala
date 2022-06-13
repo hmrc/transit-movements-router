@@ -31,10 +31,10 @@ object XmlParser extends XmlParsingServiceHelpers {
     }
     .single("messageSender")
 
-  val officeOfDestinationExtractor: Flow[ParseEvent, ParseResult[OfficeOfDestination], NotUsed] = XmlParsing
-    .subtree("CC015C" :: "CustomsOfficeOfDestinationDeclared" :: "referenceNumber" :: Nil)
+  val officeOfDeprtureExtractor: Flow[ParseEvent, ParseResult[OfficeOfDeparture], NotUsed] = XmlParsing
+    .subtree("CC015C" :: "CustomsOfficeOfDeparture" :: "referenceNumber" :: Nil)
     .collect {
-      case element if element.getTextContent.nonEmpty => OfficeOfDestination(element.getTextContent)
+      case element if element.getTextContent.nonEmpty => OfficeOfDeparture(element.getTextContent)
     }
     .single("referenceNumber")
 

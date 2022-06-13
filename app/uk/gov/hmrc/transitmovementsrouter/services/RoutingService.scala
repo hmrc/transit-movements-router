@@ -20,6 +20,7 @@ import akka.NotUsed
 import akka.stream._
 import akka.stream.alpakka.xml.ParseEvent
 import akka.stream.alpakka.xml.scaladsl.XmlParsing
+import akka.stream.alpakka.xml.scaladsl.XmlWriting
 import akka.stream.scaladsl.Flow
 import akka.stream.scaladsl.GraphDSL
 import akka.stream.scaladsl.Keep
@@ -34,7 +35,7 @@ import scala.concurrent.Future
 
 @ImplementedBy(classOf[RoutingServiceImpl])
 trait RoutingService {
-  def submitDeclaration(messageId: MovementMessageId, payload: Source[ByteString, _]): (Flow[ByteString, ParseResult[_], OfficeOfDestination])
+  def submitDeclaration(messageId: MovementMessageId, payload: Source[ByteString, _]): (Source[ByteString, _], Future[ParseResult[OfficeOfDestination]])
 }
 
 class RoutingServiceImpl @Inject() (implicit materializer: Materializer) extends RoutingService with XmlParsingServiceHelpers {
@@ -47,7 +48,7 @@ class RoutingServiceImpl @Inject() (implicit materializer: Materializer) extends
         import GraphDSL.Implicits._
 
         val xmlParsing: FlowShape[ByteString, ParseEvent]                                = builder.add(XmlParsing.parser)
-        val officeOfDestination: FlowShape[ParseEvent, ParseResult[OfficeOfDestination]] = builder.add(XmlParser.officeOfDestinationExtractor)
+        val officeOfDestination: FlowShape[ParseEvent, ParseResult[OfficeOfDestination]] = builder.add(XmlParser.officeOfDepartureExtractor)
 
         xmlParsing ~> officeOfDestination ~> officeShape
 
@@ -55,7 +56,7 @@ class RoutingServiceImpl @Inject() (implicit materializer: Materializer) extends
     }
   )
 
-  def buildMessage(messageId: MovementMessageId): Flow[ByteString, ParseEvent, NotUsed] =
+  def buildMessage(messageId: MovementMessageId): Flow[ByteString, ByteString, NotUsed] =
     Flow.fromGraph(
       GraphDSL.create() {
         implicit builder =>
@@ -63,21 +64,22 @@ class RoutingServiceImpl @Inject() (implicit materializer: Materializer) extends
 
           val xmlParsing: FlowShape[ByteString, ParseEvent]         = builder.add(XmlParsing.parser)
           val insertSenderWriter: FlowShape[ParseEvent, ParseEvent] = builder.add(XmlParser.messageSenderWriter(messageId))
+          val toByteString                                          = builder.add(XmlWriting.writer)
+          xmlParsing ~> insertSenderWriter ~> toByteString
 
-          xmlParsing ~> insertSenderWriter
-
-          FlowShape(xmlParsing.in, insertSenderWriter.out)
+          FlowShape(xmlParsing.in, toByteString.out)
       }
     )
 
-  def submitDeclaration(
+  override def submitDeclaration(
     messageId: MovementMessageId,
     payload: Source[ByteString, _]
-  ): (FlowShape[ByteString, ParseEvent], Future[ParseResult[OfficeOfDestination]]) = {
+  ): (Source[ByteString, _], Future[ParseResult[OfficeOfDestination]]) = {
 
     val officeOfDestination: Future[ParseResult[OfficeOfDestination]] = payload.toMat(officeOfDestinationSink)(Keep.right).run()
 
-    val updatedPayload = payload.via(buildMessage(messageId)).to(????)
+    val updatedPayload: Source[ByteString, _] = payload.via(buildMessage(messageId))
+
     (updatedPayload, officeOfDestination)
   }
 }
