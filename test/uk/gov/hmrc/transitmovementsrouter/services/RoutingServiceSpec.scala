@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovements.router.services
+package uk.gov.hmrc.transitmovementsrouter.services
 
 import akka.stream.scaladsl.Sink
 import akka.util.ByteString
@@ -22,11 +22,10 @@ import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
-import uk.gov.hmrc.transitmovements.base.StreamTestHelpers.createStream
-import uk.gov.hmrc.transitmovements.base.TestActorSystem
+import uk.gov.hmrc.transitmovementsrouter.base.StreamTestHelpers.createStream
+import uk.gov.hmrc.transitmovementsrouter.base.TestActorSystem
 import uk.gov.hmrc.transitmovementsrouter.models._
 import uk.gov.hmrc.transitmovementsrouter.services.ParseError.NoElementFound
-import uk.gov.hmrc.transitmovementsrouter.services.RoutingServiceImpl
 
 import scala.concurrent.duration.DurationInt
 import scala.xml.NodeSeq
