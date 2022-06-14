@@ -16,38 +16,37 @@
 
 package uk.gov.hmrc.transitmovements.router.services
 
-import akka.NotUsed
-import akka.stream.IOResult
-import akka.stream.scaladsl.FileIO
-import akka.stream.scaladsl.Source
-import akka.util.ByteString
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
-import play.api.libs.Files
-import play.api.libs.Files.SingletonTemporaryFileCreator
-import uk.gov.hmrc.transitmovementsrouter.services.RoutingService
+import uk.gov.hmrc.transitmovements.base.StreamTestHelpers.createStream
+import uk.gov.hmrc.transitmovements.base.TestActorSystem
+import uk.gov.hmrc.transitmovementsrouter.models._
+import uk.gov.hmrc.transitmovementsrouter.services.RoutingServiceImpl
 
-import scala.concurrent.Future
-import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Await
+import concurrent.duration.Duration.Inf
 import scala.xml.NodeSeq
 
-class RoutingServiceSpec extends AnyFreeSpec with Matchers {
+class RoutingServiceSpec extends AnyFreeSpec with ScalaFutures with TestActorSystem with Matchers {
 
-//  "submitMessage" - {
-//    "returns Valid Message if it has a rootNode" in {
-//
-//      val result = RoutingServiceImpl().submitMessage(Source.single(ByteString(cc015c.toString())), "ID0001")
-//
-//      result mustBe NotUsed
-//
-//    }
-//  }
+  "Office Of Destination Sink" - new Setup {
+    "should return a valid departure office" in {
+      val serviceUnderTest = new RoutingServiceImpl()
+      val payload          = createStream(cc015cOfficeOfDeparture)
+      val (updatedPayload, office) =
+        serviceUnderTest.submitDeclaration(MovementType("Departure"), MovementId("movement-001"), MessageId("message-id-001"), payload)
 
-  val cc015c: NodeSeq =
-    <CC015C>
-      <messageSender>ABC1234</messageSender>
-      <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
-    </CC015C>
+      val officeResult = Await.ready(office, Inf)
+      officeResult mustBe Some("Newcastle-0001")
+    }
+  }
 
+  trait Setup {
+
+    val cc015cOfficeOfDeparture: NodeSeq =
+      <CustomsOfficeOfDeparture>
+        <referenceNumber>Newcastle-0001</referenceNumber>
+      </CustomsOfficeOfDeparture>
+  }
 }

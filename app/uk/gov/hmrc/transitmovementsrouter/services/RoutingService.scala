@@ -19,8 +19,7 @@ package uk.gov.hmrc.transitmovementsrouter.services
 import akka.NotUsed
 import akka.stream._
 import akka.stream.alpakka.xml.ParseEvent
-import akka.stream.alpakka.xml.scaladsl.XmlParsing
-import akka.stream.alpakka.xml.scaladsl.XmlWriting
+import akka.stream.alpakka.xml.scaladsl._
 import akka.stream.scaladsl.Flow
 import akka.stream.scaladsl.GraphDSL
 import akka.stream.scaladsl.Keep
@@ -35,20 +34,26 @@ import scala.concurrent.Future
 
 @ImplementedBy(classOf[RoutingServiceImpl])
 trait RoutingService {
-  def submitDeclaration(messageId: MovementMessageId, payload: Source[ByteString, _]): (Source[ByteString, _], Future[ParseResult[OfficeOfDestination]])
+
+  def submitDeclaration(
+    movementType: MovementType,
+    movementId: MovementId,
+    messageId: MessageId,
+    payload: Source[ByteString, _]
+  ): (Source[ByteString, _], Future[ParseResult[OfficeOfDeparture]])
 }
 
 class RoutingServiceImpl @Inject() (implicit materializer: Materializer) extends RoutingService with XmlParsingServiceHelpers {
 
-  val office = Sink.head[ParseResult[OfficeOfDestination]]
+  val office = Sink.head[ParseResult[OfficeOfDeparture]]
 
-  val officeOfDestinationSink: Sink[ByteString, Future[ParseResult[OfficeOfDestination]]] = Sink.fromGraph(
+  private val officeOfDepartureSink: Sink[ByteString, Future[ParseResult[OfficeOfDeparture]]] = Sink.fromGraph(
     GraphDSL.createGraph(office) {
       implicit builder => officeShape =>
         import GraphDSL.Implicits._
 
-        val xmlParsing: FlowShape[ByteString, ParseEvent]                                = builder.add(XmlParsing.parser)
-        val officeOfDestination: FlowShape[ParseEvent, ParseResult[OfficeOfDestination]] = builder.add(XmlParser.officeOfDepartureExtractor)
+        val xmlParsing: FlowShape[ByteString, ParseEvent]                              = builder.add(XmlParsing.parser)
+        val officeOfDestination: FlowShape[ParseEvent, ParseResult[OfficeOfDeparture]] = builder.add(XmlParser.officeOfDepartureExtractor)
 
         xmlParsing ~> officeOfDestination ~> officeShape
 
@@ -56,7 +61,7 @@ class RoutingServiceImpl @Inject() (implicit materializer: Materializer) extends
     }
   )
 
-  def buildMessage(messageId: MovementMessageId): Flow[ByteString, ByteString, NotUsed] =
+  def buildMessage(messageId: MessageId): Flow[ByteString, ByteString, NotUsed] =
     Flow.fromGraph(
       GraphDSL.create() {
         implicit builder =>
@@ -72,14 +77,16 @@ class RoutingServiceImpl @Inject() (implicit materializer: Materializer) extends
     )
 
   override def submitDeclaration(
-    messageId: MovementMessageId,
+    movementType: MovementType,
+    movementId: MovementId,
+    messageId: MessageId,
     payload: Source[ByteString, _]
-  ): (Source[ByteString, _], Future[ParseResult[OfficeOfDestination]]) = {
+  ): (Source[ByteString, _], Future[ParseResult[OfficeOfDeparture]]) = {
 
-    val officeOfDestination: Future[ParseResult[OfficeOfDestination]] = payload.toMat(officeOfDestinationSink)(Keep.right).run()
+    val officeOfDeparture: Future[ParseResult[OfficeOfDeparture]] = payload.toMat(officeOfDepartureSink)(Keep.right).run()
 
     val updatedPayload: Source[ByteString, _] = payload.via(buildMessage(messageId))
 
-    (updatedPayload, officeOfDestination)
+    (updatedPayload, officeOfDeparture)
   }
 }
