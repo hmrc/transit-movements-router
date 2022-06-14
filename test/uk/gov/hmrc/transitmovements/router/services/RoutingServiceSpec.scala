@@ -25,6 +25,7 @@ import org.scalatest.matchers.must.Matchers
 import uk.gov.hmrc.transitmovements.base.StreamTestHelpers.createStream
 import uk.gov.hmrc.transitmovements.base.TestActorSystem
 import uk.gov.hmrc.transitmovementsrouter.models._
+import uk.gov.hmrc.transitmovementsrouter.services.ParseError.NoElementFound
 import uk.gov.hmrc.transitmovementsrouter.services.RoutingServiceImpl
 
 import scala.concurrent.duration.DurationInt
@@ -42,6 +43,17 @@ class RoutingServiceSpec extends AnyFreeSpec with ScalaFutures with TestActorSys
 
       whenReady(office, Timeout(2 seconds)) {
         _.mustBe(Right(OfficeOfDeparture("Newcastle-airport")))
+      }
+    }
+
+    "should not find an office of departure" in {
+      val serviceUnderTest = new RoutingServiceImpl()
+      val payload          = createStream(cc015cEmpty)
+      val (updatedPayload, office) =
+        serviceUnderTest.submitDeclaration(MovementType("Departure"), MovementId("movement-001"), MessageId("message-id-001"), payload)
+
+      whenReady(office, Timeout(2 seconds)) {
+        _.mustBe(Left(NoElementFound("referenceNumber")))
       }
     }
 
@@ -72,5 +84,8 @@ class RoutingServiceSpec extends AnyFreeSpec with ScalaFutures with TestActorSys
           <referenceNumber>Newcastle-airport</referenceNumber>
         </CustomsOfficeOfDeparture>
       </CC015C>
+
+    val cc015cEmpty: NodeSeq = <CC015C/>
+
   }
 }
