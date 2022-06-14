@@ -72,8 +72,8 @@ class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers {
       }
     }
 
-    "when provided with a missing OfficeOfDestination node" in {
-      val stream       = createParsingEventStream(cc015cNoOfficeOfDestination)
+    "when provided with a missing OfficeOfDeparture node" in {
+      val stream       = createParsingEventStream(cc015cNoOfficeOfDeparture)
       val parsedResult = stream.via(XmlParser.officeOfDepartureExtractor).runWith(Sink.head)
 
       whenReady(parsedResult) {
@@ -167,7 +167,7 @@ class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers {
         <CustomsOfficeOfDeparture/>
       </CC015C>
 
-    val cc015cNoOfficeOfDestination: NodeSeq =
+    val cc015cNoOfficeOfDeparture: NodeSeq =
       <CC015C>
         <messageSender>GB1234</messageSender>
         <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>

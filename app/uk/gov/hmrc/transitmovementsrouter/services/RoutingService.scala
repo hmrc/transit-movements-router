@@ -52,10 +52,9 @@ class RoutingServiceImpl @Inject() (implicit materializer: Materializer) extends
       implicit builder => officeShape =>
         import GraphDSL.Implicits._
 
-        val xmlParsing: FlowShape[ByteString, ParseEvent]                              = builder.add(XmlParsing.parser)
-        val officeOfDestination: FlowShape[ParseEvent, ParseResult[OfficeOfDeparture]] = builder.add(XmlParser.officeOfDepartureExtractor)
-
-        xmlParsing ~> officeOfDestination ~> officeShape
+        val xmlParsing: FlowShape[ByteString, ParseEvent]                            = builder.add(XmlParsing.parser)
+        val officeOfDeparture: FlowShape[ParseEvent, ParseResult[OfficeOfDeparture]] = builder.add(XmlParser.officeOfDepartureExtractor)
+        xmlParsing ~> officeOfDeparture ~> officeShape
 
         SinkShape(xmlParsing.in)
     }
