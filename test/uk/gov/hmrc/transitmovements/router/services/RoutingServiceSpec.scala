@@ -16,6 +16,8 @@
 
 package uk.gov.hmrc.transitmovements.router.services
 
+import akka.stream.scaladsl.Sink
+import akka.util.ByteString
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.freespec.AnyFreeSpec
@@ -42,13 +44,29 @@ class RoutingServiceSpec extends AnyFreeSpec with ScalaFutures with TestActorSys
         _.mustBe(Right(OfficeOfDeparture("Newcastle-airport")))
       }
     }
+
+    "should return a valid updated payload with a populated <messageSender> node" in {
+      val serviceUnderTest = new RoutingServiceImpl()
+      val payload          = createStream(cc015cOfficeOfDeparture)
+      val (updatedPayload, office) =
+        serviceUnderTest.submitDeclaration(MovementType("Departure"), MovementId("movement-001"), MessageId("message-id-001"), payload)
+
+      val runResult = updatedPayload
+        .fold(ByteString())(_ ++ _)
+        .map(_.utf8String)
+        .runWith(Sink.head)
+
+      whenReady(runResult, Timeout(2 seconds)) {
+        _.contains("<messageSender>message-id-001</messageSender>")
+      }
+    }
+
   }
 
   trait Setup {
 
     val cc015cOfficeOfDeparture: NodeSeq =
       <CC015C>
-        <messageSender>GB1234</messageSender>
         <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
         <CustomsOfficeOfDeparture>
           <referenceNumber>Newcastle-airport</referenceNumber>
