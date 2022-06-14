@@ -27,6 +27,7 @@ import akka.stream.scaladsl.Sink
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import com.google.inject._
+import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.transitmovementsrouter.models._
 import uk.gov.hmrc.transitmovementsrouter.services.XmlParser.ParseResult
 
@@ -40,7 +41,7 @@ trait RoutingService {
     movementId: MovementId,
     messageId: MessageId,
     payload: Source[ByteString, _]
-  ): (Source[ByteString, _], Future[ParseResult[OfficeOfDeparture]])
+  )(implicit hc: HeaderCarrier): (Source[ByteString, _], Future[ParseResult[OfficeOfDeparture]])
 }
 
 class RoutingServiceImpl @Inject() (implicit materializer: Materializer) extends RoutingService with XmlParsingServiceHelpers {
@@ -80,7 +81,7 @@ class RoutingServiceImpl @Inject() (implicit materializer: Materializer) extends
     movementId: MovementId,
     messageId: MessageId,
     payload: Source[ByteString, _]
-  ): (Source[ByteString, _], Future[ParseResult[OfficeOfDeparture]]) = {
+  )(implicit hc: HeaderCarrier): (Source[ByteString, _], Future[ParseResult[OfficeOfDeparture]]) = {
 
     val officeOfDeparture: Future[ParseResult[OfficeOfDeparture]] = payload.toMat(officeOfDepartureSink)(Keep.right).run()
 

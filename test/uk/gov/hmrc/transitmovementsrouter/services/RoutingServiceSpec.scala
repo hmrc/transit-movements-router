@@ -22,6 +22,7 @@ import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
+import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.transitmovementsrouter.base.StreamTestHelpers.createStream
 import uk.gov.hmrc.transitmovementsrouter.base.TestActorSystem
 import uk.gov.hmrc.transitmovementsrouter.models._
@@ -38,7 +39,7 @@ class RoutingServiceSpec extends AnyFreeSpec with ScalaFutures with TestActorSys
       val serviceUnderTest = new RoutingServiceImpl()
       val payload          = createStream(cc015cOfficeOfDeparture)
       val (updatedPayload, office) =
-        serviceUnderTest.submitDeclaration(MovementType("Departure"), MovementId("movement-001"), MessageId("message-id-001"), payload)
+        serviceUnderTest.submitDeclaration(MovementType("Departure"), MovementId("movement-001"), MessageId("message-id-001"), payload)(hc)
 
       whenReady(office, Timeout(2 seconds)) {
         _.mustBe(Right(OfficeOfDeparture("Newcastle-airport")))
@@ -49,7 +50,7 @@ class RoutingServiceSpec extends AnyFreeSpec with ScalaFutures with TestActorSys
       val serviceUnderTest = new RoutingServiceImpl()
       val payload          = createStream(cc015cEmpty)
       val (updatedPayload, office) =
-        serviceUnderTest.submitDeclaration(MovementType("Departure"), MovementId("movement-001"), MessageId("message-id-001"), payload)
+        serviceUnderTest.submitDeclaration(MovementType("Departure"), MovementId("movement-001"), MessageId("message-id-001"), payload)(hc)
 
       whenReady(office, Timeout(2 seconds)) {
         _.mustBe(Left(NoElementFound("referenceNumber")))
@@ -60,7 +61,7 @@ class RoutingServiceSpec extends AnyFreeSpec with ScalaFutures with TestActorSys
       val serviceUnderTest = new RoutingServiceImpl()
       val payload          = createStream(cc015cOfficeOfDeparture)
       val (updatedPayload, office) =
-        serviceUnderTest.submitDeclaration(MovementType("Departure"), MovementId("movement-001"), MessageId("message-id-001"), payload)
+        serviceUnderTest.submitDeclaration(MovementType("Departure"), MovementId("movement-001"), MessageId("message-id-001"), payload)(hc)
 
       val runResult = updatedPayload
         .fold(ByteString())(_ ++ _)
@@ -75,6 +76,8 @@ class RoutingServiceSpec extends AnyFreeSpec with ScalaFutures with TestActorSys
   }
 
   trait Setup {
+
+    val hc = HeaderCarrier()
 
     val cc015cOfficeOfDeparture: NodeSeq =
       <CC015C>
