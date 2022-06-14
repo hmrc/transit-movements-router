@@ -38,7 +38,8 @@ class RoutingServiceSpec extends AnyFreeSpec with ScalaFutures with TestActorSys
         serviceUnderTest.submitDeclaration(MovementType("Departure"), MovementId("movement-001"), MessageId("message-id-001"), payload)
 
       val officeResult = Await.ready(office, Inf)
-      officeResult mustBe Some("Newcastle-0001")
+
+      officeResult mustBe Some(OfficeOfDeparture("Newcastle-0001"))
     }
   }
 
