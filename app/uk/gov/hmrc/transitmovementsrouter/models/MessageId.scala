@@ -16,4 +16,4 @@
 
 package uk.gov.hmrc.transitmovementsrouter.models
 
-case class MovementMessageId(message: String) extends AnyVal
+case class MessageId(value: String) extends AnyVal

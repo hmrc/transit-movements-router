@@ -62,19 +62,19 @@ class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers {
     }
   }
 
-  "OfficeOfDestination parser" - new Setup {
+  "OfficeOfDeparture parser" - new Setup {
     "when provided with a valid message" in {
       val stream       = createParsingEventStream(cc015cValidGB)
-      val parsedResult = stream.via(XmlParser.officeOfDestinationExtractor).runWith(Sink.head)
+      val parsedResult = stream.via(XmlParser.officeOfDepartureExtractor).runWith(Sink.head)
 
       whenReady(parsedResult) {
-        _.right.get mustBe OfficeOfDestination("GB6789")
+        _.right.get mustBe OfficeOfDeparture("GB6789")
       }
     }
 
     "when provided with a missing OfficeOfDestination node" in {
       val stream       = createParsingEventStream(cc015cNoOfficeOfDestination)
-      val parsedResult = stream.via(XmlParser.officeOfDestinationExtractor).runWith(Sink.head)
+      val parsedResult = stream.via(XmlParser.officeOfDepartureExtractor).runWith(Sink.head)
 
       whenReady(parsedResult) {
         _.isLeft
@@ -83,7 +83,7 @@ class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers {
 
     "when provided with a missing ReferenceNumber node" in {
       val stream       = createParsingEventStream(cc015cNoRefNumber)
-      val parsedResult = stream.via(XmlParser.officeOfDestinationExtractor).runWith(Sink.head)
+      val parsedResult = stream.via(XmlParser.officeOfDepartureExtractor).runWith(Sink.head)
 
       whenReady(parsedResult) {
         _.isLeft
@@ -97,7 +97,7 @@ class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers {
 
     val parsedResult = stream
       .via(XmlParsing.parser)
-      .via(XmlParser.messageSenderWriter(MovementMessageId("GB123456789"))) // testing this
+      .via(XmlParser.messageSenderWriter(MessageId("GB123456789"))) // testing this
       .via(XmlWriting.writer)
       .fold(ByteString())(_ ++ _)
       .map(_.utf8String)
@@ -114,27 +114,27 @@ class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers {
     val cc015cInsertMessageSender =
       """<CC015C>
         <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
-        <CustomsOfficeOfDestinationDeclared>
+        <CustomsOfficeOfDeparture>
           <referenceNumber>GB6789</referenceNumber>
-        </CustomsOfficeOfDestinationDeclared>
+        </CustomsOfficeOfDeparture>
       </CC015C>""".stripMargin
 
     val cc015cValidGB: NodeSeq =
       <CC015C>
         <messageSender>GB1234</messageSender>
         <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
-        <CustomsOfficeOfDestinationDeclared>
+        <CustomsOfficeOfDeparture>
           <referenceNumber>GB6789</referenceNumber>
-        </CustomsOfficeOfDestinationDeclared>
+        </CustomsOfficeOfDeparture>
       </CC015C>
 
     val cc015cValidXI: NodeSeq =
       <CC015C>
         <messageSender>GB1234</messageSender>
         <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
-        <CustomsOfficeOfDestinationDeclared>
+        <CustomsOfficeOfDeparture>
           <referenceNumber>XI98765</referenceNumber>
-        </CustomsOfficeOfDestinationDeclared>
+        </CustomsOfficeOfDeparture>
       </CC015C>
 
     val cc015cNoMessageSenderNode: NodeSeq =
@@ -164,7 +164,7 @@ class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers {
       <CC015C>
         <messageSender>GB1234</messageSender>
         <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
-        <CustomsOfficeOfDestinationDeclared/>
+        <CustomsOfficeOfDeparture/>
       </CC015C>
 
     val cc015cNoOfficeOfDestination: NodeSeq =

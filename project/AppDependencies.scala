@@ -5,6 +5,8 @@ import sbt._
 
 object AppDependencies {
 
+  val scalaTestVersion = "3.0.5"
+
   val compile = Seq(
     "uk.gov.hmrc"        %% "bootstrap-backend-play-28" % "5.24.0",
     "com.typesafe.akka"  %% "akka-slf4j"                % PlayVersion.akkaVersion,
@@ -13,6 +15,8 @@ object AppDependencies {
 
   val test = Seq(
     "uk.gov.hmrc"         %% "bootstrap-test-play-28" % "5.24.0" % "test, it",
-    "com.vladsch.flexmark" % "flexmark-all"           % "0.36.8" % "test, it"
+    "com.vladsch.flexmark" % "flexmark-all"           % "0.36.8" % "test, it",
+    "org.scalatest"       %% "scalatest"              % scalaTestVersion
+//    "com.typesafe.akka"   %% "akka-stream-testkit"    % PlayVersion.akkaVersion % Test
   )
 }
