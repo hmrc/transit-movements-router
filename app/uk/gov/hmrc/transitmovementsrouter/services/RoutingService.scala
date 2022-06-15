@@ -101,20 +101,16 @@ class RoutingServiceImpl @Inject() (messageConnectorProvider: MessageConnectorPr
     office: Future[ParseResult[OfficeOfDeparture]]
   )(implicit messageSender: MessageSender, body: Source[ByteString, _], hc: HeaderCarrier): Future[Either[ParseError, Int]] = {
     import concurrent.ExecutionContext.Implicits.global
-    office.flatMap(
-      result =>
-        result match {
-          case Right(office) =>
-            postToEis(office).map {
-              case Right(_)    => Right(play.api.http.Status.ACCEPTED)
-              case Left(error) => Left(Unknown(Some(new Exception(error.toString)))) // TODO: not sure what we do here
-            }
-          //Future.successful(Right(play.api.http.Status.ACCEPTED))
-          case Left(parseError) =>
-            logger.error(s"Unable to extract office of departure: $parseError")
-            Future.successful(Left(parseError));
+    office.flatMap {
+      case Right(office) =>
+        postToEis(office).map {
+          case Right(_)    => Right(play.api.http.Status.ACCEPTED)
+          case Left(error) => Left(Unknown(Some(new Exception(error.toString)))) // TODO: not sure what we do here
         }
-    )
+      case Left(parseError) =>
+        logger.error(s"Unable to extract office of departure: $parseError")
+        Future.successful(Left(parseError));
+    }
   }
 
   private def postToEis(
