@@ -14,9 +14,14 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovementsrouter.models
+package uk.gov.hmrc.transitmovementsrouter.base
 
-case class OfficeOfDeparture(value: String) extends AnyVal {
-  def isGB: Boolean = value.startsWith("GB")
-  def isXi: Boolean = !isGB
+import play.api.inject.guice.GuiceApplicationBuilder
+import uk.gov.hmrc.http.HeaderCarrier
+
+object TestHelpers {
+
+  lazy val headerCarrierConfig: HeaderCarrier.Config =
+    HeaderCarrier.Config.fromConfig(GuiceApplicationBuilder().build().configuration.underlying)
+
 }
