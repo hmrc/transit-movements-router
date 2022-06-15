@@ -31,8 +31,8 @@ import play.api.Logging
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.transitmovementsrouter.connectors.MessageConnectorProvider
 import uk.gov.hmrc.transitmovementsrouter.models._
-import uk.gov.hmrc.transitmovementsrouter.services.ParseError.Unknown
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
+import cats.data.EitherT
 
 import scala.concurrent.Future
 
@@ -44,7 +44,7 @@ trait RoutingService {
     movementId: MovementId,
     messageId: MessageId,
     payload: Source[ByteString, _]
-  )(implicit hc: HeaderCarrier): Future[Either[ParseError, Int]]
+  )(implicit hc: HeaderCarrier): EitherT[Future, RoutingError, Unit]
 }
 
 class RoutingServiceImpl @Inject() (messageConnectorProvider: MessageConnectorProvider)(implicit materializer: Materializer)
@@ -87,29 +87,29 @@ class RoutingServiceImpl @Inject() (messageConnectorProvider: MessageConnectorPr
     movementId: MovementId,
     messageId: MessageId,
     payload: Source[ByteString, _]
-  )(implicit hc: HeaderCarrier): Future[Either[ParseError, Int]] = {
+  )(implicit hc: HeaderCarrier): EitherT[Future, RoutingError, Unit] = {
 
     implicit val officeOfDeparture = payload.toMat(officeOfDepartureSink)(Keep.right).run()
     implicit val updatedPayload    = payload.via(buildMessage(messageId))
     implicit val messageSender     = MessageSender(messageId.value)
 
-    post(officeOfDeparture)
+    EitherT(post(officeOfDeparture))
   }
 
   //TODO:  Not quite sure what we return here
   private def post(
     office: Future[ParseResult[OfficeOfDeparture]]
-  )(implicit messageSender: MessageSender, body: Source[ByteString, _], hc: HeaderCarrier): Future[Either[ParseError, Int]] = {
+  )(implicit messageSender: MessageSender, body: Source[ByteString, _], hc: HeaderCarrier): Future[Either[RoutingError, Unit]] = {
     import concurrent.ExecutionContext.Implicits.global
     office.flatMap {
       case Right(office) =>
         postToEis(office).map {
-          case Right(_)    => Right(play.api.http.Status.ACCEPTED)
-          case Left(error) => Left(Unknown(Some(new Exception(error.toString)))) // TODO: not sure what we do here
+          case Right(_)    => Right(())
+          case Left(error) => Left(error)
         }
-      case Left(parseError) =>
-        logger.error(s"Unable to extract office of departure: $parseError")
-        Future.successful(Left(parseError));
+      case Left(routingError) =>
+        logger.error(s"Unable to extract office of departure: $routingError")
+        Future.successful(Left(routingError));
     }
   }
 
@@ -117,10 +117,8 @@ class RoutingServiceImpl @Inject() (messageConnectorProvider: MessageConnectorPr
     office: OfficeOfDeparture
   )(implicit messageSender: MessageSender, body: Source[ByteString, _], hc: HeaderCarrier): Future[Either[RoutingError, Unit]] =
     if (office.isGB) {
-      logger.debug("Office of Departure: GB")
       messageConnectorProvider.gb.post(messageSender, body, hc)
     } else {
-      logger.debug("Office of Departure: XI")
       messageConnectorProvider.xi.post(messageSender, body, hc)
     }
 }
