@@ -75,11 +75,6 @@ class RoutingServiceSpec extends AnyFreeSpec with ScalaFutures with TestActorSys
 
   trait Setup {
 
-    val hc = HeaderCarrier()
-
-//    def source: Source[ByteString, _] = Source.single(ByteString.fromString(cc015cOfficeOfDepartureGB.toString()))
-//    val materializer: Materializer    = Materializer(TestActorSystem.system)
-//    val ec                            = concurrent.ExecutionContext.Implicits.global
     val mockMessageConnectorProvider = mock[MessageConnectorProvider]
     val mockMessageConnector         = mock[MessageConnector]
 
@@ -87,6 +82,8 @@ class RoutingServiceSpec extends AnyFreeSpec with ScalaFutures with TestActorSys
     when(mockMessageConnectorProvider.xi) thenReturn mockMessageConnector
     when(mockMessageConnector.post(ArgumentMatchers.any[MessageSender], ArgumentMatchers.any[Source[ByteString, _]], ArgumentMatchers.any[HeaderCarrier]))
       .thenReturn(Future.successful(Right(())))
+
+    val hc = HeaderCarrier()
 
     val cc015cOfficeOfDepartureGB: NodeSeq =
       <CC015C>
