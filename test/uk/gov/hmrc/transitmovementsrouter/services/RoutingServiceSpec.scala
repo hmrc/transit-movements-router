@@ -39,14 +39,13 @@ import scala.xml.NodeSeq
 class RoutingServiceSpec extends AnyFreeSpec with ScalaFutures with TestActorSystem with Matchers with MockitoSugar {
 
   "Submitting a declaration" - new Setup {
-
     "should generate a valid departure office and updated payload for a GB payload" in {
       val serviceUnderTest = new RoutingServiceImpl(mockMessageConnectorProvider)
       val payload          = createStream(cc015cOfficeOfDepartureGB)
       val response         = serviceUnderTest.submitDeclaration(MovementType("Departure"), MovementId("movement-001"), MessageId("message-id-001"), payload)(hc)
 
       whenReady(response.value, Timeout(2 seconds)) {
-        _.mustBe(Right(Unit))
+        _.mustBe(Right(()))
       }
     }
 
@@ -67,7 +66,7 @@ class RoutingServiceSpec extends AnyFreeSpec with ScalaFutures with TestActorSys
         serviceUnderTest.submitDeclaration(MovementType("Departure"), MovementId("movement-001"), MessageId("message-id-001"), payload)(hc)
 
       whenReady(response.value, Timeout(2 seconds)) {
-        _.mustBe(Right(Unit))
+        _.mustBe(Right(()))
       }
     }
 
@@ -80,7 +79,7 @@ class RoutingServiceSpec extends AnyFreeSpec with ScalaFutures with TestActorSys
 
     when(mockMessageConnectorProvider.gb) thenReturn mockMessageConnector
     when(mockMessageConnectorProvider.xi) thenReturn mockMessageConnector
-    when(mockMessageConnector.post(ArgumentMatchers.any[MessageSender], ArgumentMatchers.any[Source[ByteString, _]], ArgumentMatchers.any[HeaderCarrier]))
+    when(mockMessageConnector.post(ArgumentMatchers.any[String].asInstanceOf[MessageSender], ArgumentMatchers.any[Source[ByteString, _]], ArgumentMatchers.any[HeaderCarrier]))
       .thenReturn(Future.successful(Right(())))
 
     val hc = HeaderCarrier()
