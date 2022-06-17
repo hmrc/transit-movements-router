@@ -26,6 +26,7 @@ import org.scalatest.matchers.should.Matchers.convertToAnyShouldWrapper
 import uk.gov.hmrc.transitmovementsrouter.base.StreamTestHelpers._
 import uk.gov.hmrc.transitmovementsrouter.base.TestActorSystem
 import uk.gov.hmrc.transitmovementsrouter.models._
+import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError.NoElementFound
 
 import scala.xml.Utility.trim
 import scala.xml._
@@ -47,7 +48,7 @@ class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers {
       val parsedResult = stream.via(XmlParser.messageSenderExtractor).runWith(Sink.head)
 
       whenReady(parsedResult) {
-        _.isLeft
+        _.mustBe(Left(NoElementFound("messageSender")))
       }
     }
 
@@ -56,7 +57,7 @@ class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers {
       val parsedResult = stream.via(XmlParser.messageSenderExtractor).runWith(Sink.head)
 
       whenReady(parsedResult) {
-        _.isLeft
+        _.mustBe(Left(NoElementFound("messageSender")))
       }
     }
   }
