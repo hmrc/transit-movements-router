@@ -39,7 +39,7 @@ class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers {
       val parsedResult = stream.via(XmlParser.messageSenderExtractor).runWith(Sink.head)
 
       whenReady(parsedResult) {
-        _.right.get mustBe MessageSenderId("GB1234")
+        _.right.get mustBe MessageSender("GB1234")
       }
     }
 

@@ -24,10 +24,10 @@ import uk.gov.hmrc.transitmovementsrouter.models._
 
 object XmlParser extends XmlParsingServiceHelpers {
 
-  val messageSenderExtractor: Flow[ParseEvent, ParseResult[MessageSenderId], NotUsed] = XmlParsing
+  val messageSenderExtractor: Flow[ParseEvent, ParseResult[MessageSender], NotUsed] = XmlParsing
     .subtree("CC015C" :: "messageSender" :: Nil)
     .collect {
-      case element if element.getTextContent.nonEmpty => MessageSenderId(element.getTextContent)
+      case element if element.getTextContent.nonEmpty => MessageSender(element.getTextContent)
     }
     .single("messageSender")
 
