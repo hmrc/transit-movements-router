@@ -77,7 +77,7 @@ class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers {
       val parsedResult = stream.via(XmlParser.officeOfDepartureExtractor).runWith(Sink.head)
 
       whenReady(parsedResult) {
-        _.isLeft
+        _.mustBe(Left(NoElementFound("referenceNumber")))
       }
     }
 
@@ -86,7 +86,7 @@ class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers {
       val parsedResult = stream.via(XmlParser.officeOfDepartureExtractor).runWith(Sink.head)
 
       whenReady(parsedResult) {
-        _.isLeft
+        _.mustBe(Left(NoElementFound("referenceNumber")))
       }
     }
   }
