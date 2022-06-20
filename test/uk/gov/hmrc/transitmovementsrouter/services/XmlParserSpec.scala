@@ -39,7 +39,7 @@ class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers {
       val parsedResult = stream.via(XmlParser.messageSenderExtractor).runWith(Sink.head)
 
       whenReady(parsedResult) {
-        _.right.get mustBe MessageSender("GB1234")
+        _.right.get mustBe MessageSender("MVN123456789-MSG987654321")
       }
     }
 
@@ -97,7 +97,7 @@ class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers {
 
     val parsedResult = stream
       .via(XmlParsing.parser)
-      .via(XmlParser.messageSenderWriter(MessageId("GB123456789"))) // testing this
+      .via(XmlParser.messageSenderWriter(MessageSender("MVN123456789-MSG987654321"))) // testing this
       .via(XmlWriting.writer)
       .fold(ByteString())(_ ++ _)
       .map(_.utf8String)
@@ -121,7 +121,7 @@ class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers {
 
     val cc015cValidGB: NodeSeq =
       <CC015C>
-        <messageSender>GB1234</messageSender>
+        <messageSender>MVN123456789-MSG987654321</messageSender>
         <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
         <CustomsOfficeOfDeparture>
           <referenceNumber>GB6789</referenceNumber>
@@ -144,7 +144,7 @@ class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers {
 
     val cc015cWithExpectedMessageSenderNode: NodeSeq =
       <CC015C>
-        <messageSender>GB123456789</messageSender>
+        <messageSender>MVN123456789-MSG987654321</messageSender>
         <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
       </CC015C>
 

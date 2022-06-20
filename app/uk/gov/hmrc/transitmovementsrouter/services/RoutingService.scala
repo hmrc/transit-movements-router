@@ -67,14 +67,14 @@ class RoutingServiceImpl @Inject() (messageConnectorProvider: MessageConnectorPr
     }
   )
 
-  def buildMessage(messageId: MessageId): Flow[ByteString, ByteString, NotUsed] =
+  def buildMessage(messageSender: MessageSender): Flow[ByteString, ByteString, NotUsed] =
     Flow.fromGraph(
       GraphDSL.create() {
         implicit builder =>
           import GraphDSL.Implicits._
 
           val xmlParsing: FlowShape[ByteString, ParseEvent]         = builder.add(XmlParsing.parser)
-          val insertSenderWriter: FlowShape[ParseEvent, ParseEvent] = builder.add(XmlParser.messageSenderWriter(messageId))
+          val insertSenderWriter: FlowShape[ParseEvent, ParseEvent] = builder.add(XmlParser.messageSenderWriter(messageSender))
           val toByteString                                          = builder.add(XmlWriting.writer)
           xmlParsing ~> insertSenderWriter ~> toByteString
 
@@ -89,9 +89,9 @@ class RoutingServiceImpl @Inject() (messageConnectorProvider: MessageConnectorPr
     payload: Source[ByteString, _]
   )(implicit hc: HeaderCarrier): EitherT[Future, RoutingError, Unit] = {
 
-    implicit val officeOfDeparture = payload.toMat(officeOfDepartureSink)(Keep.right).run()
-    implicit val updatedPayload    = payload.via(buildMessage(messageId))
-    implicit val messageSender     = MessageSender(messageId.value)
+    val officeOfDeparture       = payload.toMat(officeOfDepartureSink)(Keep.right).run()
+    implicit val messageSender  = MessageSender(movementId, messageId)
+    implicit val updatedPayload = payload.via(buildMessage(messageSender))
 
     EitherT(post(officeOfDeparture))
   }

@@ -38,11 +38,11 @@ object XmlParser extends XmlParsingServiceHelpers {
     }
     .single("referenceNumber")
 
-  def messageSenderWriter(messageId: MessageId): Flow[ParseEvent, ParseEvent, NotUsed] = Flow[ParseEvent]
+  def messageSenderWriter(messageSender: MessageSender): Flow[ParseEvent, ParseEvent, NotUsed] = Flow[ParseEvent]
     .mapConcat(
       element =>
         if (isElement("CC015C", element))
-          Seq(element, StartElement("messageSender"), Characters(s"${messageId.value}"), EndElement("messageSender"))
+          Seq(element, StartElement("messageSender"), Characters(s"${messageSender.value}"), EndElement("messageSender"))
         else Seq(element)
     )
 
