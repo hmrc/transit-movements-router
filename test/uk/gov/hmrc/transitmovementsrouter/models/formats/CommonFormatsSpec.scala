@@ -19,8 +19,10 @@ package uk.gov.hmrc.transitmovementsrouter.models.formats
 import cats.data.NonEmptyList
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
-import play.api.libs.json.{JsArray, JsNumber, JsSuccess, JsValue}
-
+import play.api.libs.json.JsArray
+import play.api.libs.json.JsNumber
+import play.api.libs.json.JsSuccess
+import play.api.libs.json.JsValue
 
 class CommonFormatsSpec extends AnyFreeSpec with Matchers {
 
