@@ -82,7 +82,7 @@ class MessageConnectorSpec
       RetryPolicies.limitRetries[Future](1)(cats.implicits.catsStdInstancesForFuture(ec))
   }
 
-  val messageSender: MessageSender = Gen.alphaNumStr.map(MessageSender).sample.get
+  val messageSender: MessageSender = Gen.alphaNumStr.map(MessageSender(_)).sample.get
   val uriStub                      = "/transit-movements-eis-stub/movements/messages"
 
   val connectorConfig: EISInstanceConfig = EISInstanceConfig(
