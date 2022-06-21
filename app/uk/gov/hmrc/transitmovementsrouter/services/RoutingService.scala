@@ -96,7 +96,6 @@ class RoutingServiceImpl @Inject() (messageConnectorProvider: MessageConnectorPr
     EitherT(post(officeOfDeparture))
   }
 
-  //TODO:  Not quite sure what we return here
   private def post(
     office: Future[ParseResult[OfficeOfDeparture]]
   )(implicit messageSender: MessageSender, body: Source[ByteString, _], hc: HeaderCarrier): Future[Either[RoutingError, Unit]] = {
