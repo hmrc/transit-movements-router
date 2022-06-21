@@ -16,10 +16,4 @@
 
 package uk.gov.hmrc.transitmovementsrouter.models
 
-case class MessageSender(value: String) extends AnyVal
-
-object MessageSender {
-
-  def apply(movementId: MovementId, messageId: MessageId): MessageSender =
-    MessageSender(s"${movementId.value}-${messageId.value}")
-}
+case class MovementId(value: String) extends AnyVal

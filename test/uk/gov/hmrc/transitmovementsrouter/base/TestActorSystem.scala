@@ -14,12 +14,17 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovementsrouter.models
+package uk.gov.hmrc.transitmovementsrouter.base
 
-case class MessageSender(value: String) extends AnyVal
+import akka.actor.ActorSystem
+import akka.stream.Materializer
+import org.scalatest.Suite
 
-object MessageSender {
+object TestActorSystem {
+  val system: ActorSystem = ActorSystem("test")
+}
 
-  def apply(movementId: MovementId, messageId: MessageId): MessageSender =
-    MessageSender(s"${movementId.value}-${messageId.value}")
+trait TestActorSystem { self: Suite =>
+  implicit val system: ActorSystem        = TestActorSystem.system
+  implicit val materializer: Materializer = Materializer(TestActorSystem.system)
 }

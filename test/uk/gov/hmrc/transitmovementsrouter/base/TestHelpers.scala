@@ -14,12 +14,14 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovementsrouter.models
+package uk.gov.hmrc.transitmovementsrouter.base
 
-case class MessageSender(value: String) extends AnyVal
+import play.api.inject.guice.GuiceApplicationBuilder
+import uk.gov.hmrc.http.HeaderCarrier
 
-object MessageSender {
+object TestHelpers {
 
-  def apply(movementId: MovementId, messageId: MessageId): MessageSender =
-    MessageSender(s"${movementId.value}-${messageId.value}")
+  lazy val headerCarrierConfig: HeaderCarrier.Config =
+    HeaderCarrier.Config.fromConfig(GuiceApplicationBuilder().build().configuration.underlying)
+
 }
