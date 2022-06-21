@@ -115,6 +115,7 @@ class MessageConnectorImpl(
       val requestHeaders = hc.headers(OutgoingHeaders.headers) ++ Seq(
         "X-Correlation-Id"        -> UUID.randomUUID().toString,
         "CustomProcessHost"       -> "Digital",
+        "X-Message-Sender"        -> messageSender.value,
         HeaderNames.ACCEPT        -> MimeTypes.XML, // TODO: is this still relevant? Can't use ContentTypes.XML because EIS will not accept "application/xml; charset=utf-8"
         HeaderNames.AUTHORIZATION -> s"Bearer ${eisInstanceConfig.headers.bearerToken}"
       )
@@ -128,7 +129,7 @@ class MessageConnectorImpl(
         s"""|Posting NCTS message, routing to $code
                 |X-Correlation-Id: ${getHeader("X-Correlation-Id", eisInstanceConfig.url)(headerCarrier)}
                 |${HMRCHeaderNames.xRequestId}: $requestId
-                |X-Message-Type: ${getHeader("X-Message-Type", eisInstanceConfig.url)(headerCarrier)}
+                |X-Message-Type: ${getHeader("X-Message-Type", eisInstanceConfig.url)(headerCarrier)} // TODO - might need this from the service too
                 |X-Message-Sender: ${getHeader("X-Message-Sender", eisInstanceConfig.url)(headerCarrier)}
                 |Accept: ${getHeader("Accept", eisInstanceConfig.url)(headerCarrier)}
                 |CustomProcessHost: ${getHeader("CustomProcessHost", eisInstanceConfig.url)(headerCarrier)}
