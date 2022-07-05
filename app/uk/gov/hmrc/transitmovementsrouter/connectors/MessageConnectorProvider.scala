@@ -20,7 +20,7 @@ import akka.stream.Materializer
 import com.google.inject.ImplementedBy
 import com.google.inject.Inject
 import com.google.inject.Singleton
-import play.api.libs.ws.WSClient
+import uk.gov.hmrc.http.client.HttpClientV2
 import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
 
 import scala.concurrent.ExecutionContext
@@ -37,11 +37,11 @@ trait MessageConnectorProvider {
 class MessageConnectorProviderImpl @Inject() (
   appConfig: AppConfig,
   retries: Retries,
-  ws: WSClient
+  httpClientV2: HttpClientV2
 )(implicit ec: ExecutionContext, mat: Materializer)
     extends MessageConnectorProvider {
 
-  lazy val gb: MessageConnector = new MessageConnectorImpl("GB", appConfig.eisGb, appConfig.headerCarrierConfig, ws, retries)
-  lazy val xi: MessageConnector = new MessageConnectorImpl("XI", appConfig.eisXi, appConfig.headerCarrierConfig, ws, retries)
+  lazy val gb: MessageConnector = new MessageConnectorImpl("GB", appConfig.eisGb, appConfig.headerCarrierConfig, httpClientV2, retries)
+  lazy val xi: MessageConnector = new MessageConnectorImpl("XI", appConfig.eisXi, appConfig.headerCarrierConfig, httpClientV2, retries)
 
 }

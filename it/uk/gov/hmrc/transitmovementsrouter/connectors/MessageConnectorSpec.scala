@@ -40,6 +40,7 @@ import play.api.test.Helpers._
 import retry.RetryPolicies
 import retry.RetryPolicy
 import uk.gov.hmrc.http.HeaderCarrier
+import uk.gov.hmrc.http.test.HttpClientV2Support
 import uk.gov.hmrc.transitmovementsrouter.base.RegexPatterns
 import uk.gov.hmrc.transitmovementsrouter.base.TestActorSystem
 import uk.gov.hmrc.transitmovementsrouter.base.TestHelpers
@@ -57,6 +58,7 @@ import scala.concurrent.Future
 
 class MessageConnectorSpec
     extends AnyWordSpec
+    with HttpClientV2Support
     with Matchers
     with WiremockSuite
     with ScalaFutures
@@ -107,8 +109,8 @@ class MessageConnectorSpec
   )
 
   // We construct the connector each time to avoid issues with the circuit breaker
-  def noRetriesConnector = new MessageConnectorImpl("NoRetry", connectorConfig, TestHelpers.headerCarrierConfig, AhcWSClient(), NoRetries)
-  def oneRetryConnector  = new MessageConnectorImpl("OneRetry", connectorConfig, TestHelpers.headerCarrierConfig, AhcWSClient(), OneRetry)
+  def noRetriesConnector = new MessageConnectorImpl("NoRetry", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, NoRetries)
+  def oneRetryConnector  = new MessageConnectorImpl("OneRetry", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, OneRetry)
 
   lazy val connectorGen: Gen[() => MessageConnector] = Gen.oneOf(() => noRetriesConnector, () => oneRetryConnector)
 
@@ -258,7 +260,7 @@ class MessageConnectorSpec
     when(request.post(ArgumentMatchers.any[Source[ByteString, _]])(ArgumentMatchers.any())).thenReturn(Future.failed(error))
 
     val hc        = HeaderCarrier()
-    val connector = new MessageConnectorImpl("Failure", connectorConfig, TestHelpers.headerCarrierConfig, ws, NoRetries)
+    val connector = new MessageConnectorImpl("Failure", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, NoRetries)
 
     whenReady(connector.post(messageSender, source, hc)) {
       case Left(x) if x.isInstanceOf[RoutingError.Unexpected] => x.asInstanceOf[RoutingError.Unexpected].cause mustBe Some(error)

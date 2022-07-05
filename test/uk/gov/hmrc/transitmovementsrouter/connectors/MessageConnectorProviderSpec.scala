@@ -28,7 +28,7 @@ import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.time.SpanSugar.convertIntToGrainOfTime
 import org.scalatestplus.mockito.MockitoSugar
-import play.api.libs.ws.ahc.AhcWSClient
+import uk.gov.hmrc.http.test.HttpClientV2Support
 import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
 import uk.gov.hmrc.transitmovementsrouter.config.CircuitBreakerConfig
 import uk.gov.hmrc.transitmovementsrouter.config.EISInstanceConfig
@@ -37,7 +37,7 @@ import uk.gov.hmrc.transitmovementsrouter.config.RetryConfig
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class MessageConnectorProviderSpec extends AnyFreeSpec with Matchers with ScalaFutures with MockitoSugar with BeforeAndAfterEach {
+class MessageConnectorProviderSpec extends AnyFreeSpec with HttpClientV2Support with Matchers with ScalaFutures with MockitoSugar with BeforeAndAfterEach {
 
   implicit val materializer: Materializer = NoMaterializer
 
@@ -78,7 +78,7 @@ class MessageConnectorProviderSpec extends AnyFreeSpec with Matchers with ScalaF
     "getting the GB connector will get the GB config" in {
 
       // Given this message connector
-      val sut = new MessageConnectorProviderImpl(appConfig, retries, AhcWSClient())
+      val sut = new MessageConnectorProviderImpl(appConfig, retries, httpClientV2)
 
       // When we call the lazy val for GB
       sut.gb
@@ -93,7 +93,7 @@ class MessageConnectorProviderSpec extends AnyFreeSpec with Matchers with ScalaF
     "getting the XI connector will get the XI config" in {
 
       // Given this message connector
-      val sut = new MessageConnectorProviderImpl(appConfig, retries, AhcWSClient())
+      val sut = new MessageConnectorProviderImpl(appConfig, retries, httpClientV2)
 
       // When we call the lazy val for XI
       sut.xi
@@ -108,7 +108,7 @@ class MessageConnectorProviderSpec extends AnyFreeSpec with Matchers with ScalaF
     "both connectors are not the same" in {
 
       // Given this message connector
-      val sut = new MessageConnectorProviderImpl(appConfig, retries, AhcWSClient())
+      val sut = new MessageConnectorProviderImpl(appConfig, retries, httpClientV2)
 
       sut.gb must not be sut.xi
     }

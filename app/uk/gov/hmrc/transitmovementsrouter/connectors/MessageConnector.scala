@@ -28,9 +28,12 @@ import retry.RetryDetails
 import retry.alleycats.instances._
 import retry.retryingOnFailures
 import uk.gov.hmrc.http.HeaderCarrier
+import uk.gov.hmrc.http.StringContextOps
 import uk.gov.hmrc.http.UpstreamErrorResponse
 import uk.gov.hmrc.http.{HeaderNames => HMRCHeaderNames}
+import uk.gov.hmrc.http.client.HttpClientV2
 import uk.gov.hmrc.transitmovementsrouter.config.EISInstanceConfig
+import uk.gov.hmrc.transitmovementsrouter.models.HttpClientV2Response
 import uk.gov.hmrc.transitmovementsrouter.models.MessageSender
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
 
@@ -51,7 +54,7 @@ class MessageConnectorImpl(
   val code: String,
   val eisInstanceConfig: EISInstanceConfig,
   headerCarrierConfig: HeaderCarrier.Config,
-  ws: WSClient,
+  httpClientV2: HttpClientV2,
   retries: Retries
 )(implicit
   ec: ExecutionContext,
@@ -136,9 +139,12 @@ class MessageConnectorImpl(
                 |""".stripMargin
 
       withCircuitBreaker[Either[RoutingError, Unit]](shouldCauseCircuitBreakerStrike) {
-        ws.url(eisInstanceConfig.url)
-          .addHttpHeaders(headerCarrier.headersForUrl(headerCarrierConfig)(eisInstanceConfig.url): _*)
-          .post(body)
+
+        httpClientV2
+          .post(url"${eisInstanceConfig.url}")
+          .withBody(body)
+          .addHeaders(headerCarrier.headersForUrl(headerCarrierConfig)(eisInstanceConfig.url): _*)
+          .execute[HttpClientV2Response]
           .map {
             result =>
               val logMessageWithStatus = logMessage + s"Response status: ${result.status}"

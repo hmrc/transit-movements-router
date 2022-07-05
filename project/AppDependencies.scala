@@ -10,7 +10,7 @@ object AppDependencies {
   private val catsRetryVersion = "3.1.0"
 
   val compile = Seq(
-    "uk.gov.hmrc"        %% "bootstrap-backend-play-28" % "5.24.0",
+    "uk.gov.hmrc"        %% "bootstrap-backend-play-28" % "6.2.0",
     "org.typelevel"      %% "cats-core"                 % catsVersion,
     "com.github.cb372"   %% "cats-retry"                % catsRetryVersion,
     "com.github.cb372"   %% "alleycats-retry"           % catsRetryVersion,
@@ -31,6 +31,7 @@ object AppDependencies {
     "org.scalatestplus"      %% "scalacheck-1-14"         % "3.2.2.0",
     "org.typelevel"          %% "cats-core"               % catsVersion,
     "com.github.cb372"       %% "cats-retry"              % catsRetryVersion,
-    "com.github.cb372"       %% "alleycats-retry"         % catsRetryVersion
+    "com.github.cb372"       %% "alleycats-retry"         % catsRetryVersion,
+    "uk.gov.hmrc"            %% "bootstrap-test-play-28"  % "6.2.0"
   ).map(_ % s"$Test, $IntegrationTest")
 }
