@@ -23,20 +23,19 @@ import play.api.Logging
 import play.api.http.HeaderNames
 import play.api.http.MimeTypes
 import play.api.http.Status
-import play.api.libs.ws.WSClient
 import retry.RetryDetails
 import retry.alleycats.instances._
 import retry.retryingOnFailures
 import uk.gov.hmrc.http.HeaderCarrier
+import uk.gov.hmrc.http.HttpResponse
 import uk.gov.hmrc.http.StringContextOps
 import uk.gov.hmrc.http.UpstreamErrorResponse
 import uk.gov.hmrc.http.{HeaderNames => HMRCHeaderNames}
 import uk.gov.hmrc.http.client.HttpClientV2
 import uk.gov.hmrc.transitmovementsrouter.config.EISInstanceConfig
-import uk.gov.hmrc.transitmovementsrouter.models.HttpClientV2Response
 import uk.gov.hmrc.transitmovementsrouter.models.MessageSender
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
-
+import uk.gov.hmrc.http.HttpReads.Implicits._
 import java.util.UUID
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
@@ -73,12 +72,6 @@ class MessageConnectorImpl(
         case (_, value) => value
       }
       .getOrElse("undefined")
-
-  private def statusCodeFailure(status: Int): Boolean =
-    shouldCauseRetry(status) || status == Status.FORBIDDEN
-
-  private def shouldCauseRetry(status: Int): Boolean =
-    Status.isServerError(status)
 
   def shouldCauseCircuitBreakerStrike(result: Try[Either[RoutingError, Unit]]): Boolean =
     result.map(_.isLeft).getOrElse(true)
@@ -144,20 +137,14 @@ class MessageConnectorImpl(
           .post(url"${eisInstanceConfig.url}")
           .withBody(body)
           .addHeaders(headerCarrier.headersForUrl(headerCarrierConfig)(eisInstanceConfig.url): _*)
-          .execute[HttpClientV2Response]
+          .execute[Either[UpstreamErrorResponse, HttpResponse]]
           .map {
-            result =>
-              val logMessageWithStatus = logMessage + s"Response status: ${result.status}"
-              if (statusCodeFailure(result.status)) {
-                logger.warn(logMessageWithStatus)
-              } else {
-                logger.info(logMessageWithStatus)
-              }
-
-              if (result.status > 399)
-                Left(RoutingError.Upstream(UpstreamErrorResponse(s"Request Error: Routing to $code returned status code ${result.status}", result.status)))
-              else
-                Right(())
+            case Right(result) =>
+              logger.info(logMessage + s"Response status: ${result.status}")
+              Right(())
+            case Left(error) =>
+              logger.warn(logMessage + s"Response status: ${error.statusCode}")
+              Left(RoutingError.Upstream(UpstreamErrorResponse(s"Request Error: Routing to $code returned status code ${error.statusCode}", error.statusCode)))
           }
           .recover {
             case NonFatal(e) =>

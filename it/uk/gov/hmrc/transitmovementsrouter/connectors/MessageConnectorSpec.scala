@@ -21,7 +21,6 @@ import akka.util.ByteString
 import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.stubbing.Scenario
 import org.mockito.ArgumentMatchers
-import org.mockito.ArgumentMatchers.anyString
 import org.mockito.Mockito.when
 import org.scalacheck.Gen
 import org.scalatest.concurrent.IntegrationPatience
@@ -33,17 +32,14 @@ import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.mockito.MockitoSugar
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import play.api.http.HeaderNames
-import play.api.libs.ws.WSClient
-import play.api.libs.ws.WSRequest
-import play.api.libs.ws.ahc.AhcWSClient
 import play.api.test.Helpers._
 import retry.RetryPolicies
 import retry.RetryPolicy
 import uk.gov.hmrc.http.HeaderCarrier
+import uk.gov.hmrc.http.client.HttpClientV2
 import uk.gov.hmrc.http.test.HttpClientV2Support
 import uk.gov.hmrc.transitmovementsrouter.base.RegexPatterns
 import uk.gov.hmrc.transitmovementsrouter.base.TestActorSystem
-import uk.gov.hmrc.transitmovementsrouter.base.TestHelpers
 import uk.gov.hmrc.transitmovementsrouter.base.TestHelpers
 import uk.gov.hmrc.transitmovementsrouter.config.CircuitBreakerConfig
 import uk.gov.hmrc.transitmovementsrouter.config.EISInstanceConfig
@@ -52,6 +48,7 @@ import uk.gov.hmrc.transitmovementsrouter.config.RetryConfig
 import uk.gov.hmrc.transitmovementsrouter.models.MessageSender
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
 
+import java.net.URL
 import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -95,7 +92,7 @@ class MessageConnectorSpec
     Headers("bearertokenhereGB"),
     CircuitBreakerConfig(
       3,
-      1.seconds,
+      2.seconds,
       2.seconds,
       3.seconds,
       1,
@@ -252,18 +249,15 @@ class MessageConnectorSpec
   }
 
   "handle exceptions by returning an HttpResponse with status code 500" in {
-    val ws      = mock[WSClient]
-    val request = mock[WSRequest]
-    val error   = new RuntimeException("Simulated error")
-    when(ws.url(anyString())).thenReturn(request)
-    when(request.addHttpHeaders(ArgumentMatchers.any())).thenReturn(request)
-    when(request.post(ArgumentMatchers.any[Source[ByteString, _]])(ArgumentMatchers.any())).thenReturn(Future.failed(error))
+    val httpClientV2 = mock[HttpClientV2]
 
     val hc        = HeaderCarrier()
     val connector = new MessageConnectorImpl("Failure", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, NoRetries)
 
+    when(httpClientV2.post(ArgumentMatchers.any[URL])(ArgumentMatchers.any[HeaderCarrier])).thenReturn(new FakeRequestBuilder)
+
     whenReady(connector.post(messageSender, source, hc)) {
-      case Left(x) if x.isInstanceOf[RoutingError.Unexpected] => x.asInstanceOf[RoutingError.Unexpected].cause mustBe Some(error)
+      case Left(x) if x.isInstanceOf[RoutingError.Unexpected] => x.asInstanceOf[RoutingError.Unexpected].cause.get mustBe a[RuntimeException]
       case _                                                  => fail("Left was not a RoutingError.Unexpected")
     }
   }
