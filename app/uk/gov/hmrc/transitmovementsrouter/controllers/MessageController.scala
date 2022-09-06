@@ -26,6 +26,7 @@ import play.api.mvc.Result
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
 import uk.gov.hmrc.play.http.HeaderCarrierConverter
+import uk.gov.hmrc.transitmovementsrouter.connectors.PersistenceConnector
 import uk.gov.hmrc.transitmovementsrouter.controllers.errors.ConvertError
 import uk.gov.hmrc.transitmovementsrouter.controllers.stream.StreamingParsers
 import uk.gov.hmrc.transitmovementsrouter.models.EoriNumber
@@ -38,14 +39,15 @@ import javax.inject.Inject
 
 class MessagesController @Inject() (
   cc: ControllerComponents,
-  routingService: RoutingService
+  routingService: RoutingService,
+  persistenceConnector: PersistenceConnector
 )(implicit
   val materializer: Materializer
 ) extends BackendController(cc)
     with StreamingParsers
     with ConvertError {
 
-  def post(eori: EoriNumber, movementType: MovementType, movementId: MovementId, messageId: MessageId): Action[Source[ByteString, _]] = Action.async(
+  def outgoing(eori: EoriNumber, movementType: MovementType, movementId: MovementId, messageId: MessageId): Action[Source[ByteString, _]] = Action.async(
     streamFromFile
   ) {
     implicit request =>
@@ -57,5 +59,17 @@ class MessagesController @Inject() (
         _ => Accepted
       )
   }
+
+  def incoming(ids: (MovementId, MessageId)): Action[Source[ByteString, _]] = Action
+    .async(streamFromFile) {
+      implicit request =>
+        implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
+        val (movementId, messageId)    = ids
+
+        persistenceConnector
+          .post(movementId, messageId, request.body)
+          .asPresentation
+          .fold[Result](error => Status(error.code.statusCode)(Json.toJson(error)), _ => Created)
+    }
 
 }

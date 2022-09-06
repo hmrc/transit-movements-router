@@ -22,6 +22,7 @@ import play.api.libs.json.OWrites
 import play.api.libs.json.Reads
 import play.api.libs.json.__
 import uk.gov.hmrc.http.UpstreamErrorResponse
+import uk.gov.hmrc.transitmovementsrouter.models.errors.ErrorCode
 import uk.gov.hmrc.transitmovementsrouter.models.formats.CommonFormats
 
 object PresentationError extends CommonFormats {
@@ -44,6 +45,9 @@ object PresentationError extends CommonFormats {
     cause: UpstreamErrorResponse
   ): PresentationError =
     UpstreamServiceError(message, code, cause)
+
+  def notImplemented(message: String = "Not Implemented"): PresentationError =
+    StandardError(message, ErrorCode.NotImplemented)
 
   def internalServiceError(
     message: String = "Internal server error",

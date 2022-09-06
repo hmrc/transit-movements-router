@@ -37,7 +37,7 @@ import uk.gov.hmrc.transitmovementsrouter.config.RetryConfig
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class MessageConnectorProviderSpec extends AnyFreeSpec with HttpClientV2Support with Matchers with ScalaFutures with MockitoSugar with BeforeAndAfterEach {
+class OutgoingConnectorProviderSpec extends AnyFreeSpec with HttpClientV2Support with Matchers with ScalaFutures with MockitoSugar with BeforeAndAfterEach {
 
   implicit val materializer: Materializer = NoMaterializer
 

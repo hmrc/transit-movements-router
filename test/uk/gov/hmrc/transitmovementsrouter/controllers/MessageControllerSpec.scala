@@ -46,6 +46,7 @@ import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.HttpVerbs.POST
 import uk.gov.hmrc.transitmovementsrouter.base.StreamTestHelpers.createStream
 import uk.gov.hmrc.transitmovementsrouter.base.TestActorSystem
+import uk.gov.hmrc.transitmovementsrouter.connectors.PersistenceConnector
 import uk.gov.hmrc.transitmovementsrouter.models.EoriNumber
 import uk.gov.hmrc.transitmovementsrouter.models.MessageId
 import uk.gov.hmrc.transitmovementsrouter.models.MovementId
@@ -72,12 +73,13 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
       </CustomsOfficeOfDeparture>
     </CC015C>
 
-  val mockRoutingService = mock[RoutingService]
+  val mockRoutingService       = mock[RoutingService]
+  val mockPersistenceConnector = mock[PersistenceConnector]
 
   val errorHandler                    = new DefaultHttpErrorHandler(HttpErrorConfig(showDevErrors = false, None), None, None)
   val controllerComponentWithTempFile = stubControllerComponents(playBodyParsers = PlayBodyParsers(SingletonTemporaryFileCreator, errorHandler)(materializer))
 
-  val controller = new MessagesController(controllerComponentWithTempFile, mockRoutingService)
+  val controller = new MessagesController(controllerComponentWithTempFile, mockRoutingService, mockPersistenceConnector)
 
   def source = createStream(cc015cOfficeOfDepartureGB)
 
@@ -86,7 +88,7 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
   ): Request[Source[ByteString, _]] =
     FakeRequest(
       method = POST,
-      uri = routes.MessagesController.post(eori, movementType, movementId, messageId).url,
+      uri = routes.MessagesController.outgoing(eori, movementType, movementId, messageId).url,
       headers = FakeHeaders(Seq.empty),
       body = createStream(body)
     )
@@ -111,7 +113,7 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
         )(any[HeaderCarrier])
       ).thenReturn(submitDeclarationEither)
 
-      val result = controller.post(eori, movementType, movementId, messageId)(fakeRequest(cc015cOfficeOfDepartureGB))
+      val result = controller.outgoing(eori, movementType, movementId, messageId)(fakeRequest(cc015cOfficeOfDepartureGB))
 
       status(result) mustBe ACCEPTED
     }
@@ -129,7 +131,7 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
           )(any[HeaderCarrier])
         ).thenReturn(EitherT[Future, RoutingError, Unit](Future.successful(Left(RoutingError.NoElementFound("messageSender")))))
 
-        val result = controller.post(eori, movementType, movementId, messageId)(fakeRequest(cc015cOfficeOfDepartureGB))
+        val result = controller.outgoing(eori, movementType, movementId, messageId)(fakeRequest(cc015cOfficeOfDepartureGB))
 
         status(result) mustBe BAD_REQUEST
         contentAsJson(result) mustBe Json.obj(
@@ -149,7 +151,7 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
           )(any[HeaderCarrier])
         ).thenReturn(EitherT[Future, RoutingError, Unit](Future.successful(Left(RoutingError.TooManyElementsFound("eori")))))
 
-        val result = controller.post(eori, movementType, movementId, messageId)(fakeRequest(cc015cOfficeOfDepartureGB))
+        val result = controller.outgoing(eori, movementType, movementId, messageId)(fakeRequest(cc015cOfficeOfDepartureGB))
 
         status(result) mustBe BAD_REQUEST
         contentAsJson(result) mustBe Json.obj(
@@ -174,7 +176,7 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
         )
       )
 
-      val result = controller.post(eori, movementType, movementId, messageId)(fakeRequest(cc015cOfficeOfDepartureGB))
+      val result = controller.outgoing(eori, movementType, movementId, messageId)(fakeRequest(cc015cOfficeOfDepartureGB))
 
       status(result) mustBe INTERNAL_SERVER_ERROR
       contentAsJson(result) mustBe Json.obj(

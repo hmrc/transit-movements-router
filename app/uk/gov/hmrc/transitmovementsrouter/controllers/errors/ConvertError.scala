@@ -17,6 +17,7 @@
 package uk.gov.hmrc.transitmovementsrouter.controllers.errors
 
 import cats.data.EitherT
+import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError._
 
@@ -45,6 +46,15 @@ trait ConvertError {
       case BadDateTime(element, ex)        => PresentationError.badRequestError(s"Could not parse datetime for $element: ${ex.getMessage}")
     }
 
+  }
+
+  implicit val persistenceErrorConverter = new Converter[PersistenceError] {
+    import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError._
+
+    def convert(error: PersistenceError): PresentationError = error match {
+      case MovementNotFound(movementId) => PresentationError.badRequestError(s"Movement $movementId not found")
+      case Unexpected(error)            => PresentationError.internalServiceError(cause = error)
+    }
   }
 
 }

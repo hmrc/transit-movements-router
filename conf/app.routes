@@ -1,3 +1,5 @@
 # microservice specific routes
 
-POST        /traders/:eori/movements/:movementType/:movementId/messages/:messageId             uk.gov.hmrc.transitmovementsrouter.controllers.MessagesController.post(eori: EoriNumber, movementType: MovementType, movementId: MovementId, messageId: MessageId)
+POST        /traders/:eori/movements/:movementType/:movementId/messages/:messageId             uk.gov.hmrc.transitmovementsrouter.controllers.MessagesController.outgoing(eori: EoriNumber, movementType: MovementType, movementId: MovementId, messageId: MessageId)
+
+POST        /traders/movements/:ids/messages                                                   uk.gov.hmrc.transitmovementsrouter.controllers.MessagesController.incoming(ids: (MovementId, MessageId))

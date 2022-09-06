@@ -28,8 +28,8 @@ import scala.concurrent.ExecutionContext
 @ImplementedBy(classOf[MessageConnectorProviderImpl])
 trait MessageConnectorProvider {
 
-  def gb: MessageConnector
-  def xi: MessageConnector
+  def gb: OutgoingConnector
+  def xi: OutgoingConnector
 
 }
 
@@ -41,7 +41,7 @@ class MessageConnectorProviderImpl @Inject() (
 )(implicit ec: ExecutionContext, mat: Materializer)
     extends MessageConnectorProvider {
 
-  lazy val gb: MessageConnector = new MessageConnectorImpl("GB", appConfig.eisGb, appConfig.headerCarrierConfig, httpClientV2, retries)
-  lazy val xi: MessageConnector = new MessageConnectorImpl("XI", appConfig.eisXi, appConfig.headerCarrierConfig, httpClientV2, retries)
+  lazy val gb: OutgoingConnector = new OutgoingConnectorImpl("GB", appConfig.eisGb, appConfig.headerCarrierConfig, httpClientV2, retries)
+  lazy val xi: OutgoingConnector = new OutgoingConnectorImpl("XI", appConfig.eisXi, appConfig.headerCarrierConfig, httpClientV2, retries)
 
 }

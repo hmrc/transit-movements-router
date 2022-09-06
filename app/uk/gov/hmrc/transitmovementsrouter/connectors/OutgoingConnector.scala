@@ -22,7 +22,6 @@ import akka.util.ByteString
 import play.api.Logging
 import play.api.http.HeaderNames
 import play.api.http.MimeTypes
-import play.api.http.Status
 import retry.RetryDetails
 import retry.alleycats.instances._
 import retry.retryingOnFailures
@@ -42,14 +41,13 @@ import scala.concurrent.Future
 import scala.util.Try
 import scala.util.control.NonFatal
 
-trait MessageConnector {
+trait OutgoingConnector {
 
   def post(messageSender: MessageSender, body: Source[ByteString, _], hc: HeaderCarrier): Future[Either[RoutingError, Unit]]
 
 }
 
-// TODO: Change WSClient for HttpClientV2 when https://github.com/hmrc/bootstrap-play/pull/75 is pulled
-class MessageConnectorImpl(
+class OutgoingConnectorImpl(
   val code: String,
   val eisInstanceConfig: EISInstanceConfig,
   headerCarrierConfig: HeaderCarrier.Config,
@@ -58,7 +56,7 @@ class MessageConnectorImpl(
 )(implicit
   ec: ExecutionContext,
   val materializer: Materializer
-) extends MessageConnector
+) extends OutgoingConnector
     with Logging
     with CircuitBreakers {
 
@@ -77,6 +75,7 @@ class MessageConnectorImpl(
     result.map(_.isLeft).getOrElse(true)
 
   def onFailure(response: Either[RoutingError, Unit], retryDetails: RetryDetails): Future[Unit] = {
+    //TODO: What should the other three cases do?
     val message: String = response.left.get match {
       case RoutingError.Upstream(upstreamErrorResponse) => s"with status code ${upstreamErrorResponse.statusCode}"
       case RoutingError.Unexpected(message, _)          => s"with error $message"

@@ -106,10 +106,10 @@ class MessageConnectorSpec
   )
 
   // We construct the connector each time to avoid issues with the circuit breaker
-  def noRetriesConnector = new MessageConnectorImpl("NoRetry", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, NoRetries)
-  def oneRetryConnector  = new MessageConnectorImpl("OneRetry", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, OneRetry)
+  def noRetriesConnector = new OutgoingConnectorImpl("NoRetry", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, NoRetries)
+  def oneRetryConnector  = new OutgoingConnectorImpl("OneRetry", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, OneRetry)
 
-  lazy val connectorGen: Gen[() => MessageConnector] = Gen.oneOf(() => noRetriesConnector, () => oneRetryConnector)
+  lazy val connectorGen: Gen[() => OutgoingConnector] = Gen.oneOf(() => noRetriesConnector, () => oneRetryConnector)
 
   def source: Source[ByteString, _] = Source.single(ByteString.fromString("<test></test>"))
 
@@ -252,7 +252,7 @@ class MessageConnectorSpec
     val httpClientV2 = mock[HttpClientV2]
 
     val hc        = HeaderCarrier()
-    val connector = new MessageConnectorImpl("Failure", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, NoRetries)
+    val connector = new OutgoingConnectorImpl("Failure", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, NoRetries)
 
     when(httpClientV2.post(ArgumentMatchers.any[URL])(ArgumentMatchers.any[HeaderCarrier])).thenReturn(new FakeRequestBuilder)
 

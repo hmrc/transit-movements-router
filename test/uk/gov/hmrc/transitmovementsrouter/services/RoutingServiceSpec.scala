@@ -75,7 +75,7 @@ class RoutingServiceSpec extends AnyFreeSpec with ScalaFutures with TestActorSys
   trait Setup {
 
     val mockMessageConnectorProvider = mock[MessageConnectorProvider]
-    val mockMessageConnector         = mock[MessageConnector]
+    val mockMessageConnector         = mock[OutgoingConnector]
 
     when(mockMessageConnectorProvider.gb) thenReturn mockMessageConnector
     when(mockMessageConnectorProvider.xi) thenReturn mockMessageConnector
