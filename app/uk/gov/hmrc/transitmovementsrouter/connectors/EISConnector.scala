@@ -75,7 +75,6 @@ class EISConnectorImpl(
     result.map(_.isLeft).getOrElse(true)
 
   def onFailure(response: Either[RoutingError, Unit], retryDetails: RetryDetails): Future[Unit] = {
-    //TODO: What should the other three cases do?
     val message: String = response.left.get match {
       case RoutingError.Upstream(upstreamErrorResponse) => s"with status code ${upstreamErrorResponse.statusCode}"
       case RoutingError.Unexpected(message, _)          => s"with error $message"

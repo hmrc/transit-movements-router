@@ -18,6 +18,7 @@ package uk.gov.hmrc.transitmovementsrouter.controllers.actions
 
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
+import com.google.inject.ImplementedBy
 import com.google.inject.Inject
 import play.api.http.HeaderNames
 import play.api.libs.json.Json
@@ -37,6 +38,7 @@ import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
 
+@ImplementedBy(classOf[MessageSizeActionImpl[_]])
 trait MessageSizeAction[R[_] <: Request[_]] extends ActionFilter[R]
 
 class MessageSizeActionImpl[R[_] <: Request[_]] @Inject() (config: AppConfig)(implicit val executionContext: ExecutionContext) extends MessageSizeAction[R] {
