@@ -41,13 +41,13 @@ import scala.concurrent.Future
 import scala.util.Try
 import scala.util.control.NonFatal
 
-trait OutgoingConnector {
+trait EISConnector {
 
   def post(messageSender: MessageSender, body: Source[ByteString, _], hc: HeaderCarrier): Future[Either[RoutingError, Unit]]
 
 }
 
-class OutgoingConnectorImpl(
+class EISConnectorImpl(
   val code: String,
   val eisInstanceConfig: EISInstanceConfig,
   headerCarrierConfig: HeaderCarrier.Config,
@@ -56,7 +56,7 @@ class OutgoingConnectorImpl(
 )(implicit
   ec: ExecutionContext,
   val materializer: Materializer
-) extends OutgoingConnector
+) extends EISConnector
     with Logging
     with CircuitBreakers {
 

@@ -56,6 +56,9 @@ object PresentationError extends CommonFormats {
   ): PresentationError =
     InternalServiceError(message, code, cause)
 
+  def entityTooLargeError(message: String): PresentationError =
+    StandardError(message, ErrorCode.EntityTooLarge)
+
   def unapply(error: PresentationError): Option[(String, ErrorCode)] = Some((error.message, error.code))
 
   implicit val baseErrorWrites: OWrites[PresentationError] =

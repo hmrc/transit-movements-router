@@ -37,7 +37,7 @@ import uk.gov.hmrc.transitmovementsrouter.config.RetryConfig
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class OutgoingConnectorProviderSpec extends AnyFreeSpec with HttpClientV2Support with Matchers with ScalaFutures with MockitoSugar with BeforeAndAfterEach {
+class EISConnectorProviderSpec extends AnyFreeSpec with HttpClientV2Support with Matchers with ScalaFutures with MockitoSugar with BeforeAndAfterEach {
 
   implicit val materializer: Materializer = NoMaterializer
 
@@ -78,7 +78,7 @@ class OutgoingConnectorProviderSpec extends AnyFreeSpec with HttpClientV2Support
     "getting the GB connector will get the GB config" in {
 
       // Given this message connector
-      val sut = new MessageConnectorProviderImpl(appConfig, retries, httpClientV2)
+      val sut = new EISConnectorProviderImpl(appConfig, retries, httpClientV2)
 
       // When we call the lazy val for GB
       sut.gb
@@ -93,7 +93,7 @@ class OutgoingConnectorProviderSpec extends AnyFreeSpec with HttpClientV2Support
     "getting the XI connector will get the XI config" in {
 
       // Given this message connector
-      val sut = new MessageConnectorProviderImpl(appConfig, retries, httpClientV2)
+      val sut = new EISConnectorProviderImpl(appConfig, retries, httpClientV2)
 
       // When we call the lazy val for XI
       sut.xi
@@ -108,7 +108,7 @@ class OutgoingConnectorProviderSpec extends AnyFreeSpec with HttpClientV2Support
     "both connectors are not the same" in {
 
       // Given this message connector
-      val sut = new MessageConnectorProviderImpl(appConfig, retries, httpClientV2)
+      val sut = new EISConnectorProviderImpl(appConfig, retries, httpClientV2)
 
       sut.gb must not be sut.xi
     }

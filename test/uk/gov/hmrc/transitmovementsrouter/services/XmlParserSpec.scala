@@ -173,6 +173,17 @@ class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers {
         <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
       </CC015C>
 
+    val wrappedExample: NodeSeq =
+      <TraderChannelResponse>
+        <intendedRoot>
+          <elem1>text</elem1>
+          <elem2>text</elem2>
+          <elem3>
+            <elem4>text</elem4>
+          </elem3>
+        </intendedRoot>
+      </TraderChannelResponse>
+
   }
 
 }

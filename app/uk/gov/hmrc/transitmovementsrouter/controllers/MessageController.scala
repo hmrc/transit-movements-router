@@ -22,25 +22,31 @@ import akka.util.ByteString
 import play.api.libs.json.Json
 import play.api.mvc.Action
 import play.api.mvc.ControllerComponents
+import play.api.mvc.DefaultActionBuilder
 import play.api.mvc.Result
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
 import uk.gov.hmrc.play.http.HeaderCarrierConverter
 import uk.gov.hmrc.transitmovementsrouter.connectors.PersistenceConnector
+import uk.gov.hmrc.transitmovementsrouter.controllers.actions.MessageSizeActionProvider
 import uk.gov.hmrc.transitmovementsrouter.controllers.errors.ConvertError
 import uk.gov.hmrc.transitmovementsrouter.controllers.stream.StreamingParsers
 import uk.gov.hmrc.transitmovementsrouter.models.EoriNumber
 import uk.gov.hmrc.transitmovementsrouter.models.MessageId
 import uk.gov.hmrc.transitmovementsrouter.models.MovementId
 import uk.gov.hmrc.transitmovementsrouter.models.MovementType
+import uk.gov.hmrc.transitmovementsrouter.services.MessageTypeHeaderExtractor
 import uk.gov.hmrc.transitmovementsrouter.services.RoutingService
+import uk.gov.hmrc.transitmovementsrouter.services.StreamingMessageTrimmer
 
 import javax.inject.Inject
 
 class MessagesController @Inject() (
   cc: ControllerComponents,
   routingService: RoutingService,
-  persistenceConnector: PersistenceConnector
+  persistenceConnector: PersistenceConnector,
+  trimmer: StreamingMessageTrimmer,
+  messageSize: MessageSizeActionProvider
 )(implicit
   val materializer: Materializer
 ) extends BackendController(cc)
@@ -60,16 +66,18 @@ class MessagesController @Inject() (
       )
   }
 
-  def incoming(ids: (MovementId, MessageId)): Action[Source[ByteString, _]] = Action
-    .async(streamFromFile) {
+  def incoming(ids: (MovementId, MessageId)): Action[Source[ByteString, _]] =
+    (DefaultActionBuilder.apply(cc.parsers.anyContent) andThen messageSize()).async(streamFromFile) {
       implicit request =>
         implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
         val (movementId, messageId)    = ids
 
-        persistenceConnector
-          .post(movementId, messageId, request.body)
-          .asPresentation
-          .fold[Result](error => Status(error.code.statusCode)(Json.toJson(error)), _ => Created)
+        (for {
+          messageType <- MessageTypeHeaderExtractor.extract(request.headers).asPresentation
+          newSource = trimmer.trim(request.body, messageType)
+          _ <- persistenceConnector.post(movementId, messageId, messageType, newSource).asPresentation
+        } yield ()).fold[Result](error => Status(error.code.statusCode)(Json.toJson(error)), _ => Created)
+
     }
 
 }

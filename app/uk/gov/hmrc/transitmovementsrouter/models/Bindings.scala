@@ -30,6 +30,6 @@ object Bindings {
         Right((MovementId(split.head), MessageId(split.last)))
       } else Left(s"$key: Value $value is not a pair of 16 character hexadecimal string's split by a hyphen")
 
-    override def unbind(key: String, value: (MovementId, MessageId)): String = s"${value._1}-${value._2}"
+    override def unbind(key: String, value: (MovementId, MessageId)): String = s"${value._1.value}-${value._2.value}"
   }
 }
