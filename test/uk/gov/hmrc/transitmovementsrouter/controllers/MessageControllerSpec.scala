@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovementsrouter.connectors.controllers
+package uk.gov.hmrc.transitmovementsrouter.controllers
 
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
@@ -29,11 +29,7 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.mockito.MockitoSugar.mock
 import play.api.http.DefaultHttpErrorHandler
 import play.api.http.HttpErrorConfig
-import play.api.http.Status.ACCEPTED
-import play.api.http.Status.BAD_REQUEST
-import play.api.http.Status.CREATED
-import play.api.http.Status.INTERNAL_SERVER_ERROR
-import play.api.http.Status.NOT_FOUND
+import play.api.http.Status._
 import play.api.libs.Files.SingletonTemporaryFileCreator
 import play.api.libs.json.Json
 import play.api.mvc.PlayBodyParsers
@@ -50,13 +46,11 @@ import uk.gov.hmrc.transitmovementsrouter.base.StreamTestHelpers.createStream
 import uk.gov.hmrc.transitmovementsrouter.base.TestActorSystem
 import uk.gov.hmrc.transitmovementsrouter.connectors.PersistenceConnector
 import uk.gov.hmrc.transitmovementsrouter.controllers.actions.MessageSizeActionProvider
-import uk.gov.hmrc.transitmovementsrouter.controllers.MessagesController
-import uk.gov.hmrc.transitmovementsrouter.controllers.routes
 import uk.gov.hmrc.transitmovementsrouter.fakes.actions.FakeMessageSizeAction
 import uk.gov.hmrc.transitmovementsrouter.fakes.actions.FakeXmlTrimmer
+import uk.gov.hmrc.transitmovementsrouter.models.MessageType.RequestOfRelease
 import uk.gov.hmrc.transitmovementsrouter.models.EoriNumber
 import uk.gov.hmrc.transitmovementsrouter.models.MessageId
-import uk.gov.hmrc.transitmovementsrouter.models.MessageType.RequestOfRelease
 import uk.gov.hmrc.transitmovementsrouter.models.MovementId
 import uk.gov.hmrc.transitmovementsrouter.models.MovementType
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.MovementNotFound

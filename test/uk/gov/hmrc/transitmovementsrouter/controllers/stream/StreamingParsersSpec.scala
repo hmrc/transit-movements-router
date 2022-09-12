@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovementsrouter.connectors.controllers.stream
+package uk.gov.hmrc.transitmovementsrouter.controllers.stream
 
 import akka.NotUsed
 import akka.stream.Materializer
@@ -40,7 +40,6 @@ import play.api.test.Helpers.defaultAwaitTimeout
 import play.api.test.Helpers.status
 import play.api.test.Helpers.stubControllerComponents
 import uk.gov.hmrc.transitmovementsrouter.base.TestActorSystem
-import uk.gov.hmrc.transitmovementsrouter.controllers.stream.StreamingParsers
 
 import java.nio.charset.StandardCharsets
 import scala.annotation.tailrec

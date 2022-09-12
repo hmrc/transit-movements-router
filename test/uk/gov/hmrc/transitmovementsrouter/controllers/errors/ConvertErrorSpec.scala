@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovementsrouter.connectors.controllers.errors
+package uk.gov.hmrc.transitmovementsrouter.controllers.errors
 
 import cats.syntax.all._
 import org.scalatest.OptionValues
@@ -22,8 +22,6 @@ import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
 import org.scalatestplus.mockito.MockitoSugar
-import uk.gov.hmrc.transitmovementsrouter.controllers.errors.ConvertError
-import uk.gov.hmrc.transitmovementsrouter.controllers.errors.StandardError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.ErrorCode.BadRequest
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError.NoElementFound

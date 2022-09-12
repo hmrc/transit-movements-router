@@ -14,16 +14,13 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovementsrouter.connectors.controllers.errors
+package uk.gov.hmrc.transitmovementsrouter.controllers.errors
 
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
 import org.scalatestplus.mockito.MockitoSugar
 import play.api.libs.json.Json
 import uk.gov.hmrc.http.UpstreamErrorResponse
-import uk.gov.hmrc.transitmovementsrouter.controllers.errors.InternalServiceError
-import uk.gov.hmrc.transitmovementsrouter.controllers.errors.PresentationError
-import uk.gov.hmrc.transitmovementsrouter.controllers.errors.UpstreamServiceError
 
 class PresentationErrorSpec extends AnyFreeSpec with Matchers with MockitoSugar {
 
