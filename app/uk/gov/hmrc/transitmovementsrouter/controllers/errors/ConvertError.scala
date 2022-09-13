@@ -54,7 +54,7 @@ trait ConvertError {
     import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError._
 
     def convert(error: PersistenceError): PresentationError = error match {
-      case MovementNotFound(movementId) => PresentationError.notFoundError(s"Movement $movementId not found")
+      case MovementNotFound(movementId) => PresentationError.notFoundError(s"Movement ${movementId.value} not found")
       case Unexpected(error)            => PresentationError.internalServiceError(cause = error)
     }
   }
