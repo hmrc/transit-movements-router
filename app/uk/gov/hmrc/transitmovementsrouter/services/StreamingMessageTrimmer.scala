@@ -18,6 +18,7 @@ package uk.gov.hmrc.transitmovementsrouter.services
 
 import akka.stream.alpakka.xml.scaladsl.XmlWriting
 import akka.stream.alpakka.xml.scaladsl.XmlParsing
+import akka.stream.scaladsl.Flow
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import com.google.inject.ImplementedBy
@@ -27,14 +28,14 @@ import uk.gov.hmrc.transitmovementsrouter.models.MessageType
 @ImplementedBy(classOf[StreamingMessageTrimmerImpl])
 trait StreamingMessageTrimmer {
 
-  def trim(source: Source[ByteString, _], messageType: MessageType): Source[ByteString, _]
+  def trim(source: Source[ByteString, _]): Source[ByteString, _]
 }
 
 class StreamingMessageTrimmerImpl @Inject() extends StreamingMessageTrimmer {
 
-  override def trim(source: Source[ByteString, _], messageType: MessageType): Source[ByteString, _] =
+  override def trim(source: Source[ByteString, _]): Source[ByteString, _] =
     source
       .via(XmlParsing.parser)
-      .via(XmlParsing.subslice("TraderChannelResponse" :: messageType.rootNode :: Nil))
+      .via(XmlParsing.subslice("TraderChannelResponse" :: Nil))
       .via(XmlWriting.writer)
 }

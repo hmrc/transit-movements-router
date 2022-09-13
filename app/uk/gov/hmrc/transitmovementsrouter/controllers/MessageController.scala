@@ -74,7 +74,7 @@ class MessagesController @Inject() (
 
         (for {
           messageType <- MessageTypeHeaderExtractor.extract(request.headers).asPresentation
-          newSource = trimmer.trim(request.body, messageType)
+          newSource = trimmer.trim(request.body)
           _ <- persistenceConnector.post(movementId, messageId, messageType, newSource).asPresentation
         } yield ()).fold[Result](error => Status(error.code.statusCode)(Json.toJson(error)), _ => Created)
 

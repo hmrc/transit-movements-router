@@ -25,5 +25,5 @@ import uk.gov.hmrc.transitmovementsrouter.services.StreamingMessageTrimmer
 import scala.xml.NodeSeq
 
 class FakeXmlTrimmer(xml: NodeSeq) extends StreamingMessageTrimmer {
-  override def trim(source: Source[ByteString, _], messageType: MessageType): Source[ByteString, _] = StreamTestHelpers.createStream(xml)
+  override def trim(source: Source[ByteString, _]): Source[ByteString, _] = StreamTestHelpers.createStream(xml)
 }

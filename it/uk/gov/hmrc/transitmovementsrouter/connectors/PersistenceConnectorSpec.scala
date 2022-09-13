@@ -30,6 +30,7 @@ import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.mockito.MockitoSugar
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+import play.api.http.Status.BAD_REQUEST
 import play.api.http.Status.INTERNAL_SERVER_ERROR
 import play.api.http.Status.NOT_FOUND
 import play.api.http.Status.OK
@@ -41,6 +42,8 @@ import uk.gov.hmrc.transitmovementsrouter.models.MessageType.DeclarationAmendmen
 import uk.gov.hmrc.transitmovementsrouter.models.MovementId
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.MovementNotFound
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.Unexpected
+import uk.gov.hmrc.transitmovementsrouter.services.StreamingMessageTrimmer
+import uk.gov.hmrc.transitmovementsrouter.services.StreamingMessageTrimmerImpl
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -72,6 +75,7 @@ class PersistenceConnectorSpec
 
   val errorCodes = Gen.oneOf(
     Seq(
+      BAD_REQUEST,
       INTERNAL_SERVER_ERROR,
       NOT_FOUND
     )
@@ -109,11 +113,26 @@ class PersistenceConnectorSpec
             x.isLeft mustBe true
 
             statusCode match {
+              case BAD_REQUEST           => x mustBe a[Left[Unexpected, _]]
               case NOT_FOUND             => x mustBe a[Left[MovementNotFound, _]]
               case INTERNAL_SERVER_ERROR => x mustBe a[Left[Unexpected, _]]
             }
 
         }
+    }
+
+    "return Unexpected(throwable) when NonFatal exception is thrown" in {
+      server.resetAll()
+
+      stub(OK)
+
+      val failingSource = new StreamingMessageTrimmerImpl().trim(Source.single(ByteString.fromString("<abc>asdadsadads")))
+
+      whenReady(connector.post(movementId, messageId, DeclarationAmendment, failingSource).value) {
+        res =>
+          res mustBe a[Left[Unexpected, _]]
+          res.left.get.asInstanceOf[Unexpected].thr.isDefined
+      }
     }
 
   }

@@ -26,6 +26,7 @@ import io.lemonlabs.uri.UrlPath
 import play.api.Logging
 import play.api.http.HeaderNames
 import play.api.http.MimeTypes
+import play.api.http.Status.BAD_REQUEST
 import play.api.http.Status.INTERNAL_SERVER_ERROR
 import play.api.http.Status.NOT_FOUND
 import uk.gov.hmrc.http.HeaderCarrier
@@ -44,6 +45,7 @@ import uk.gov.hmrc.http.HttpReads.Implicits._
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
+import scala.util.control.NonFatal
 
 @ImplementedBy(classOf[PersistenceConnectorImpl])
 trait PersistenceConnector {
@@ -79,9 +81,13 @@ class PersistenceConnectorImpl @Inject() (httpClientV2: HttpClientV2, appConfig:
             Right(())
           case Left(error) =>
             error.statusCode match {
+              case BAD_REQUEST           => Left(Unexpected())
               case NOT_FOUND             => Left(MovementNotFound(movementId))
               case INTERNAL_SERVER_ERROR => Left(Unexpected())
             }
+        }
+        .recover {
+          case NonFatal(ex) => Left(Unexpected(Some(ex)))
         }
     }
 
