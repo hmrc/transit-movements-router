@@ -96,7 +96,7 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
   def source = createStream(cc015cOfficeOfDepartureGB)
 
   val outgoing = routes.MessagesController.outgoing(eori, movementType, movementId, messageId).url
-  val incoming = routes.MessagesController.incoming(movementId, messageId).url
+  val incoming = routes.MessagesController.incoming((movementId, messageId)).url
 
   def fakeRequest[A](
     body: NodeSeq,

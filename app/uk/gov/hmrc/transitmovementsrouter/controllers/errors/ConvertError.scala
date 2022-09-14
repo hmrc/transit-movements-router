@@ -16,7 +16,6 @@
 
 package uk.gov.hmrc.transitmovementsrouter.controllers.errors
 
-import cats.Id
 import cats.data.EitherT
 import uk.gov.hmrc.transitmovementsrouter.models.errors.HeaderExtractError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError
