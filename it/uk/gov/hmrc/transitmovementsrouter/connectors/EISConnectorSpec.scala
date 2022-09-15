@@ -18,6 +18,7 @@ package uk.gov.hmrc.transitmovementsrouter.connectors
 
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
+import cats.syntax.all._
 import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.stubbing.Scenario
 import org.mockito.ArgumentMatchers
@@ -33,6 +34,7 @@ import org.scalatestplus.mockito.MockitoSugar
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import play.api.http.HeaderNames
 import play.api.test.Helpers._
+import retry.RetryDetails
 import retry.RetryPolicies
 import retry.RetryPolicy
 import uk.gov.hmrc.http.HeaderCarrier
@@ -261,4 +263,24 @@ class EISConnectorSpec
       case _                                                  => fail("Left was not a RoutingError.Unexpected")
     }
   }
+
+  "when retrying with an error that should occur, fail the future with an IllegalStateException" in {
+    val httpClientV2 = mock[HttpClientV2]
+
+    val connector = new EISConnectorImpl("Failure", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, NoRetries)
+
+    val result = connector
+      .onFailure(Left(RoutingError.NoElementFound("error")), mock[RetryDetails])
+      .map(
+        _ => fail("No error was thrown when it should be")
+      )
+      .recover {
+        case _: IllegalStateException => ()
+      }
+
+    whenReady(result) {
+      r => r mustBe ()
+    }
+  }
+
 }

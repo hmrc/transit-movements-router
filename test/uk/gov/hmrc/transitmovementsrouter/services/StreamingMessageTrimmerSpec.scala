@@ -25,7 +25,6 @@ import org.scalatest.matchers.must.Matchers
 import uk.gov.hmrc.transitmovementsrouter.base.TestActorSystem
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.reflect.runtime.universe.Try
 import scala.util.Failure
 import scala.util.Success
 

@@ -16,14 +16,12 @@
 
 package uk.gov.hmrc.transitmovementsrouter.services
 
-import akka.stream.alpakka.xml.scaladsl.XmlWriting
 import akka.stream.alpakka.xml.scaladsl.XmlParsing
-import akka.stream.scaladsl.Flow
+import akka.stream.alpakka.xml.scaladsl.XmlWriting
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import com.google.inject.ImplementedBy
 import com.google.inject.Inject
-import uk.gov.hmrc.transitmovementsrouter.models.MessageType
 
 @ImplementedBy(classOf[StreamingMessageTrimmerImpl])
 trait StreamingMessageTrimmer {
