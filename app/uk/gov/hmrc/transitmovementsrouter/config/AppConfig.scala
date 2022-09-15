@@ -16,13 +16,16 @@
 
 package uk.gov.hmrc.transitmovementsrouter.config
 
+import io.lemonlabs.uri.Url
+
 import javax.inject.Inject
 import javax.inject.Singleton
 import play.api.Configuration
 import uk.gov.hmrc.http.HeaderCarrier
+import uk.gov.hmrc.play.bootstrap.config.ServicesConfig
 
 @Singleton
-class AppConfig @Inject() (config: Configuration) {
+class AppConfig @Inject() (config: Configuration, servicesConfig: ServicesConfig) {
 
   lazy val appName: String = config.get[String]("appName")
 
@@ -30,4 +33,9 @@ class AppConfig @Inject() (config: Configuration) {
   lazy val eisGb: EISInstanceConfig = config.get[EISInstanceConfig]("microservice.services.eis.gb")
 
   lazy val headerCarrierConfig: HeaderCarrier.Config = HeaderCarrier.Config.fromConfig(config.underlying)
+
+  lazy val persistenceServiceBaseUrl: Url = Url.parse(servicesConfig.baseUrl("transit-movements"))
+
+  lazy val messageSizeLimit: Int = config.get[Int]("messageSizeLimit")
+
 }

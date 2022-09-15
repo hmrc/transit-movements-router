@@ -16,7 +16,9 @@ object AppDependencies {
     "com.github.cb372"   %% "cats-retry"                % catsRetryVersion,
     "com.github.cb372"   %% "alleycats-retry"           % catsRetryVersion,
     "com.typesafe.akka"  %% "akka-slf4j"                % PlayVersion.akkaVersion,
-    "com.lightbend.akka" %% "akka-stream-alpakka-xml"   % "3.0.4"
+    "com.lightbend.akka" %% "akka-stream-alpakka-xml"   % "3.0.4",
+    "io.lemonlabs"       %% "scala-uri"                 % "3.6.0",
+    "org.typelevel"      %% "alleycats-core"            % catsVersion
   )
 
   val test = Seq(

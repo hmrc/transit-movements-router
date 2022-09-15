@@ -53,7 +53,7 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
-class MessageConnectorSpec
+class EISConnectorSpec
     extends AnyWordSpec
     with HttpClientV2Support
     with Matchers
@@ -106,10 +106,10 @@ class MessageConnectorSpec
   )
 
   // We construct the connector each time to avoid issues with the circuit breaker
-  def noRetriesConnector = new MessageConnectorImpl("NoRetry", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, NoRetries)
-  def oneRetryConnector  = new MessageConnectorImpl("OneRetry", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, OneRetry)
+  def noRetriesConnector = new EISConnectorImpl("NoRetry", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, NoRetries)
+  def oneRetryConnector  = new EISConnectorImpl("OneRetry", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, OneRetry)
 
-  lazy val connectorGen: Gen[() => MessageConnector] = Gen.oneOf(() => noRetriesConnector, () => oneRetryConnector)
+  lazy val connectorGen: Gen[() => EISConnector] = Gen.oneOf(() => noRetriesConnector, () => oneRetryConnector)
 
   def source: Source[ByteString, _] = Source.single(ByteString.fromString("<test></test>"))
 
@@ -252,7 +252,7 @@ class MessageConnectorSpec
     val httpClientV2 = mock[HttpClientV2]
 
     val hc        = HeaderCarrier()
-    val connector = new MessageConnectorImpl("Failure", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, NoRetries)
+    val connector = new EISConnectorImpl("Failure", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, NoRetries)
 
     when(httpClientV2.post(ArgumentMatchers.any[URL])(ArgumentMatchers.any[HeaderCarrier])).thenReturn(new FakeRequestBuilder)
 

@@ -17,6 +17,8 @@
 package uk.gov.hmrc.transitmovementsrouter.controllers.errors
 
 import cats.data.EitherT
+import uk.gov.hmrc.transitmovementsrouter.models.errors.HeaderExtractError
+import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError._
 
@@ -25,7 +27,7 @@ import scala.concurrent.Future
 
 trait ConvertError {
 
-  implicit class ErrorConverter[E, A](value: EitherT[Future, E, A]) {
+  implicit class FutureErrorConverter[E, A](value: EitherT[Future, E, A]) {
 
     def asPresentation(implicit c: Converter[E], ec: ExecutionContext): EitherT[Future, PresentationError, A] =
       value.leftMap(c.convert)
@@ -45,6 +47,24 @@ trait ConvertError {
       case BadDateTime(element, ex)        => PresentationError.badRequestError(s"Could not parse datetime for $element: ${ex.getMessage}")
     }
 
+  }
+
+  implicit val persistenceErrorConverter = new Converter[PersistenceError] {
+    import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError._
+
+    def convert(error: PersistenceError): PresentationError = error match {
+      case MovementNotFound(movementId) => PresentationError.notFoundError(s"Movement ${movementId.value} not found")
+      case Unexpected(error)            => PresentationError.internalServiceError(cause = error)
+    }
+  }
+
+  implicit val headerExtractErrorConverter = new Converter[HeaderExtractError] {
+    import uk.gov.hmrc.transitmovementsrouter.models.errors.HeaderExtractError._
+
+    def convert(error: HeaderExtractError): PresentationError = error match {
+      case NoHeaderFound(headerValue)       => PresentationError.badRequestError(s"Missing header: $headerValue")
+      case InvalidMessageType(code: String) => PresentationError.badRequestError(s"Invalid message type: $code")
+    }
   }
 
 }

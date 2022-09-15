@@ -29,9 +29,7 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.mockito.MockitoSugar.mock
 import play.api.http.DefaultHttpErrorHandler
 import play.api.http.HttpErrorConfig
-import play.api.http.Status.ACCEPTED
-import play.api.http.Status.BAD_REQUEST
-import play.api.http.Status.INTERNAL_SERVER_ERROR
+import play.api.http.Status._
 import play.api.libs.Files.SingletonTemporaryFileCreator
 import play.api.libs.json.Json
 import play.api.mvc.PlayBodyParsers
@@ -46,11 +44,19 @@ import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.HttpVerbs.POST
 import uk.gov.hmrc.transitmovementsrouter.base.StreamTestHelpers.createStream
 import uk.gov.hmrc.transitmovementsrouter.base.TestActorSystem
+import uk.gov.hmrc.transitmovementsrouter.connectors.PersistenceConnector
+import uk.gov.hmrc.transitmovementsrouter.controllers.actions.MessageSizeActionProvider
+import uk.gov.hmrc.transitmovementsrouter.fakes.actions.FakeMessageSizeAction
+import uk.gov.hmrc.transitmovementsrouter.fakes.actions.FakeXmlTrimmer
+import uk.gov.hmrc.transitmovementsrouter.models.MessageType.RequestOfRelease
 import uk.gov.hmrc.transitmovementsrouter.models.EoriNumber
 import uk.gov.hmrc.transitmovementsrouter.models.MessageId
 import uk.gov.hmrc.transitmovementsrouter.models.MovementId
 import uk.gov.hmrc.transitmovementsrouter.models.MovementType
+import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.MovementNotFound
+import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.Unexpected
 import uk.gov.hmrc.transitmovementsrouter.services.RoutingService
+import uk.gov.hmrc.transitmovementsrouter.services.StreamingMessageTrimmer
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -72,21 +78,33 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
       </CustomsOfficeOfDeparture>
     </CC015C>
 
-  val mockRoutingService = mock[RoutingService]
+  val incomingXml: NodeSeq = <TraderChannelResponse><CC013C>text</CC013C></TraderChannelResponse>
+  val trimmedXml: NodeSeq  = <CC013C>text</CC013C>
+
+  val mockRoutingService       = mock[RoutingService]
+  val mockPersistenceConnector = mock[PersistenceConnector]
+
+  val mockProvider = mock[MessageSizeActionProvider]
+  when(mockProvider.apply()).thenReturn(new FakeMessageSizeAction[Nothing])
 
   val errorHandler                    = new DefaultHttpErrorHandler(HttpErrorConfig(showDevErrors = false, None), None, None)
   val controllerComponentWithTempFile = stubControllerComponents(playBodyParsers = PlayBodyParsers(SingletonTemporaryFileCreator, errorHandler)(materializer))
 
-  val controller = new MessagesController(controllerComponentWithTempFile, mockRoutingService)
+  def controller(trimmer: StreamingMessageTrimmer = new FakeXmlTrimmer(trimmedXml)) =
+    new MessagesController(controllerComponentWithTempFile, mockRoutingService, mockPersistenceConnector, trimmer, mockProvider)
 
   def source = createStream(cc015cOfficeOfDepartureGB)
 
+  val outgoing = routes.MessagesController.outgoing(eori, movementType, movementId, messageId).url
+  val incoming = routes.MessagesController.incoming((movementId, messageId)).url
+
   def fakeRequest[A](
-    body: NodeSeq
+    body: NodeSeq,
+    url: String
   ): Request[Source[ByteString, _]] =
     FakeRequest(
       method = POST,
-      uri = routes.MessagesController.post(eori, movementType, movementId, messageId).url,
+      uri = url,
       headers = FakeHeaders(Seq.empty),
       body = createStream(body)
     )
@@ -99,7 +117,7 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
   lazy val submitDeclarationEither: EitherT[Future, RoutingError, Unit] =
     EitherT.rightT(())
 
-  "POST /" - {
+  "POST outgoing" - {
     "must return ACCEPTED when declaration is submitted successfully" in {
 
       when(
@@ -111,7 +129,7 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
         )(any[HeaderCarrier])
       ).thenReturn(submitDeclarationEither)
 
-      val result = controller.post(eori, movementType, movementId, messageId)(fakeRequest(cc015cOfficeOfDepartureGB))
+      val result = controller().outgoing(eori, movementType, movementId, messageId)(fakeRequest(cc015cOfficeOfDepartureGB, outgoing))
 
       status(result) mustBe ACCEPTED
     }
@@ -129,7 +147,7 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
           )(any[HeaderCarrier])
         ).thenReturn(EitherT[Future, RoutingError, Unit](Future.successful(Left(RoutingError.NoElementFound("messageSender")))))
 
-        val result = controller.post(eori, movementType, movementId, messageId)(fakeRequest(cc015cOfficeOfDepartureGB))
+        val result = controller().outgoing(eori, movementType, movementId, messageId)(fakeRequest(cc015cOfficeOfDepartureGB, outgoing))
 
         status(result) mustBe BAD_REQUEST
         contentAsJson(result) mustBe Json.obj(
@@ -149,7 +167,7 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
           )(any[HeaderCarrier])
         ).thenReturn(EitherT[Future, RoutingError, Unit](Future.successful(Left(RoutingError.TooManyElementsFound("eori")))))
 
-        val result = controller.post(eori, movementType, movementId, messageId)(fakeRequest(cc015cOfficeOfDepartureGB))
+        val result = controller().outgoing(eori, movementType, movementId, messageId)(fakeRequest(cc015cOfficeOfDepartureGB, outgoing))
 
         status(result) mustBe BAD_REQUEST
         contentAsJson(result) mustBe Json.obj(
@@ -174,7 +192,7 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
         )
       )
 
-      val result = controller.post(eori, movementType, movementId, messageId)(fakeRequest(cc015cOfficeOfDepartureGB))
+      val result = controller().outgoing(eori, movementType, movementId, messageId)(fakeRequest(cc015cOfficeOfDepartureGB, outgoing))
 
       status(result) mustBe INTERNAL_SERVER_ERROR
       contentAsJson(result) mustBe Json.obj(
@@ -182,5 +200,65 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
         "message" -> "Internal server error"
       )
     }
+  }
+
+  "POST incoming" - {
+    "must return CREATED when message is successfully forwarded" in {
+
+      when(mockPersistenceConnector.post(any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId], any(), any())(any(), any()))
+        .thenReturn(EitherT.fromEither(Right(())))
+
+      val request = fakeRequest(incomingXml, incoming)
+        .withHeaders(FakeHeaders().add("X-Message-Type" -> RequestOfRelease.code))
+
+      val result = controller().incoming((movementId, messageId))(request)
+
+      status(result) mustBe CREATED
+    }
+
+    "must return BAD_REQUEST when the X-Message-Type header is missing" in {
+
+      val result = controller().incoming((movementId, messageId))(fakeRequest(incomingXml, incoming))
+
+      status(result) mustBe BAD_REQUEST
+
+    }
+
+    "must return BAD_REQUEST when message type is invalid" in {
+
+      val request = fakeRequest(incomingXml, incoming)
+        .withHeaders(FakeHeaders().add("X-Message-Type" -> "abcdef"))
+
+      val result = controller().incoming((movementId, messageId))(request)
+
+      status(result) mustBe BAD_REQUEST
+    }
+
+    "must return NOT_FOUND when target movement is invalid or archived" in {
+
+      when(mockPersistenceConnector.post(any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId], any(), any())(any(), any()))
+        .thenReturn(EitherT.fromEither(Left(MovementNotFound(MovementId("ABC")))))
+
+      val request = fakeRequest(incomingXml, incoming)
+        .withHeaders(FakeHeaders().add("X-Message-Type" -> RequestOfRelease.code))
+
+      val result = controller().incoming((movementId, messageId))(request)
+
+      status(result) mustBe NOT_FOUND
+    }
+
+    "must return INTERNAL_SERVER_ERROR when persistence service fails unexpected" in {
+
+      when(mockPersistenceConnector.post(any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId], any(), any())(any(), any()))
+        .thenReturn(EitherT.fromEither(Left(Unexpected(None))))
+
+      val request = fakeRequest(incomingXml, incoming)
+        .withHeaders(FakeHeaders().add("X-Message-Type" -> RequestOfRelease.code))
+
+      val result = controller().incoming((movementId, messageId))(request)
+
+      status(result) mustBe INTERNAL_SERVER_ERROR
+    }
+
   }
 }

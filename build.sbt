@@ -21,7 +21,8 @@ lazy val microservice = Project(appName, file("."))
       "com.github.ghik" % "silencer-lib" % silencerVersion % Provided cross CrossVersion.full
     ),
     RoutesKeys.routesImport ++= Seq(
-      "uk.gov.hmrc.transitmovementsrouter.models._"
+      "uk.gov.hmrc.transitmovementsrouter.models._",
+      "uk.gov.hmrc.transitmovementsrouter.models.Bindings._"
     )
     // ***************
   )

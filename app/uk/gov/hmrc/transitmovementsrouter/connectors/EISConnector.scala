@@ -22,7 +22,6 @@ import akka.util.ByteString
 import play.api.Logging
 import play.api.http.HeaderNames
 import play.api.http.MimeTypes
-import play.api.http.Status
 import retry.RetryDetails
 import retry.alleycats.instances._
 import retry.retryingOnFailures
@@ -42,14 +41,13 @@ import scala.concurrent.Future
 import scala.util.Try
 import scala.util.control.NonFatal
 
-trait MessageConnector {
+trait EISConnector {
 
   def post(messageSender: MessageSender, body: Source[ByteString, _], hc: HeaderCarrier): Future[Either[RoutingError, Unit]]
 
 }
 
-// TODO: Change WSClient for HttpClientV2 when https://github.com/hmrc/bootstrap-play/pull/75 is pulled
-class MessageConnectorImpl(
+class EISConnectorImpl(
   val code: String,
   val eisInstanceConfig: EISInstanceConfig,
   headerCarrierConfig: HeaderCarrier.Config,
@@ -58,7 +56,7 @@ class MessageConnectorImpl(
 )(implicit
   ec: ExecutionContext,
   val materializer: Materializer
-) extends MessageConnector
+) extends EISConnector
     with Logging
     with CircuitBreakers {
 

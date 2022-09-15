@@ -29,7 +29,7 @@ import akka.util.ByteString
 import com.google.inject._
 import play.api.Logging
 import uk.gov.hmrc.http.HeaderCarrier
-import uk.gov.hmrc.transitmovementsrouter.connectors.MessageConnectorProvider
+import uk.gov.hmrc.transitmovementsrouter.connectors.EISConnectorProvider
 import uk.gov.hmrc.transitmovementsrouter.models._
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
 import cats.data.EitherT
@@ -47,7 +47,7 @@ trait RoutingService {
   )(implicit hc: HeaderCarrier): EitherT[Future, RoutingError, Unit]
 }
 
-class RoutingServiceImpl @Inject() (messageConnectorProvider: MessageConnectorProvider)(implicit materializer: Materializer)
+class RoutingServiceImpl @Inject() (messageConnectorProvider: EISConnectorProvider)(implicit materializer: Materializer)
     extends RoutingService
     with XmlParsingServiceHelpers
     with Logging {

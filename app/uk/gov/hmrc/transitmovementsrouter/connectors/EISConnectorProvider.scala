@@ -25,23 +25,23 @@ import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
 
 import scala.concurrent.ExecutionContext
 
-@ImplementedBy(classOf[MessageConnectorProviderImpl])
-trait MessageConnectorProvider {
+@ImplementedBy(classOf[EISConnectorProviderImpl])
+trait EISConnectorProvider {
 
-  def gb: MessageConnector
-  def xi: MessageConnector
+  def gb: EISConnector
+  def xi: EISConnector
 
 }
 
 @Singleton // singleton as the message connectors need to be singletons for the circuit breakers.
-class MessageConnectorProviderImpl @Inject() (
+class EISConnectorProviderImpl @Inject() (
   appConfig: AppConfig,
   retries: Retries,
   httpClientV2: HttpClientV2
 )(implicit ec: ExecutionContext, mat: Materializer)
-    extends MessageConnectorProvider {
+    extends EISConnectorProvider {
 
-  lazy val gb: MessageConnector = new MessageConnectorImpl("GB", appConfig.eisGb, appConfig.headerCarrierConfig, httpClientV2, retries)
-  lazy val xi: MessageConnector = new MessageConnectorImpl("XI", appConfig.eisXi, appConfig.headerCarrierConfig, httpClientV2, retries)
+  lazy val gb: EISConnector = new EISConnectorImpl("GB", appConfig.eisGb, appConfig.headerCarrierConfig, httpClientV2, retries)
+  lazy val xi: EISConnector = new EISConnectorImpl("XI", appConfig.eisXi, appConfig.headerCarrierConfig, httpClientV2, retries)
 
 }

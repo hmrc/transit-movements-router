@@ -20,6 +20,7 @@ import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
 import org.scalatestplus.mockito.MockitoSugar
 import play.api.libs.json._
+import uk.gov.hmrc.transitmovementsrouter.models.errors.ErrorCode
 
 class ErrorCodeSpec extends AnyFreeSpec with Matchers with MockitoSugar {
 
