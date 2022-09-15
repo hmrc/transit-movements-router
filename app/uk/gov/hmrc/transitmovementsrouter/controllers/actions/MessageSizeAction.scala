@@ -16,8 +16,6 @@
 
 package uk.gov.hmrc.transitmovementsrouter.controllers.actions
 
-import com.google.inject.ImplementedBy
-import com.google.inject.Inject
 import play.api.http.HeaderNames
 import play.api.libs.json.Json
 import play.api.mvc.ActionFilter
@@ -30,14 +28,14 @@ import uk.gov.hmrc.transitmovementsrouter.controllers.errors.PresentationError
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
+import scala.language.higherKinds
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
 
-@ImplementedBy(classOf[MessageSizeActionImpl[_]])
 trait MessageSizeAction[R[_] <: Request[_]] extends ActionFilter[R]
 
-class MessageSizeActionImpl[R[_] <: Request[_]] @Inject() (config: AppConfig)(implicit val executionContext: ExecutionContext) extends MessageSizeAction[R] {
+class MessageSizeActionImpl[R[_] <: Request[_]](config: AppConfig)(implicit val executionContext: ExecutionContext) extends MessageSizeAction[R] {
 
   override protected def filter[A](request: R[A]): Future[Option[Result]] =
     contentLengthHeader(request) match {

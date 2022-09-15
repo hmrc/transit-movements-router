@@ -19,7 +19,6 @@ package uk.gov.hmrc.transitmovementsrouter.fakes.actions
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import uk.gov.hmrc.transitmovementsrouter.base.StreamTestHelpers
-import uk.gov.hmrc.transitmovementsrouter.models.MessageType
 import uk.gov.hmrc.transitmovementsrouter.services.StreamingMessageTrimmer
 
 import scala.xml.NodeSeq

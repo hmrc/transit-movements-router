@@ -18,12 +18,11 @@ package uk.gov.hmrc.transitmovementsrouter.controllers.actions
 
 import com.google.inject.ImplementedBy
 import com.google.inject.Inject
-import play.api.mvc.AnyContent
-import play.api.mvc.BodyParser
 import play.api.mvc.Request
 import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
 
 import scala.concurrent.ExecutionContext
+import scala.language.higherKinds
 
 @ImplementedBy(classOf[MessageSizeActionProviderImpl])
 trait MessageSizeActionProvider {

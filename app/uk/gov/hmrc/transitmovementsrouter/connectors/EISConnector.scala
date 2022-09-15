@@ -74,31 +74,14 @@ class EISConnectorImpl(
   def shouldCauseCircuitBreakerStrike(result: Try[Either[RoutingError, Unit]]): Boolean =
     result.map(_.isLeft).getOrElse(true)
 
-  def onFailure(response: Either[RoutingError, Unit], retryDetails: RetryDetails): Future[Unit] = {
-    val message: String = response.left.get match {
-      case RoutingError.Upstream(upstreamErrorResponse) => s"with status code ${upstreamErrorResponse.statusCode}"
-      case RoutingError.Unexpected(message, _)          => s"with error $message"
+  def onFailure(response: Either[RoutingError, Unit], retryDetails: RetryDetails): Future[Unit] =
+    response.left.get match {
+      case RoutingError.Upstream(upstreamErrorResponse) => attemptRetry(s"with status code ${upstreamErrorResponse.statusCode}", retryDetails)
+      case RoutingError.Unexpected(message, _)          => attemptRetry(s"with error $message", retryDetails)
+      case x: RoutingError =>
+        logger.error(s"An unexpected error occurred - got a ${x.getClass}")
+        Future.failed(new IllegalStateException(s"An unexpected error occurred - got a ${x.getClass}"))
     }
-    val attemptNumber = retryDetails.retriesSoFar + 1
-    if (retryDetails.givingUp) {
-      logger.error(
-        s"Message when routing to $code failed $message\n" +
-          s"Attempted $attemptNumber times in ${retryDetails.cumulativeDelay.toSeconds} seconds, giving up."
-      )
-    } else {
-      val nextAttempt =
-        retryDetails.upcomingDelay
-          .map(
-            d => s"in ${d.toSeconds} seconds"
-          )
-          .getOrElse("immediately")
-      logger.warn(
-        s"Message when routing to $code failed with $message\n" +
-          s"Attempted $attemptNumber times in ${retryDetails.cumulativeDelay.toSeconds} seconds so far, trying again $nextAttempt."
-      )
-    }
-    Future.unit
-  }
 
   override def post(messageSender: MessageSender, body: Source[ByteString, _], hc: HeaderCarrier): Future[Either[RoutingError, Unit]] =
     retryingOnFailures(
@@ -152,4 +135,26 @@ class EISConnectorImpl(
           }
       }
     }
+
+  private def attemptRetry(message: String, retryDetails: RetryDetails): Future[Unit] = {
+    val attemptNumber = retryDetails.retriesSoFar + 1
+    if (retryDetails.givingUp) {
+      logger.error(
+        s"Message when routing to $code failed $message\n" +
+          s"Attempted $attemptNumber times in ${retryDetails.cumulativeDelay.toSeconds} seconds, giving up."
+      )
+    } else {
+      val nextAttempt =
+        retryDetails.upcomingDelay
+          .map(
+            d => s"in ${d.toSeconds} seconds"
+          )
+          .getOrElse("immediately")
+      logger.warn(
+        s"Message when routing to $code failed with $message\n" +
+          s"Attempted $attemptNumber times in ${retryDetails.cumulativeDelay.toSeconds} seconds so far, trying again $nextAttempt."
+      )
+    }
+    Future.unit
+  }
 }
