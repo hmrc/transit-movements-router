@@ -16,4 +16,11 @@
 
 package uk.gov.hmrc.transitmovementsrouter.models
 
-case class MessageId(value: String) extends AnyVal
+import play.api.libs.json.Json
+import uk.gov.hmrc.transitmovementsrouter.models.formats.CommonFormats
+
+case class PersistenceResponse(messageId: MessageId)
+
+object PersistenceResponse extends CommonFormats {
+  implicit val format = Json.format[PersistenceResponse]
+}

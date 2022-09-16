@@ -54,6 +54,7 @@ import uk.gov.hmrc.transitmovementsrouter.models.EoriNumber
 import uk.gov.hmrc.transitmovementsrouter.models.MessageId
 import uk.gov.hmrc.transitmovementsrouter.models.MovementId
 import uk.gov.hmrc.transitmovementsrouter.models.MovementType
+import uk.gov.hmrc.transitmovementsrouter.models.PersistenceResponse
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.MovementNotFound
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.Unexpected
 import uk.gov.hmrc.transitmovementsrouter.services.RoutingService
@@ -205,9 +206,8 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
 
   "POST incoming" - {
     "must return CREATED when message is successfully forwarded" in {
-
       when(mockPersistenceConnector.post(any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId], any(), any())(any(), any()))
-        .thenReturn(EitherT.fromEither(Right(MessageId("1"))))
+        .thenReturn(EitherT.fromEither(Right(PersistenceResponse(MessageId("1")))))
 
       val request = fakeRequest(incomingXml, incoming)
         .withHeaders(FakeHeaders().add("X-Message-Type" -> RequestOfRelease.code))

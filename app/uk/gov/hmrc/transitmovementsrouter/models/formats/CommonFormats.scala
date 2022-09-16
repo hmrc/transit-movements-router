@@ -24,10 +24,14 @@ import play.api.libs.json.JsResult
 import play.api.libs.json.JsString
 import play.api.libs.json.JsSuccess
 import play.api.libs.json.JsValue
+import play.api.libs.json.Json
+import uk.gov.hmrc.transitmovementsrouter.models.MessageId
 
 object CommonFormats extends CommonFormats
 
 trait CommonFormats {
+
+  implicit val messageIdFormat: Format[MessageId] = Json.valueFormat[MessageId]
 
   implicit def nonEmptyListFormat[A: Format]: Format[NonEmptyList[A]] =
     Format

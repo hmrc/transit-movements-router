@@ -39,6 +39,7 @@ import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
 import uk.gov.hmrc.transitmovementsrouter.models.MessageId
 import uk.gov.hmrc.transitmovementsrouter.models.MessageType
 import uk.gov.hmrc.transitmovementsrouter.models.MovementId
+import uk.gov.hmrc.transitmovementsrouter.models.PersistenceResponse
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.MovementNotFound
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.Unexpected
@@ -54,7 +55,7 @@ trait PersistenceConnector {
   def post(movementId: MovementId, messageId: MessageId, messageType: MessageType, source: Source[ByteString, _])(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
-  ): EitherT[Future, PersistenceError, MessageId]
+  ): EitherT[Future, PersistenceError, PersistenceResponse]
 }
 
 @Singleton
@@ -69,7 +70,7 @@ class PersistenceConnectorImpl @Inject() (httpClientV2: HttpClientV2, appConfig:
   override def post(movementId: MovementId, messageId: MessageId, messageType: MessageType, source: Source[ByteString, _])(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
-  ): EitherT[Future, PersistenceError, MessageId] =
+  ): EitherT[Future, PersistenceError, PersistenceResponse] =
     EitherT {
       val url = baseUrl.withPath(persistenceSendMessage(movementId, messageId))
       httpClientV2
@@ -80,7 +81,7 @@ class PersistenceConnectorImpl @Inject() (httpClientV2: HttpClientV2, appConfig:
         .map {
           case Right(res) =>
             Json
-              .fromJson[MessageId](Json.parse(res.body))
+              .fromJson[PersistenceResponse](res.json)
               .map(Right(_))
               .getOrElse(Left(Unexpected()))
           case Left(error) =>
