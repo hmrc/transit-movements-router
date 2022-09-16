@@ -79,8 +79,10 @@ class PersistenceConnectorImpl @Inject() (httpClientV2: HttpClientV2, appConfig:
         .execute[Either[UpstreamErrorResponse, HttpResponse]]
         .map {
           case Right(res) =>
-            val m = Json.toJson(res.body) \ "messageId"
-            Right(MessageId(m.head.toString))
+            Json
+              .fromJson[MessageId](Json.parse(res.body))
+              .map(Right(_))
+              .getOrElse(Left(Unexpected()))
           case Left(error) =>
             error.statusCode match {
               case BAD_REQUEST           => Left(Unexpected())

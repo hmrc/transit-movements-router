@@ -16,4 +16,12 @@
 
 package uk.gov.hmrc.transitmovementsrouter.models
 
+import play.api.libs.json.Reads
+import play.api.libs.json.__
+
 case class MessageId(value: String) extends AnyVal
+
+object MessageId {
+
+  implicit val messageIdReads: Reads[MessageId] = (__ \ "messageId").read[String].map(MessageId(_))
+}
