@@ -29,6 +29,7 @@ import play.api.http.MimeTypes
 import play.api.http.Status.BAD_REQUEST
 import play.api.http.Status.INTERNAL_SERVER_ERROR
 import play.api.http.Status.NOT_FOUND
+import play.api.libs.json.Json
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.HttpResponse
 import uk.gov.hmrc.http.StringContextOps
@@ -38,6 +39,7 @@ import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
 import uk.gov.hmrc.transitmovementsrouter.models.MessageId
 import uk.gov.hmrc.transitmovementsrouter.models.MessageType
 import uk.gov.hmrc.transitmovementsrouter.models.MovementId
+import uk.gov.hmrc.transitmovementsrouter.models.PersistenceResponse
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.MovementNotFound
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.Unexpected
@@ -53,7 +55,7 @@ trait PersistenceConnector {
   def post(movementId: MovementId, messageId: MessageId, messageType: MessageType, source: Source[ByteString, _])(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
-  ): EitherT[Future, PersistenceError, Unit]
+  ): EitherT[Future, PersistenceError, PersistenceResponse]
 }
 
 @Singleton
@@ -68,7 +70,7 @@ class PersistenceConnectorImpl @Inject() (httpClientV2: HttpClientV2, appConfig:
   override def post(movementId: MovementId, messageId: MessageId, messageType: MessageType, source: Source[ByteString, _])(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
-  ): EitherT[Future, PersistenceError, Unit] =
+  ): EitherT[Future, PersistenceError, PersistenceResponse] =
     EitherT {
       val url = baseUrl.withPath(persistenceSendMessage(movementId, messageId))
       httpClientV2
@@ -77,8 +79,11 @@ class PersistenceConnectorImpl @Inject() (httpClientV2: HttpClientV2, appConfig:
         .withBody(source)
         .execute[Either[UpstreamErrorResponse, HttpResponse]]
         .map {
-          case Right(_) =>
-            Right(())
+          case Right(res) =>
+            Json
+              .fromJson[PersistenceResponse](res.json)
+              .map(Right(_))
+              .getOrElse(Left(Unexpected()))
           case Left(error) =>
             error.statusCode match {
               case BAD_REQUEST           => Left(Unexpected())

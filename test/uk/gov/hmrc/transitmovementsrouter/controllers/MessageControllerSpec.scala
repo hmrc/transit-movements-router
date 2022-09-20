@@ -38,6 +38,7 @@ import play.api.test.FakeHeaders
 import play.api.test.FakeRequest
 import play.api.test.Helpers.contentAsJson
 import play.api.test.Helpers.defaultAwaitTimeout
+import play.api.test.Helpers.header
 import play.api.test.Helpers.status
 import play.api.test.Helpers.stubControllerComponents
 import uk.gov.hmrc.http.HeaderCarrier
@@ -53,6 +54,7 @@ import uk.gov.hmrc.transitmovementsrouter.models.EoriNumber
 import uk.gov.hmrc.transitmovementsrouter.models.MessageId
 import uk.gov.hmrc.transitmovementsrouter.models.MovementId
 import uk.gov.hmrc.transitmovementsrouter.models.MovementType
+import uk.gov.hmrc.transitmovementsrouter.models.PersistenceResponse
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.MovementNotFound
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.Unexpected
 import uk.gov.hmrc.transitmovementsrouter.services.RoutingService
@@ -204,9 +206,8 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
 
   "POST incoming" - {
     "must return CREATED when message is successfully forwarded" in {
-
       when(mockPersistenceConnector.post(any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId], any(), any())(any(), any()))
-        .thenReturn(EitherT.fromEither(Right(())))
+        .thenReturn(EitherT.fromEither(Right(PersistenceResponse(MessageId("1")))))
 
       val request = fakeRequest(incomingXml, incoming)
         .withHeaders(FakeHeaders().add("X-Message-Type" -> RequestOfRelease.code))
@@ -214,6 +215,7 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
       val result = controller().incoming((movementId, messageId))(request)
 
       status(result) mustBe CREATED
+      header("X-Message-Id", result) mustBe Some("1")
     }
 
     "must return BAD_REQUEST when the X-Message-Type header is missing" in {

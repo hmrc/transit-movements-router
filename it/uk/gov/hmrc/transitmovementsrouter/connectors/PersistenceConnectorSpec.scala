@@ -34,15 +34,16 @@ import play.api.http.Status.BAD_REQUEST
 import play.api.http.Status.INTERNAL_SERVER_ERROR
 import play.api.http.Status.NOT_FOUND
 import play.api.http.Status.OK
+import play.api.libs.json.Json
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.test.HttpClientV2Support
 import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
 import uk.gov.hmrc.transitmovementsrouter.models.MessageId
-import uk.gov.hmrc.transitmovementsrouter.models.MessageType.DeclarationAmendment
 import uk.gov.hmrc.transitmovementsrouter.models.MovementId
+import uk.gov.hmrc.transitmovementsrouter.models.PersistenceResponse
+import uk.gov.hmrc.transitmovementsrouter.models.MessageType.DeclarationAmendment
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.MovementNotFound
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.Unexpected
-import uk.gov.hmrc.transitmovementsrouter.services.StreamingMessageTrimmer
 import uk.gov.hmrc.transitmovementsrouter.services.StreamingMessageTrimmerImpl
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -83,22 +84,27 @@ class PersistenceConnectorSpec
 
   def source: Source[ByteString, _] = Source.single(ByteString.fromString("<TraderChannelResponse><CC013C><CC013C></TraderChannelResponse>"))
 
-  def stub(codeToReturn: Int) = server.stubFor(
+  def stub(codeToReturn: Int, body: Option[String] = None) = server.stubFor(
     post(
       urlEqualTo(uriPersistence)
     )
-      .willReturn(aResponse().withStatus(codeToReturn))
+      .willReturn(
+        if (body.isEmpty) aResponse().withStatus(codeToReturn)
+        else aResponse().withStatus(codeToReturn).withBody(body.get)
+      )
   )
 
   "post" should {
-    "return a unit when post is successful" in {
+    "return messageId when post is successful" in {
 
-      stub(OK)
+      val body = Json.obj("messageId" -> messageId.value).toString()
+
+      stub(OK, Some(body))
 
       whenReady(connector.post(movementId, messageId, DeclarationAmendment, source).value) {
         x =>
           x.isRight mustBe true
-          x mustBe a[Right[_, Unit]]
+          x mustBe Right(PersistenceResponse(messageId))
       }
     }
 

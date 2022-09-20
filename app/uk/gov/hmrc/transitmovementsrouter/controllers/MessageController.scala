@@ -75,8 +75,12 @@ class MessagesController @Inject() (
         (for {
           messageType <- MessageTypeHeaderExtractor.extract(request.headers).asPresentation
           newSource = trimmer.trim(request.body)
-          _ <- persistenceConnector.post(movementId, messageId, messageType, newSource).asPresentation
-        } yield ()).fold[Result](error => Status(error.code.statusCode)(Json.toJson(error)), _ => Created)
+          persistenceResponse <- persistenceConnector.post(movementId, messageId, messageType, newSource).asPresentation
+        } yield persistenceResponse)
+          .fold[Result](
+            error => Status(error.code.statusCode)(Json.toJson(error)),
+            response => Created.withHeaders("X-Message-Id" -> response.messageId.value)
+          )
 
     }
 
