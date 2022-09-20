@@ -65,7 +65,7 @@ class PersistenceConnectorImpl @Inject() (httpClientV2: HttpClientV2, appConfig:
   val baseRoute: String = "/transit-movements"
 
   private def persistenceSendMessage(movementId: MovementId, messageId: MessageId): UrlPath =
-    UrlPath.parse(s"$baseRoute/traders/movements/${movementId.value}/messages/${messageId.value}")
+    UrlPath.parse(s"$baseRoute/traders/movements/${movementId.value}/messages?triggerId=${messageId.value}")
 
   override def post(movementId: MovementId, messageId: MessageId, messageType: MessageType, source: Source[ByteString, _])(implicit
     hc: HeaderCarrier,

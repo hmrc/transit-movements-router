@@ -2,4 +2,4 @@
 
 POST        /traders/:eori/movements/:movementType/:movementId/messages/:messageId             uk.gov.hmrc.transitmovementsrouter.controllers.MessagesController.outgoing(eori: EoriNumber, movementType: MovementType, movementId: MovementId, messageId: MessageId)
 
-POST        /movements/:ids/messages                                                   uk.gov.hmrc.transitmovementsrouter.controllers.MessagesController.incoming(ids: (MovementId, MessageId))
+POST        /movements/:ids/messages                                                           uk.gov.hmrc.transitmovementsrouter.controllers.MessagesController.incoming(ids: (MovementId, MessageId))
