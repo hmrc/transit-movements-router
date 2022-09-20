@@ -21,6 +21,7 @@ import akka.util.ByteString
 import com.github.tomakehurst.wiremock.client.WireMock.aResponse
 import com.github.tomakehurst.wiremock.client.WireMock.post
 import com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo
+import io.lemonlabs.uri.QueryString
 import io.lemonlabs.uri.Url
 import org.mockito.Mockito.when
 import org.scalacheck.Gen
@@ -61,7 +62,10 @@ class PersistenceConnectorSpec
   val movementId = MovementId("ABC")
   val messageId  = MessageId("XYZ")
 
-  val uriPersistence = s"/transit-movements/traders/movements/${movementId.value}/messages/${messageId.value}"
+  val uriPersistence = Url(
+    path = s"/transit-movements/traders/movements/${movementId.value}/messages",
+    query = QueryString.fromPairs("triggerId" -> messageId.value)
+  ).path.toStringRaw
 
   val appConfig = mock[AppConfig]
 

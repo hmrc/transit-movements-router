@@ -22,6 +22,8 @@ import cats.data.EitherT
 import com.google.inject.ImplementedBy
 import com.google.inject.Inject
 import com.google.inject.Singleton
+import io.lemonlabs.uri.QueryString
+import io.lemonlabs.uri.Url
 import io.lemonlabs.uri.UrlPath
 import play.api.Logging
 import play.api.http.HeaderNames
@@ -65,7 +67,7 @@ class PersistenceConnectorImpl @Inject() (httpClientV2: HttpClientV2, appConfig:
   val baseRoute: String = "/transit-movements"
 
   private def persistenceSendMessage(movementId: MovementId, messageId: MessageId): UrlPath =
-    UrlPath.parse(s"$baseRoute/traders/movements/${movementId.value}/messages?triggerId=${messageId.value}")
+    Url(path = s"$baseRoute/traders/movements/${movementId.value}/messages", query = QueryString.fromPairs("triggerId" -> messageId.value)).path
 
   override def post(movementId: MovementId, messageId: MessageId, messageType: MessageType, source: Source[ByteString, _])(implicit
     hc: HeaderCarrier,
