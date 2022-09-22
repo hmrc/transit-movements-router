@@ -39,10 +39,11 @@ import scala.concurrent.Future
 @ImplementedBy(classOf[RoutingServiceImpl])
 trait RoutingService {
 
-  def submitDeclaration(
+  def submitMessage(
     movementType: MovementType,
     movementId: MovementId,
     messageId: MessageId,
+    messageType: MessageType,
     payload: Source[ByteString, _]
   )(implicit hc: HeaderCarrier): EitherT[Future, RoutingError, Unit]
 }
@@ -54,27 +55,27 @@ class RoutingServiceImpl @Inject() (messageConnectorProvider: EISConnectorProvid
 
   val office = Sink.head[ParseResult[OfficeOfDeparture]]
 
-  private val officeOfDepartureSink: Sink[ByteString, Future[ParseResult[OfficeOfDeparture]]] = Sink.fromGraph(
+  private def officeOfDepartureSink(messageType: MessageType): Sink[ByteString, Future[ParseResult[OfficeOfDeparture]]] = Sink.fromGraph(
     GraphDSL.createGraph(office) {
       implicit builder => officeShape =>
         import GraphDSL.Implicits._
 
         val xmlParsing: FlowShape[ByteString, ParseEvent]                            = builder.add(XmlParsing.parser)
-        val officeOfDeparture: FlowShape[ParseEvent, ParseResult[OfficeOfDeparture]] = builder.add(XmlParser.officeOfDepartureExtractor)
+        val officeOfDeparture: FlowShape[ParseEvent, ParseResult[OfficeOfDeparture]] = builder.add(XmlParser.officeOfDepartureExtractor(messageType))
         xmlParsing ~> officeOfDeparture ~> officeShape
 
         SinkShape(xmlParsing.in)
     }
   )
 
-  def buildMessage(messageSender: MessageSender): Flow[ByteString, ByteString, NotUsed] =
+  def buildMessage(messageType: MessageType, messageSender: MessageSender): Flow[ByteString, ByteString, NotUsed] =
     Flow.fromGraph(
       GraphDSL.create() {
         implicit builder =>
           import GraphDSL.Implicits._
 
           val xmlParsing: FlowShape[ByteString, ParseEvent]         = builder.add(XmlParsing.parser)
-          val insertSenderWriter: FlowShape[ParseEvent, ParseEvent] = builder.add(XmlParser.messageSenderWriter(messageSender))
+          val insertSenderWriter: FlowShape[ParseEvent, ParseEvent] = builder.add(XmlParser.messageSenderWriter(messageType, messageSender))
           val toByteString                                          = builder.add(XmlWriting.writer)
           xmlParsing ~> insertSenderWriter ~> toByteString
 
@@ -82,16 +83,17 @@ class RoutingServiceImpl @Inject() (messageConnectorProvider: EISConnectorProvid
       }
     )
 
-  override def submitDeclaration(
+  override def submitMessage(
     movementType: MovementType,
     movementId: MovementId,
     messageId: MessageId,
+    messageType: MessageType,
     payload: Source[ByteString, _]
   )(implicit hc: HeaderCarrier): EitherT[Future, RoutingError, Unit] = {
 
-    val officeOfDeparture       = payload.toMat(officeOfDepartureSink)(Keep.right).run()
+    val officeOfDeparture       = payload.toMat(officeOfDepartureSink(messageType))(Keep.right).run()
     implicit val messageSender  = MessageSender(movementId, messageId)
-    implicit val updatedPayload = payload.via(buildMessage(messageSender))
+    implicit val updatedPayload = payload.via(buildMessage(messageType, messageSender))
 
     EitherT(post(officeOfDeparture))
   }

@@ -59,7 +59,8 @@ class MessagesController @Inject() (
     implicit request =>
       implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
       (for {
-        submitted <- routingService.submitDeclaration(movementType, movementId, messageId, request.body).asPresentation
+        messageType <- MessageTypeHeaderExtractor.extract(request.headers).asPresentation
+        submitted   <- routingService.submitMessage(movementType, movementId, messageId, messageType, request.body).asPresentation
       } yield submitted).fold[Result](
         error => Status(error.code.statusCode)(Json.toJson(error)),
         _ => Accepted
