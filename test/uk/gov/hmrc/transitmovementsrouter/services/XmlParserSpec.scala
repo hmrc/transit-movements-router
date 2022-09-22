@@ -25,25 +25,27 @@ import org.scalatest.matchers.must.Matchers
 import org.scalatest.matchers.should.Matchers.convertToAnyShouldWrapper
 import uk.gov.hmrc.transitmovementsrouter.base.StreamTestHelpers._
 import uk.gov.hmrc.transitmovementsrouter.base.TestActorSystem
+import uk.gov.hmrc.transitmovementsrouter.generators.ModelGenerators
 import uk.gov.hmrc.transitmovementsrouter.models._
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError.NoElementFound
 
+import java.time.format.DateTimeFormatter
 import scala.xml._
 
-class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers {
+class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers with ModelGenerators {
 
   "MessageSender parser" - new Setup {
     "when provided with a valid message it extracts the message sender" in {
-      val stream       = createParsingEventStream(cc015cValidGB)
+      val stream       = createParsingEventStream(messageWithMessageSender(MessageType.DeclarationData.rootNode))
       val parsedResult = stream.via(XmlParser.messageSenderExtractor).runWith(Sink.head)
 
       whenReady(parsedResult) {
-        _.right.get mustBe MessageSender("MVN123456789-MSG987654321")
+        _.right.get mustBe messageSender
       }
     }
 
     "when provided with a missing messageSender node it returns NoElementFound" in {
-      val stream       = createParsingEventStream(cc015cNoMessageSenderNode)
+      val stream       = createParsingEventStream(messageWithoutMessageSender(MessageType.DeclarationData.rootNode))
       val parsedResult = stream.via(XmlParser.messageSenderExtractor).runWith(Sink.head)
 
       whenReady(parsedResult) {
@@ -52,7 +54,7 @@ class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers {
     }
 
     "when provided with a no value for messageSender node it returns NoElementFound" in {
-      val stream       = createParsingEventStream(cc015cNoMessageSenderValue)
+      val stream       = createParsingEventStream(cc015cWithoutMessageSenderValue)
       val parsedResult = stream.via(XmlParser.messageSenderExtractor).runWith(Sink.head)
 
       whenReady(parsedResult) {
@@ -65,11 +67,11 @@ class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers {
     messageType =>
       "OfficeOfDeparture parser" - new Setup {
         s"when provided with a valid ${messageType.code} message it extracts the OfficeOfDeparture" in {
-          val stream       = createParsingEventStream(messageOfficeOfDepartureGb(messageType.rootNode))
+          val stream       = createParsingEventStream(messageWithoutMessageSender(messageType.rootNode))
           val parsedResult = stream.via(XmlParser.officeOfDepartureExtractor(messageType)).runWith(Sink.head)
 
           whenReady(parsedResult) {
-            _.right.get mustBe OfficeOfDeparture("GB6789")
+            _.right.get mustBe referenceNumber
           }
         }
 
@@ -94,11 +96,11 @@ class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers {
 
       s"MessageSenderElement parser should add the messageSender node with the movement Id in ${messageType.code} message" in new Setup {
 
-        val stream = createStream(messageOfficeOfDepartureGb(messageType.rootNode))
+        val stream = createStream(messageWithoutMessageSender(messageType.rootNode))
 
         val parsedResult = stream
           .via(XmlParsing.parser)
-          .via(XmlParser.messageSenderWriter(messageType, MessageSender("MVN123456789-MSG987654321"))) // testing this
+          .via(XmlParser.messageSenderWriter(messageType, messageSender)) // testing this
           .via(XmlWriting.writer)
           .fold(ByteString())(_ ++ _)
           .map(_.utf8String)
@@ -106,92 +108,46 @@ class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers {
 
         whenReady(parsedResult) {
           result =>
-            XML.loadString(result) shouldBe messageWithExpectedMessageSender(messageType.rootNode)
+            XML.loadString(result) shouldBe messageWithMessageSender(messageType.rootNode)
         }
       }
   }
 
   trait Setup {
 
-    def messageOfficeOfDepartureGb(messageTypeNode: String): NodeSeq = {
-      val strMessage =
-        s"<$messageTypeNode><preparationDateAndTime>2022-03-28T09:15:12</preparationDateAndTime><CustomsOfficeOfDeparture><referenceNumber>GB6789</referenceNumber></CustomsOfficeOfDeparture></$messageTypeNode>"
-      XML.loadString(strMessage)
-    }
+    val referenceNumber        = arbitraryOfficeOfDeparture.arbitrary.sample.get
+    val messageSender          = arbitraryMessageSender.arbitrary.sample.get
+    val preparationDateAndTime = arbitraryOffsetDateTime.arbitrary.sample.get.toLocalDateTime.format(DateTimeFormatter.ISO_DATE_TIME)
 
-    def messageOfficeOfDepartureXi(messageTypeNode: String): NodeSeq = {
+    def messageWithoutMessageSender(messageTypeNode: String): NodeSeq = {
       val strMessage =
-        s"<$messageTypeNode><preparationDateAndTime>2022-03-28T09:15:12</preparationDateAndTime><CustomsOfficeOfDeparture><referenceNumber>GB6789</referenceNumber></CustomsOfficeOfDeparture></$messageTypeNode>"
+        s"<$messageTypeNode><preparationDateAndTime>$preparationDateAndTime</preparationDateAndTime><CustomsOfficeOfDeparture><referenceNumber>${referenceNumber.value}</referenceNumber></CustomsOfficeOfDeparture></$messageTypeNode>"
       XML.loadString(strMessage)
     }
 
     def messageWithoutRefNumber(messageTypeNode: String): NodeSeq = {
       val strMessage =
-        s"<$messageTypeNode><preparationDateAndTime>2022-03-28T09:15:12</preparationDateAndTime><CustomsOfficeOfDeparture><referenceNumber></referenceNumber></CustomsOfficeOfDeparture></$messageTypeNode>"
+        s"<$messageTypeNode><preparationDateAndTime>$preparationDateAndTime</preparationDateAndTime><CustomsOfficeOfDeparture><referenceNumber></referenceNumber></CustomsOfficeOfDeparture></$messageTypeNode>"
       XML.loadString(strMessage)
     }
 
     def messageWithoutOfficeOfDeparture(messageTypeNode: String): NodeSeq = {
       val strMessage =
-        s"<$messageTypeNode><preparationDateAndTime>2022-03-28T09:15:12</preparationDateAndTime></$messageTypeNode>"
+        s"<$messageTypeNode><preparationDateAndTime>$preparationDateAndTime</preparationDateAndTime></$messageTypeNode>"
       XML.loadString(strMessage)
     }
 
-    def messageWithExpectedMessageSender(messageTypeNode: String): NodeSeq = {
+    def messageWithMessageSender(messageTypeNode: String): NodeSeq = {
       val strMessage =
-        s"<$messageTypeNode><messageSender>MVN123456789-MSG987654321</messageSender><preparationDateAndTime>2022-03-28T09:15:12</preparationDateAndTime><CustomsOfficeOfDeparture><referenceNumber>GB6789</referenceNumber></CustomsOfficeOfDeparture></$messageTypeNode>"
+        s"<$messageTypeNode><messageSender>${messageSender.value}</messageSender><preparationDateAndTime>$preparationDateAndTime</preparationDateAndTime><CustomsOfficeOfDeparture><referenceNumber>${referenceNumber.value}</referenceNumber></CustomsOfficeOfDeparture></$messageTypeNode>"
       XML.loadString(strMessage)
     }
 
-    val cc015cValidGB: NodeSeq =
-      <CC015C>
-        <messageSender>MVN123456789-MSG987654321</messageSender>
-        <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
-        <CustomsOfficeOfDeparture>
-          <referenceNumber>GB6789</referenceNumber>
-        </CustomsOfficeOfDeparture>
-      </CC015C>
-
-    val cc015cValidXI: NodeSeq =
-      <CC015C>
-        <messageSender>GB1234</messageSender>
-        <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
-        <CustomsOfficeOfDeparture>
-          <referenceNumber>XI98765</referenceNumber>
-        </CustomsOfficeOfDeparture>
-      </CC015C>
-
-    val cc015cNoMessageSenderNode: NodeSeq =
-      <CC015C>
-        <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
-      </CC015C>
-
-    val cc015cMessageSenderNode: NodeSeq =
-      <CC015C>
-        <messageSender></messageSender>
-        <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
-      </CC015C>
-
-    val cc015cNoMessageSenderValue: NodeSeq =
-      <CC015C>
-        <messageSender></messageSender>
-        <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
-      </CC015C>
-
-    val cc015cNoRefNumber: NodeSeq =
-      <CC015C>
-        <messageSender>GB1234</messageSender>
-        <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
-        <CustomsOfficeOfDeparture>
-          <referenceNumber></referenceNumber>
-        </CustomsOfficeOfDeparture>
-      </CC015C>
-
-    val cc015cNoOfficeOfDeparture: NodeSeq =
-      <CC015C>
-        <messageSender>GB1234</messageSender>
-        <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
-      </CC015C>
+    val cc015cWithoutMessageSenderValue = {
+      val strMessage =
+        s"<CC015C><messageSender></messageSender><preparationDateAndTime>$preparationDateAndTime</preparationDateAndTime><CustomsOfficeOfDeparture><referenceNumber>${referenceNumber.value}</referenceNumber></CustomsOfficeOfDeparture></CC015C>"
+      XML.loadString(strMessage)
+    }
 
   }
 
