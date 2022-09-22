@@ -121,31 +121,31 @@ class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers with 
 
     def messageWithoutMessageSender(messageTypeNode: String): NodeSeq = {
       val strMessage =
-        s"<$messageTypeNode><preparationDateAndTime>$preparationDateAndTime</preparationDateAndTime><CustomsOfficeOfDeparture><referenceNumber>${referenceNumber.value}</referenceNumber></CustomsOfficeOfDeparture></$messageTypeNode>"
+        s"""<ncts:$messageTypeNode PhaseID="NCTS5.0" xmlns:ncts="http://ncts.dgtaxud.ec"><preparationDateAndTime>$preparationDateAndTime</preparationDateAndTime><CustomsOfficeOfDeparture><referenceNumber>${referenceNumber.value}</referenceNumber></CustomsOfficeOfDeparture></ncts:$messageTypeNode>"""
       XML.loadString(strMessage)
     }
 
     def messageWithoutRefNumber(messageTypeNode: String): NodeSeq = {
       val strMessage =
-        s"<$messageTypeNode><preparationDateAndTime>$preparationDateAndTime</preparationDateAndTime><CustomsOfficeOfDeparture><referenceNumber></referenceNumber></CustomsOfficeOfDeparture></$messageTypeNode>"
+        s"""<ncts:$messageTypeNode PhaseID="NCTS5.0" xmlns:ncts="http://ncts.dgtaxud.ec"><preparationDateAndTime>$preparationDateAndTime</preparationDateAndTime><CustomsOfficeOfDeparture><referenceNumber></referenceNumber></CustomsOfficeOfDeparture></ncts:$messageTypeNode>"""
       XML.loadString(strMessage)
     }
 
     def messageWithoutOfficeOfDeparture(messageTypeNode: String): NodeSeq = {
       val strMessage =
-        s"<$messageTypeNode><preparationDateAndTime>$preparationDateAndTime</preparationDateAndTime></$messageTypeNode>"
+        s"""<ncts:$messageTypeNode PhaseID="NCTS5.0" xmlns:ncts="http://ncts.dgtaxud.ec"><preparationDateAndTime>$preparationDateAndTime</preparationDateAndTime></ncts:$messageTypeNode>"""
       XML.loadString(strMessage)
     }
 
     def messageWithMessageSender(messageTypeNode: String): NodeSeq = {
       val strMessage =
-        s"<$messageTypeNode><messageSender>${messageSender.value}</messageSender><preparationDateAndTime>$preparationDateAndTime</preparationDateAndTime><CustomsOfficeOfDeparture><referenceNumber>${referenceNumber.value}</referenceNumber></CustomsOfficeOfDeparture></$messageTypeNode>"
+        s"""<ncts:$messageTypeNode PhaseID="NCTS5.0" xmlns:ncts="http://ncts.dgtaxud.ec"><messageSender>${messageSender.value}</messageSender><preparationDateAndTime>$preparationDateAndTime</preparationDateAndTime><CustomsOfficeOfDeparture><referenceNumber>${referenceNumber.value}</referenceNumber></CustomsOfficeOfDeparture></ncts:$messageTypeNode>"""
       XML.loadString(strMessage)
     }
 
     val cc015cWithoutMessageSenderValue = {
       val strMessage =
-        s"<CC015C><messageSender></messageSender><preparationDateAndTime>$preparationDateAndTime</preparationDateAndTime><CustomsOfficeOfDeparture><referenceNumber>${referenceNumber.value}</referenceNumber></CustomsOfficeOfDeparture></CC015C>"
+        s"""<ncts:CC015C PhaseID="NCTS5.0" xmlns:ncts="http://ncts.dgtaxud.ec"><messageSender></messageSender><preparationDateAndTime>$preparationDateAndTime</preparationDateAndTime><CustomsOfficeOfDeparture><referenceNumber>${referenceNumber.value}</referenceNumber></CustomsOfficeOfDeparture></ncts:CC015C>"""
       XML.loadString(strMessage)
     }
 
