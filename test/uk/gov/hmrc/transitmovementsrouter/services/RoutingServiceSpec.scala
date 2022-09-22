@@ -38,38 +38,58 @@ import scala.xml.NodeSeq
 
 class RoutingServiceSpec extends AnyFreeSpec with ScalaFutures with TestActorSystem with Matchers with MockitoSugar {
 
-  "Submitting a declaration" - new Setup {
-    "should generate a valid departure office and updated payload for a GB payload" in {
-      val serviceUnderTest = new RoutingServiceImpl(mockMessageConnectorProvider)
-      val payload          = createStream(cc015cOfficeOfDepartureGB)
-      val response         = serviceUnderTest.submitDeclaration(MovementType("Departure"), MovementId("movement-001"), MessageId("message-id-001"), payload)(hc)
+  "Submitting a declaration request" - new Setup {
 
-      whenReady(response.value, Timeout(2 seconds)) {
-        _.mustBe(Right(()))
-      }
+    MessageType.departureRequestValues.foreach {
+      messageType =>
+        s"${messageType.code} should generate a valid departure office and updated payload for a GB payload" in {
+          val serviceUnderTest = new RoutingServiceImpl(mockMessageConnectorProvider)
+          val payload          = createStream(messageOfficeOfDepartureGB(messageType.rootNode))
+          val response = serviceUnderTest.submitMessage(
+            MovementType("Departure"),
+            MovementId("movement-001"),
+            MessageId("message-id-001"),
+            messageType,
+            payload
+          )(hc)
+
+          whenReady(response.value, Timeout(2 seconds)) {
+            _.mustBe(Right(()))
+          }
+        }
+
+        s"${messageType.code} should generate a valid departure office and updated payload for a Xi payload" in {
+          val serviceUnderTest = new RoutingServiceImpl(mockMessageConnectorProvider)
+          val payload          = createStream(messageOfficeOfDepartureXi(messageType.rootNode))
+          val response = serviceUnderTest.submitMessage(
+            MovementType("Departure"),
+            MovementId("movement-001"),
+            MessageId("message-id-001"),
+            messageType,
+            payload
+          )(hc)
+
+          whenReady(response.value, Timeout(2 seconds)) {
+            _.mustBe(Right(()))
+          }
+        }
+
+        s"${messageType.code} returns NoElementFound(referenceNumber) when it does not find an office of departure element" in {
+          val serviceUnderTest = new RoutingServiceImpl(mockMessageConnectorProvider)
+          val payload          = createStream(emptyMessage(messageType.rootNode))
+          val response = serviceUnderTest.submitMessage(
+            MovementType("Departure"),
+            MovementId("movement-001"),
+            MessageId("message-id-001"),
+            messageType,
+            payload
+          )(hc)
+
+          whenReady(response.value, Timeout(2 seconds)) {
+            _.mustBe(Left(NoElementFound("referenceNumber")))
+          }
+        }
     }
-
-    "should not find an office of departure element" in {
-      val serviceUnderTest = new RoutingServiceImpl(mockMessageConnectorProvider)
-      val payload          = createStream(cc015cEmpty)
-      val response         = serviceUnderTest.submitDeclaration(MovementType("Departure"), MovementId("movement-001"), MessageId("message-id-001"), payload)(hc)
-
-      whenReady(response.value, Timeout(2 seconds)) {
-        _.mustBe(Left(NoElementFound("referenceNumber")))
-      }
-    }
-
-    "should generate a valid departure office and updated payload for a Xi payload" in {
-      val serviceUnderTest = new RoutingServiceImpl(mockMessageConnectorProvider)
-      val payload          = createStream(cc015cOfficeOfDepartureXi)
-      val response =
-        serviceUnderTest.submitDeclaration(MovementType("Departure"), MovementId("movement-001"), MessageId("message-id-001"), payload)(hc)
-
-      whenReady(response.value, Timeout(2 seconds)) {
-        _.mustBe(Right(()))
-      }
-    }
-
   }
 
   trait Setup {
@@ -90,23 +110,21 @@ class RoutingServiceSpec extends AnyFreeSpec with ScalaFutures with TestActorSys
 
     val hc = HeaderCarrier()
 
-    val cc015cOfficeOfDepartureGB: NodeSeq =
-      <CC015C>
-        <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
-        <CustomsOfficeOfDeparture>
-          <referenceNumber>GB1234567</referenceNumber>
-        </CustomsOfficeOfDeparture>
-      </CC015C>
+    def messageOfficeOfDepartureGB(messageTypeNode: String): NodeSeq = {
+      val strMessage =
+        s"<$messageTypeNode><preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime><CustomsOfficeOfDeparture><referenceNumber>GB1234567</referenceNumber></CustomsOfficeOfDeparture></$messageTypeNode>"
+      xml.XML.loadString(strMessage)
+    }
 
-    val cc015cOfficeOfDepartureXi: NodeSeq =
-      <CC015C>
-        <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
-        <CustomsOfficeOfDeparture>
-          <referenceNumber>Xi1234567</referenceNumber>
-        </CustomsOfficeOfDeparture>
-      </CC015C>
+    def messageOfficeOfDepartureXi(messageTypeNode: String): NodeSeq = {
+      val strMessage =
+        s"<$messageTypeNode><preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime><CustomsOfficeOfDeparture><referenceNumber>Xi1234567</referenceNumber></CustomsOfficeOfDeparture></$messageTypeNode>"
+      xml.XML.loadString(strMessage)
+    }
 
-    val cc015cEmpty: NodeSeq = <CC015C/>
-
+    def emptyMessage(messageTypeNode: String): NodeSeq = {
+      val strMessage = s"<$messageTypeNode/>"
+      xml.XML.loadString(strMessage)
+    }
   }
 }
