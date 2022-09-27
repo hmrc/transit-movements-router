@@ -74,15 +74,16 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
   val messageId    = MessageId("XYZ456")
 
   val cc015cOfficeOfDepartureGB: NodeSeq =
-    <CC015C>
+    <ncts:CC015C PhaseID="NCTS5.0" xmlns:ncts="http://ncts.dgtaxud.ec">
       <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
       <CustomsOfficeOfDeparture>
         <referenceNumber>GB1234567</referenceNumber>
       </CustomsOfficeOfDeparture>
-    </CC015C>
+    </ncts:CC015C>
 
-  val incomingXml: NodeSeq = <TraderChannelResponse><CC013C>text</CC013C></TraderChannelResponse>
-  val trimmedXml: NodeSeq  = <CC013C>text</CC013C>
+  val incomingXml: NodeSeq =
+    <TraderChannelResponse><ncts:CC013C PhaseID="NCTS5.0" xmlns:ncts="http://ncts.dgtaxud.ec">text</ncts:CC013C></TraderChannelResponse>
+  val trimmedXml: NodeSeq = <ncts:CC013C PhaseID="NCTS5.0" xmlns:ncts="http://ncts.dgtaxud.ec">text</ncts:CC013C>
 
   val mockRoutingService       = mock[RoutingService]
   val mockPersistenceConnector = mock[PersistenceConnector]

@@ -279,7 +279,7 @@ class EISConnectorSpec
       }
 
     whenReady(result) {
-      r => r mustBe ()
+      r => // we can only get here if it was successful and a unit
     }
   }
 
