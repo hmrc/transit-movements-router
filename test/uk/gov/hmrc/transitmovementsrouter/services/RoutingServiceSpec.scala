@@ -20,56 +20,103 @@ import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import org.mockito.ArgumentMatchers
 import org.mockito.Mockito.when
+import org.scalacheck.Arbitrary.arbitrary
+import org.scalacheck.Gen
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
 import org.scalatestplus.mockito.MockitoSugar
+import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.transitmovementsrouter.base.StreamTestHelpers.createStream
 import uk.gov.hmrc.transitmovementsrouter.base._
 import uk.gov.hmrc.transitmovementsrouter.connectors._
+import uk.gov.hmrc.transitmovementsrouter.generators.ModelGenerators
 import uk.gov.hmrc.transitmovementsrouter.models._
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError.NoElementFound
 
+import java.time.OffsetDateTime
+import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
-import scala.xml.NodeSeq
 
-class RoutingServiceSpec extends AnyFreeSpec with ScalaFutures with TestActorSystem with Matchers with MockitoSugar {
+class RoutingServiceSpec
+    extends AnyFreeSpec
+    with ScalaFutures
+    with TestActorSystem
+    with Matchers
+    with MockitoSugar
+    with ScalaCheckDrivenPropertyChecks
+    with ModelGenerators {
 
-  "Submitting a declaration" - new Setup {
-    "should generate a valid departure office and updated payload for a GB payload" in {
-      val serviceUnderTest = new RoutingServiceImpl(mockMessageConnectorProvider)
-      val payload          = createStream(cc015cOfficeOfDepartureGB)
-      val response         = serviceUnderTest.submitDeclaration(MovementType("Departure"), MovementId("movement-001"), MessageId("message-id-001"), payload)(hc)
+  "Submitting a declaration request" - new Setup {
 
-      whenReady(response.value, Timeout(2 seconds)) {
-        _.mustBe(Right(()))
-      }
+    MessageType.departureRequestValues.foreach {
+      messageType =>
+        s"${messageType.code} should generate a valid departure office and updated payload for a GB payload" in forAll(
+          arbitrary[MessageId],
+          arbitrary[MovementId],
+          messageOfficeOfDeparture(messageType.rootNode, "GB")
+        ) {
+          (messageId, movementId, officeOfDepartureXML) =>
+            val serviceUnderTest = new RoutingServiceImpl(mockMessageConnectorProvider)
+            val payload          = createStream(officeOfDepartureXML)
+            val response = serviceUnderTest.submitMessage(
+              MovementType("departures"),
+              movementId,
+              messageId,
+              messageType,
+              payload
+            )(hc)
+
+            whenReady(response.value, Timeout(2 seconds)) {
+              _.mustBe(Right(()))
+            }
+        }
+
+        s"${messageType.code} should generate a valid departure office and updated payload for a Xi payload" in forAll(
+          arbitrary[MessageId],
+          arbitrary[MovementId],
+          messageOfficeOfDeparture(messageType.rootNode, "XI")
+        ) {
+          (messageId, movementId, officeOfDepartureXML) =>
+            val serviceUnderTest = new RoutingServiceImpl(mockMessageConnectorProvider)
+            val payload          = createStream(officeOfDepartureXML)
+            val response = serviceUnderTest.submitMessage(
+              MovementType("departures"),
+              movementId,
+              messageId,
+              messageType,
+              payload
+            )(hc)
+
+            whenReady(response.value, Timeout(2 seconds)) {
+              _.mustBe(Right(()))
+            }
+        }
+
+        s"${messageType.code} returns NoElementFound(referenceNumber) when it does not find an office of departure element" in forAll(
+          arbitrary[MessageId],
+          arbitrary[MovementId]
+        ) {
+          (messageId, movementId) =>
+            val serviceUnderTest = new RoutingServiceImpl(mockMessageConnectorProvider)
+            val payload          = createStream(emptyMessage(messageType.rootNode))
+            val response = serviceUnderTest.submitMessage(
+              MovementType("departures"),
+              movementId,
+              messageId,
+              messageType,
+              payload
+            )(hc)
+
+            whenReady(response.value, Timeout(2 seconds)) {
+              _.mustBe(Left(NoElementFound("referenceNumber")))
+            }
+        }
     }
-
-    "should not find an office of departure element" in {
-      val serviceUnderTest = new RoutingServiceImpl(mockMessageConnectorProvider)
-      val payload          = createStream(cc015cEmpty)
-      val response         = serviceUnderTest.submitDeclaration(MovementType("Departure"), MovementId("movement-001"), MessageId("message-id-001"), payload)(hc)
-
-      whenReady(response.value, Timeout(2 seconds)) {
-        _.mustBe(Left(NoElementFound("referenceNumber")))
-      }
-    }
-
-    "should generate a valid departure office and updated payload for a Xi payload" in {
-      val serviceUnderTest = new RoutingServiceImpl(mockMessageConnectorProvider)
-      val payload          = createStream(cc015cOfficeOfDepartureXi)
-      val response =
-        serviceUnderTest.submitDeclaration(MovementType("Departure"), MovementId("movement-001"), MessageId("message-id-001"), payload)(hc)
-
-      whenReady(response.value, Timeout(2 seconds)) {
-        _.mustBe(Right(()))
-      }
-    }
-
   }
 
   trait Setup {
@@ -90,23 +137,14 @@ class RoutingServiceSpec extends AnyFreeSpec with ScalaFutures with TestActorSys
 
     val hc = HeaderCarrier()
 
-    val cc015cOfficeOfDepartureGB: NodeSeq =
-      <CC015C>
-        <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
-        <CustomsOfficeOfDeparture>
-          <referenceNumber>GB1234567</referenceNumber>
-        </CustomsOfficeOfDeparture>
-      </CC015C>
+    def messageOfficeOfDeparture(messageTypeNode: String, referenceType: String): Gen[String] =
+      for {
+        dateTime <- arbitrary[OffsetDateTime].map(_.toLocalDateTime.truncatedTo(ChronoUnit.SECONDS).format(DateTimeFormatter.ISO_LOCAL_DATE))
+        referenceNumber <- intWithMaxLength(7, 7).map(
+          n => s"$referenceType$n"
+        )
+      } yield s"<$messageTypeNode><preparationDateAndTime>$dateTime</preparationDateAndTime><CustomsOfficeOfDeparture><referenceNumber>$referenceNumber</referenceNumber></CustomsOfficeOfDeparture></$messageTypeNode>"
 
-    val cc015cOfficeOfDepartureXi: NodeSeq =
-      <CC015C>
-        <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
-        <CustomsOfficeOfDeparture>
-          <referenceNumber>Xi1234567</referenceNumber>
-        </CustomsOfficeOfDeparture>
-      </CC015C>
-
-    val cc015cEmpty: NodeSeq = <CC015C/>
-
+    def emptyMessage(messageTypeNode: String): String = s"<$messageTypeNode/>"
   }
 }

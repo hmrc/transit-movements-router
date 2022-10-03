@@ -52,6 +52,7 @@ import uk.gov.hmrc.transitmovementsrouter.fakes.actions.FakeXmlTrimmer
 import uk.gov.hmrc.transitmovementsrouter.models.MessageType.RequestOfRelease
 import uk.gov.hmrc.transitmovementsrouter.models.EoriNumber
 import uk.gov.hmrc.transitmovementsrouter.models.MessageId
+import uk.gov.hmrc.transitmovementsrouter.models.MessageType
 import uk.gov.hmrc.transitmovementsrouter.models.MovementId
 import uk.gov.hmrc.transitmovementsrouter.models.MovementType
 import uk.gov.hmrc.transitmovementsrouter.models.PersistenceResponse
@@ -73,15 +74,16 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
   val messageId    = MessageId("XYZ456")
 
   val cc015cOfficeOfDepartureGB: NodeSeq =
-    <CC015C>
+    <ncts:CC015C PhaseID="NCTS5.0" xmlns:ncts="http://ncts.dgtaxud.ec">
       <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
       <CustomsOfficeOfDeparture>
         <referenceNumber>GB1234567</referenceNumber>
       </CustomsOfficeOfDeparture>
-    </CC015C>
+    </ncts:CC015C>
 
-  val incomingXml: NodeSeq = <TraderChannelResponse><CC013C>text</CC013C></TraderChannelResponse>
-  val trimmedXml: NodeSeq  = <CC013C>text</CC013C>
+  val incomingXml: NodeSeq =
+    <TraderChannelResponse><ncts:CC013C PhaseID="NCTS5.0" xmlns:ncts="http://ncts.dgtaxud.ec">text</ncts:CC013C></TraderChannelResponse>
+  val trimmedXml: NodeSeq = <ncts:CC013C PhaseID="NCTS5.0" xmlns:ncts="http://ncts.dgtaxud.ec">text</ncts:CC013C>
 
   val mockRoutingService       = mock[RoutingService]
   val mockPersistenceConnector = mock[PersistenceConnector]
@@ -102,12 +104,13 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
 
   def fakeRequest[A](
     body: NodeSeq,
-    url: String
+    url: String,
+    headers: FakeHeaders = FakeHeaders(Seq.empty)
   ): Request[Source[ByteString, _]] =
     FakeRequest(
       method = POST,
       uri = url,
-      headers = FakeHeaders(Seq.empty),
+      headers = headers,
       body = createStream(body)
     )
 
@@ -119,19 +122,22 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
   lazy val submitDeclarationEither: EitherT[Future, RoutingError, Unit] =
     EitherT.rightT(())
 
+  lazy val messageTypeHeader = FakeHeaders(Seq(("X-Message-Type", MessageType.DeclarationData.code)))
+
   "POST outgoing" - {
     "must return ACCEPTED when declaration is submitted successfully" in {
 
       when(
-        mockRoutingService.submitDeclaration(
+        mockRoutingService.submitMessage(
           any[String].asInstanceOf[MovementType],
           any[String].asInstanceOf[MovementId],
           any[String].asInstanceOf[MessageId],
+          any[MessageType],
           any[Source[ByteString, _]]
         )(any[HeaderCarrier])
       ).thenReturn(submitDeclarationEither)
 
-      val result = controller().outgoing(eori, movementType, movementId, messageId)(fakeRequest(cc015cOfficeOfDepartureGB, outgoing))
+      val result = controller().outgoing(eori, movementType, movementId, messageId)(fakeRequest(cc015cOfficeOfDepartureGB, outgoing, messageTypeHeader))
 
       status(result) mustBe ACCEPTED
     }
@@ -141,15 +147,16 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
       "returns message to indicate element not found" in {
 
         when(
-          mockRoutingService.submitDeclaration(
+          mockRoutingService.submitMessage(
             any[String].asInstanceOf[MovementType],
             any[String].asInstanceOf[MovementId],
             any[String].asInstanceOf[MessageId],
+            any[MessageType],
             any[Source[ByteString, _]]
           )(any[HeaderCarrier])
         ).thenReturn(EitherT[Future, RoutingError, Unit](Future.successful(Left(RoutingError.NoElementFound("messageSender")))))
 
-        val result = controller().outgoing(eori, movementType, movementId, messageId)(fakeRequest(cc015cOfficeOfDepartureGB, outgoing))
+        val result = controller().outgoing(eori, movementType, movementId, messageId)(fakeRequest(cc015cOfficeOfDepartureGB, outgoing, messageTypeHeader))
 
         status(result) mustBe BAD_REQUEST
         contentAsJson(result) mustBe Json.obj(
@@ -161,15 +168,16 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
       "returns message to indicate too many elements" in {
 
         when(
-          mockRoutingService.submitDeclaration(
+          mockRoutingService.submitMessage(
             any[String].asInstanceOf[MovementType],
             any[String].asInstanceOf[MovementId],
             any[String].asInstanceOf[MessageId],
+            any[MessageType],
             any[Source[ByteString, _]]
           )(any[HeaderCarrier])
         ).thenReturn(EitherT[Future, RoutingError, Unit](Future.successful(Left(RoutingError.TooManyElementsFound("eori")))))
 
-        val result = controller().outgoing(eori, movementType, movementId, messageId)(fakeRequest(cc015cOfficeOfDepartureGB, outgoing))
+        val result = controller().outgoing(eori, movementType, movementId, messageId)(fakeRequest(cc015cOfficeOfDepartureGB, outgoing, messageTypeHeader))
 
         status(result) mustBe BAD_REQUEST
         contentAsJson(result) mustBe Json.obj(
@@ -177,15 +185,60 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
           "message" -> "Found too many elements of type eori"
         )
       }
+
+      "returns message to inform that the X-Message-Type header is not present" in {
+
+        when(
+          mockRoutingService.submitMessage(
+            any[String].asInstanceOf[MovementType],
+            any[String].asInstanceOf[MovementId],
+            any[String].asInstanceOf[MessageId],
+            any[MessageType],
+            any[Source[ByteString, _]]
+          )(any[HeaderCarrier])
+        ).thenReturn(EitherT[Future, RoutingError, Unit](Future.successful(Left(RoutingError.NoElementFound("messageSender")))))
+
+        val result = controller().outgoing(eori, movementType, movementId, messageId)(fakeRequest(cc015cOfficeOfDepartureGB, outgoing))
+
+        status(result) mustBe BAD_REQUEST
+        contentAsJson(result) mustBe Json.obj(
+          "code"    -> "BAD_REQUEST",
+          "message" -> "Missing header: X-Message-Type"
+        )
+      }
+
+      "returns message to inform that the X-Message-Type header value is invalid" in {
+
+        when(
+          mockRoutingService.submitMessage(
+            any[String].asInstanceOf[MovementType],
+            any[String].asInstanceOf[MovementId],
+            any[String].asInstanceOf[MessageId],
+            any[MessageType],
+            any[Source[ByteString, _]]
+          )(any[HeaderCarrier])
+        ).thenReturn(EitherT[Future, RoutingError, Unit](Future.successful(Left(RoutingError.NoElementFound("messageSender")))))
+
+        val result = controller().outgoing(eori, movementType, movementId, messageId)(
+          fakeRequest(cc015cOfficeOfDepartureGB, outgoing, FakeHeaders(Seq(("X-Message-Type", "EEinvalid"))))
+        )
+
+        status(result) mustBe BAD_REQUEST
+        contentAsJson(result) mustBe Json.obj(
+          "code"    -> "BAD_REQUEST",
+          "message" -> "Invalid message type: Invalid X-Message-Type header value: EEinvalid"
+        )
+      }
     }
 
     "must return INTERNAL_SERVER_ERROR when declaration submission fails due to unexpected error" in {
 
       when(
-        mockRoutingService.submitDeclaration(
+        mockRoutingService.submitMessage(
           any[String].asInstanceOf[MovementType],
           any[String].asInstanceOf[MovementId],
           any[String].asInstanceOf[MessageId],
+          any[MessageType],
           any[Source[ByteString, _]]
         )(any[HeaderCarrier])
       ).thenReturn(
@@ -194,7 +247,7 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
         )
       )
 
-      val result = controller().outgoing(eori, movementType, movementId, messageId)(fakeRequest(cc015cOfficeOfDepartureGB, outgoing))
+      val result = controller().outgoing(eori, movementType, movementId, messageId)(fakeRequest(cc015cOfficeOfDepartureGB, outgoing, messageTypeHeader))
 
       status(result) mustBe INTERNAL_SERVER_ERROR
       contentAsJson(result) mustBe Json.obj(

@@ -25,26 +25,27 @@ import org.scalatest.matchers.must.Matchers
 import org.scalatest.matchers.should.Matchers.convertToAnyShouldWrapper
 import uk.gov.hmrc.transitmovementsrouter.base.StreamTestHelpers._
 import uk.gov.hmrc.transitmovementsrouter.base.TestActorSystem
+import uk.gov.hmrc.transitmovementsrouter.generators.ModelGenerators
 import uk.gov.hmrc.transitmovementsrouter.models._
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError.NoElementFound
 
-import scala.xml.Utility.trim
+import java.time.format.DateTimeFormatter
 import scala.xml._
 
-class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers {
+class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers with ModelGenerators {
 
   "MessageSender parser" - new Setup {
-    "when provided with a valid message" in {
-      val stream       = createParsingEventStream(cc015cValidGB)
+    "when provided with a valid message it extracts the message sender" in {
+      val stream       = createParsingEventStream(messageWithMessageSender(MessageType.DeclarationData.rootNode))
       val parsedResult = stream.via(XmlParser.messageSenderExtractor).runWith(Sink.head)
 
       whenReady(parsedResult) {
-        _.right.get mustBe MessageSender("MVN123456789-MSG987654321")
+        _.right.get mustBe messageSender
       }
     }
 
-    "when provided with a missing messageSender node" in {
-      val stream       = createParsingEventStream(cc015cNoMessageSenderNode)
+    "when provided with a missing messageSender node it returns NoElementFound" in {
+      val stream       = createParsingEventStream(messageWithoutMessageSender(MessageType.DeclarationData.rootNode))
       val parsedResult = stream.via(XmlParser.messageSenderExtractor).runWith(Sink.head)
 
       whenReady(parsedResult) {
@@ -52,8 +53,8 @@ class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers {
       }
     }
 
-    "when provided with a no value for messageSender node" in {
-      val stream       = createParsingEventStream(cc015cNoMessageSenderValue)
+    "when provided with a no value for messageSender node it returns NoElementFound" in {
+      val stream       = createParsingEventStream(cc015cWithoutMessageSenderValue)
       val parsedResult = stream.via(XmlParser.messageSenderExtractor).runWith(Sink.head)
 
       whenReady(parsedResult) {
@@ -62,116 +63,91 @@ class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers {
     }
   }
 
-  "OfficeOfDeparture parser" - new Setup {
-    "when provided with a valid message" in {
-      val stream       = createParsingEventStream(cc015cValidGB)
-      val parsedResult = stream.via(XmlParser.officeOfDepartureExtractor).runWith(Sink.head)
+  MessageType.departureRequestValues.foreach {
+    messageType =>
+      "OfficeOfDeparture parser" - new Setup {
+        s"when provided with a valid ${messageType.code} message it extracts the OfficeOfDeparture" in {
+          val stream       = createParsingEventStream(messageWithoutMessageSender(messageType.rootNode))
+          val parsedResult = stream.via(XmlParser.officeOfDepartureExtractor(messageType)).runWith(Sink.head)
 
-      whenReady(parsedResult) {
-        _.right.get mustBe OfficeOfDeparture("GB6789")
+          whenReady(parsedResult) {
+            _.right.get mustBe referenceNumber
+          }
+        }
+
+        s"when provided with a missing OfficeOfDeparture node in ${messageType.code} message it returns NoElementFound" in {
+          val stream       = createParsingEventStream(messageWithoutOfficeOfDeparture(messageType.rootNode))
+          val parsedResult = stream.via(XmlParser.officeOfDepartureExtractor(MessageType.DeclarationData)).runWith(Sink.head)
+
+          whenReady(parsedResult) {
+            _.mustBe(Left(NoElementFound("referenceNumber")))
+          }
+        }
+
+        s"when provided with a missing ReferenceNumber node in ${messageType.code} message it returns NoElementFound" in {
+          val stream       = createParsingEventStream(messageWithoutRefNumber(messageType.rootNode))
+          val parsedResult = stream.via(XmlParser.officeOfDepartureExtractor(MessageType.DeclarationData)).runWith(Sink.head)
+
+          whenReady(parsedResult) {
+            _.mustBe(Left(NoElementFound("referenceNumber")))
+          }
+        }
       }
-    }
 
-    "when provided with a missing OfficeOfDeparture node" in {
-      val stream       = createParsingEventStream(cc015cNoOfficeOfDeparture)
-      val parsedResult = stream.via(XmlParser.officeOfDepartureExtractor).runWith(Sink.head)
+      s"MessageSenderElement parser should add the messageSender node with the movement Id in ${messageType.code} message" in new Setup {
 
-      whenReady(parsedResult) {
-        _.mustBe(Left(NoElementFound("referenceNumber")))
+        val stream = createStream(messageWithoutMessageSender(messageType.rootNode))
+
+        val parsedResult = stream
+          .via(XmlParsing.parser)
+          .via(XmlParser.messageSenderWriter(messageType, messageSender)) // testing this
+          .via(XmlWriting.writer)
+          .fold(ByteString())(_ ++ _)
+          .map(_.utf8String)
+          .runWith(Sink.head)
+
+        whenReady(parsedResult) {
+          result =>
+            XML.loadString(result) shouldBe messageWithMessageSender(messageType.rootNode)
+        }
       }
-    }
-
-    "when provided with a missing ReferenceNumber node" in {
-      val stream       = createParsingEventStream(cc015cNoRefNumber)
-      val parsedResult = stream.via(XmlParser.officeOfDepartureExtractor).runWith(Sink.head)
-
-      whenReady(parsedResult) {
-        _.mustBe(Left(NoElementFound("referenceNumber")))
-      }
-    }
-  }
-
-  "MessageSenderElement parser should add the messageSender node with the movement Id" in new Setup {
-
-    val stream = createStream(cc015cNoMessageSenderNode)
-
-    val parsedResult = stream
-      .via(XmlParsing.parser)
-      .via(XmlParser.messageSenderWriter(MessageSender("MVN123456789-MSG987654321"))) // testing this
-      .via(XmlWriting.writer)
-      .fold(ByteString())(_ ++ _)
-      .map(_.utf8String)
-      .runWith(Sink.head)
-
-    whenReady(parsedResult) {
-      result =>
-        trim(XML.loadString(result)) shouldBe trim(cc015cWithExpectedMessageSenderNode.head)
-    }
   }
 
   trait Setup {
 
-    val cc015cInsertMessageSender =
-      """<CC015C>
-        <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
-        <CustomsOfficeOfDeparture>
-          <referenceNumber>GB6789</referenceNumber>
-        </CustomsOfficeOfDeparture>
-      </CC015C>""".stripMargin
+    val referenceNumber        = arbitraryOfficeOfDeparture.arbitrary.sample.get
+    val messageSender          = arbitraryMessageSender.arbitrary.sample.get
+    val preparationDateAndTime = arbitraryOffsetDateTime.arbitrary.sample.get.toLocalDateTime.format(DateTimeFormatter.ISO_DATE_TIME)
 
-    val cc015cValidGB: NodeSeq =
-      <CC015C>
-        <messageSender>MVN123456789-MSG987654321</messageSender>
-        <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
-        <CustomsOfficeOfDeparture>
-          <referenceNumber>GB6789</referenceNumber>
-        </CustomsOfficeOfDeparture>
-      </CC015C>
+    def messageWithoutMessageSender(messageTypeNode: String): NodeSeq = {
+      val strMessage =
+        s"""<ncts:$messageTypeNode PhaseID="NCTS5.0" xmlns:ncts="http://ncts.dgtaxud.ec"><preparationDateAndTime>$preparationDateAndTime</preparationDateAndTime><CustomsOfficeOfDeparture><referenceNumber>${referenceNumber.value}</referenceNumber></CustomsOfficeOfDeparture></ncts:$messageTypeNode>"""
+      XML.loadString(strMessage)
+    }
 
-    val cc015cValidXI: NodeSeq =
-      <CC015C>
-        <messageSender>GB1234</messageSender>
-        <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
-        <CustomsOfficeOfDeparture>
-          <referenceNumber>XI98765</referenceNumber>
-        </CustomsOfficeOfDeparture>
-      </CC015C>
+    def messageWithoutRefNumber(messageTypeNode: String): NodeSeq = {
+      val strMessage =
+        s"""<ncts:$messageTypeNode PhaseID="NCTS5.0" xmlns:ncts="http://ncts.dgtaxud.ec"><preparationDateAndTime>$preparationDateAndTime</preparationDateAndTime><CustomsOfficeOfDeparture><referenceNumber></referenceNumber></CustomsOfficeOfDeparture></ncts:$messageTypeNode>"""
+      XML.loadString(strMessage)
+    }
 
-    val cc015cNoMessageSenderNode: NodeSeq =
-      <CC015C>
-        <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
-      </CC015C>
+    def messageWithoutOfficeOfDeparture(messageTypeNode: String): NodeSeq = {
+      val strMessage =
+        s"""<ncts:$messageTypeNode PhaseID="NCTS5.0" xmlns:ncts="http://ncts.dgtaxud.ec"><preparationDateAndTime>$preparationDateAndTime</preparationDateAndTime></ncts:$messageTypeNode>"""
+      XML.loadString(strMessage)
+    }
 
-    val cc015cWithExpectedMessageSenderNode: NodeSeq =
-      <CC015C>
-        <messageSender>MVN123456789-MSG987654321</messageSender>
-        <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
-      </CC015C>
+    def messageWithMessageSender(messageTypeNode: String): NodeSeq = {
+      val strMessage =
+        s"""<ncts:$messageTypeNode PhaseID="NCTS5.0" xmlns:ncts="http://ncts.dgtaxud.ec"><messageSender>${messageSender.value}</messageSender><preparationDateAndTime>$preparationDateAndTime</preparationDateAndTime><CustomsOfficeOfDeparture><referenceNumber>${referenceNumber.value}</referenceNumber></CustomsOfficeOfDeparture></ncts:$messageTypeNode>"""
+      XML.loadString(strMessage)
+    }
 
-    val cc015cMessageSenderNode: NodeSeq =
-      <CC015C>
-        <messageSender></messageSender>
-        <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
-      </CC015C>
-
-    val cc015cNoMessageSenderValue: NodeSeq =
-      <CC015C>
-        <messageSender></messageSender>
-        <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
-      </CC015C>
-
-    val cc015cNoRefNumber: NodeSeq =
-      <CC015C>
-        <messageSender>GB1234</messageSender>
-        <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
-        <CustomsOfficeOfDeparture/>
-      </CC015C>
-
-    val cc015cNoOfficeOfDeparture: NodeSeq =
-      <CC015C>
-        <messageSender>GB1234</messageSender>
-        <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
-      </CC015C>
+    val cc015cWithoutMessageSenderValue = {
+      val strMessage =
+        s"""<ncts:CC015C PhaseID="NCTS5.0" xmlns:ncts="http://ncts.dgtaxud.ec"><messageSender></messageSender><preparationDateAndTime>$preparationDateAndTime</preparationDateAndTime><CustomsOfficeOfDeparture><referenceNumber>${referenceNumber.value}</referenceNumber></CustomsOfficeOfDeparture></ncts:CC015C>"""
+      XML.loadString(strMessage)
+    }
 
   }
 
