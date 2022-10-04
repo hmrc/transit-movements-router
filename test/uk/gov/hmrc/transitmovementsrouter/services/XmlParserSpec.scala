@@ -63,6 +63,38 @@ class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers with 
     }
   }
 
+  MessageType.arrivalRequestValues.foreach {
+    messageType =>
+      "CustomsOfficeOfDestinationActual parser" - new Setup {
+        s"when provided with a valid ${messageType.code} message" in {
+          val stream       = createParsingEventStream(arrivalMessageOfficeOfDestinationActual(messageType.rootNode))
+          val parsedResult = stream.via(XmlParser.customsOfficeOfDestinationActualExtractor(messageType)).runWith(Sink.head)
+
+          whenReady(parsedResult) {
+            _.right.get mustBe referenceNumberDestinationActual
+          }
+        }
+
+        s"when ${messageType.code} is provided without a reference number value" in {
+          val stream       = createParsingEventStream(arrivalMessageWithoutRefNumber(messageType.rootNode))
+          val parsedResult = stream.via(XmlParser.customsOfficeOfDestinationActualExtractor(messageType)).runWith(Sink.head)
+
+          whenReady(parsedResult) {
+            _.mustBe(Left(NoElementFound("referenceNumber")))
+          }
+        }
+
+        s"when ${messageType.code} is provided without a MessageOfficeOfDestinationActual node" in {
+          val stream       = createParsingEventStream(arrivalMessageWithoutCustomsOfficeOfDestinationActual(messageType.rootNode))
+          val parsedResult = stream.via(XmlParser.customsOfficeOfDestinationActualExtractor(messageType)).runWith(Sink.head)
+
+          whenReady(parsedResult) {
+            _.mustBe(Left(NoElementFound("referenceNumber")))
+          }
+        }
+      }
+  }
+
   MessageType.departureRequestValues.foreach {
     messageType =>
       "OfficeOfDeparture parser" - new Setup {
@@ -115,9 +147,10 @@ class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers with 
 
   trait Setup {
 
-    val referenceNumber        = arbitraryOfficeOfDeparture.arbitrary.sample.get
-    val messageSender          = arbitraryMessageSender.arbitrary.sample.get
-    val preparationDateAndTime = arbitraryOffsetDateTime.arbitrary.sample.get.toLocalDateTime.format(DateTimeFormatter.ISO_DATE_TIME)
+    val referenceNumber                  = arbitraryOfficeOfDeparture.arbitrary.sample.get
+    val referenceNumberDestinationActual = arbitraryCustomsOfficeOfDestinationActual.arbitrary.sample.get
+    val messageSender                    = arbitraryMessageSender.arbitrary.sample.get
+    val preparationDateAndTime           = arbitraryOffsetDateTime.arbitrary.sample.get.toLocalDateTime.format(DateTimeFormatter.ISO_DATE_TIME)
 
     def messageWithoutMessageSender(messageTypeNode: String): NodeSeq = {
       val strMessage =
@@ -146,6 +179,36 @@ class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers with 
     val cc015cWithoutMessageSenderValue = {
       val strMessage =
         s"""<ncts:CC015C PhaseID="NCTS5.0" xmlns:ncts="http://ncts.dgtaxud.ec"><messageSender></messageSender><preparationDateAndTime>$preparationDateAndTime</preparationDateAndTime><CustomsOfficeOfDeparture><referenceNumber>${referenceNumber.value}</referenceNumber></CustomsOfficeOfDeparture></ncts:CC015C>"""
+      XML.loadString(strMessage)
+    }
+
+    def arrivalMessageOfficeOfDestinationActual(messageTypeNode: String): NodeSeq = {
+      val strMessage =
+        s"""<ncts:$messageTypeNode PhaseID="NCTS5.0" xmlns:ncts="http://ncts.dgtaxud.ec">
+           |<messageType>$messageTypeNode</messageType>
+           |<CustomsOfficeOfDestinationActual>
+           |  <referenceNumber>${referenceNumberDestinationActual.value}</referenceNumber>
+           |</CustomsOfficeOfDestinationActual>
+           |</ncts:$messageTypeNode>""".stripMargin
+      XML.loadString(strMessage)
+    }
+
+    def arrivalMessageWithoutRefNumber(messageTypeNode: String): NodeSeq = {
+      val strMessage =
+        s"""<ncts:$messageTypeNode PhaseID="NCTS5.0" xmlns:ncts="http://ncts.dgtaxud.ec">
+           |<messageType>$messageTypeNode</messageType>
+           |<CustomsOfficeOfDestinationActual>
+           |  <referenceNumber></referenceNumber>
+           |</CustomsOfficeOfDestinationActual>
+           |</ncts:$messageTypeNode>""".stripMargin
+      XML.loadString(strMessage)
+    }
+
+    def arrivalMessageWithoutCustomsOfficeOfDestinationActual(messageTypeNode: String): NodeSeq = {
+      val strMessage =
+        s"""<ncts:$messageTypeNode PhaseID="NCTS5.0" xmlns:ncts="http://ncts.dgtaxud.ec">
+           |<messageType>$messageTypeNode</messageType>
+           |</ncts:$messageTypeNode>""".stripMargin
       XML.loadString(strMessage)
     }
 

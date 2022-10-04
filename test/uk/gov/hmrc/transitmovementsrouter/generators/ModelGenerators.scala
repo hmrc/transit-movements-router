@@ -18,6 +18,7 @@ package uk.gov.hmrc.transitmovementsrouter.generators
 
 import org.scalacheck.Arbitrary
 import org.scalacheck.Gen
+import uk.gov.hmrc.transitmovementsrouter.models.CustomsOfficeOfDestinationActual
 import uk.gov.hmrc.transitmovementsrouter.models.MessageId
 import uk.gov.hmrc.transitmovementsrouter.models.MessageSender
 import uk.gov.hmrc.transitmovementsrouter.models.MessageType
@@ -36,6 +37,15 @@ trait ModelGenerators extends BaseGenerators {
         destination <- Gen.oneOf(Seq("GB", "XI"))
         id          <- intWithMaxLength(7, 7)
       } yield OfficeOfDeparture(s"$destination$id")
+    }
+
+  // generic?
+  implicit lazy val arbitraryCustomsOfficeOfDestinationActual: Arbitrary[CustomsOfficeOfDestinationActual] =
+    Arbitrary {
+      for {
+        destination <- Gen.oneOf(Seq("GB", "XI"))
+        id          <- intWithMaxLength(7, 7)
+      } yield CustomsOfficeOfDestinationActual(s"$destination$id")
     }
 
   implicit lazy val arbitraryMessageSender: Arbitrary[MessageSender] =

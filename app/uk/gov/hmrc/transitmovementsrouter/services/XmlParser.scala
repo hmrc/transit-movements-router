@@ -38,6 +38,15 @@ object XmlParser extends XmlParsingServiceHelpers {
     }
     .single("referenceNumber")
 
+  def customsOfficeOfDestinationActualExtractor(
+    arrivalMessageType: ArrivalMessageType
+  ): Flow[ParseEvent, ParseResult[CustomsOfficeOfDestinationActual], NotUsed] = XmlParsing
+    .subtree(arrivalMessageType.rootNode :: "CustomsOfficeOfDestinationActual" :: "referenceNumber" :: Nil)
+    .collect {
+      case element if element.getTextContent.nonEmpty => CustomsOfficeOfDestinationActual(element.getTextContent)
+    }
+    .single("referenceNumber")
+
   def messageSenderWriter(messageType: MessageType, messageSender: MessageSender): Flow[ParseEvent, ParseEvent, NotUsed] = Flow[ParseEvent]
     .mapConcat(
       element =>
