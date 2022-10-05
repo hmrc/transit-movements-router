@@ -19,6 +19,7 @@ package uk.gov.hmrc.transitmovementsrouter.controllers
 import akka.stream.Materializer
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
+import play.api.libs.Files.TemporaryFileCreator
 import play.api.libs.json.Json
 import play.api.mvc.Action
 import play.api.mvc.ControllerComponents
@@ -48,27 +49,27 @@ class MessagesController @Inject() (
   trimmer: StreamingMessageTrimmer,
   messageSize: MessageSizeActionProvider
 )(implicit
-  val materializer: Materializer
+  val materializer: Materializer,
+  val temporaryFileCreator: TemporaryFileCreator
 ) extends BackendController(cc)
     with StreamingParsers
     with ConvertError {
 
-  def outgoing(eori: EoriNumber, movementType: MovementType, movementId: MovementId, messageId: MessageId): Action[Source[ByteString, _]] = Action.async(
-    streamFromFile
-  ) {
-    implicit request =>
-      implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
-      (for {
-        messageType <- MessageTypeHeaderExtractor.extract(request.headers).asPresentation
-        submitted   <- routingService.submitMessage(movementType, movementId, messageId, messageType, request.body).asPresentation
-      } yield submitted).fold[Result](
-        error => Status(error.code.statusCode)(Json.toJson(error)),
-        _ => Accepted
-      )
-  }
+  def outgoing(eori: EoriNumber, movementType: MovementType, movementId: MovementId, messageId: MessageId): Action[Source[ByteString, _]] =
+    Action.stream {
+      implicit request =>
+        implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
+        (for {
+          messageType <- MessageTypeHeaderExtractor.extract(request.headers).asPresentation
+          submitted   <- routingService.submitMessage(movementType, movementId, messageId, messageType, request.body).asPresentation
+        } yield submitted).fold[Result](
+          error => Status(error.code.statusCode)(Json.toJson(error)),
+          _ => Accepted
+        )
+    }
 
   def incoming(ids: (MovementId, MessageId)): Action[Source[ByteString, _]] =
-    (DefaultActionBuilder.apply(cc.parsers.anyContent) andThen messageSize()).async(streamFromFile) {
+    (DefaultActionBuilder.apply(cc.parsers.anyContent) andThen messageSize()).stream {
       implicit request =>
         implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
         val (movementId, messageId)    = ids

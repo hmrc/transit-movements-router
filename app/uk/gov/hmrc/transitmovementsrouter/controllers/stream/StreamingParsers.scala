@@ -23,16 +23,22 @@ import akka.stream.scaladsl.RunnableGraph
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import play.api.libs.Files
+import play.api.libs.Files.TemporaryFileCreator
 import play.api.libs.streams.Accumulator
+import play.api.mvc.Action
+import play.api.mvc.ActionBuilder
 import play.api.mvc.BaseControllerHelpers
 import play.api.mvc.BodyParser
 import play.api.mvc.Request
+import play.api.mvc.Result
+import uk.gov.hmrc.transitmovementsrouter.utils.FutureConversions._
+import uk.gov.hmrc.transitmovementsrouter.utils.StreamWithFile
 
 import java.util.concurrent.Executors
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 
-trait StreamingParsers {
+trait StreamingParsers extends StreamWithFile {
   self: BaseControllerHelpers =>
 
   implicit val materializer: Materializer
@@ -58,4 +64,18 @@ trait StreamingParsers {
       Accumulator.source[ByteString].map(Right.apply)
   }
 
+  implicit class ActionBuilderStreamHelpers(actionBuilder: ActionBuilder[Request, _]) {
+
+    def stream(
+      block: Request[Source[ByteString, _]] => Future[Result]
+    )(implicit temporaryFileCreator: TemporaryFileCreator): Action[Source[ByteString, _]] =
+      actionBuilder.async(streamFromMemory) {
+        request =>
+          withReusableSource(request.body) {
+            memoryOrFileSource =>
+              block(request.withBody(memoryOrFileSource))
+          }
+      }
+
+  }
 }

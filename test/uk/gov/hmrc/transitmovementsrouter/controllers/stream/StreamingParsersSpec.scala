@@ -23,8 +23,11 @@ import akka.stream.scaladsl.Keep
 import akka.stream.scaladsl.Sink
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
+import org.scalacheck.Gen
+import org.scalatest.OptionValues
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
+import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 import play.api.http.HeaderNames
 import play.api.http.Status.OK
 import play.api.libs.Files
@@ -40,6 +43,7 @@ import play.api.test.Helpers.defaultAwaitTimeout
 import play.api.test.Helpers.status
 import play.api.test.Helpers.stubControllerComponents
 import uk.gov.hmrc.transitmovementsrouter.base.TestActorSystem
+import uk.gov.hmrc.transitmovementsrouter.base.TestSourceProvider
 
 import java.nio.charset.StandardCharsets
 import scala.annotation.tailrec
@@ -48,13 +52,22 @@ import scala.concurrent.Await
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 
-class StreamingParsersSpec extends AnyFreeSpec with Matchers with TestActorSystem {
+class StreamingParsersSpec
+    extends AnyFreeSpec
+    with Matchers
+    with TestActorSystem
+    with TestSourceProvider
+    with ScalaCheckDrivenPropertyChecks
+    with OptionValues {
 
   lazy val headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> "text/plain", HeaderNames.ACCEPT -> "application/vnd.hmrc.2.0+json"))
 
-  class Harness(val controllerComponents: ControllerComponents = stubControllerComponents())(implicit val materializer: Materializer)
-      extends BaseController
-      with StreamingParsers {
+  object Harness extends BaseController with StreamingParsers {
+
+    implicit override val materializer: Materializer        = Materializer(TestActorSystem.system)
+    override val controllerComponents: ControllerComponents = stubControllerComponents()
+
+    implicit val tfc = SingletonTemporaryFileCreator
 
     def testFromMemory: Action[Source[ByteString, _]] = Action.async(streamFromMemory) {
       request => result.apply(request).run(request.body)(materializer)
@@ -81,6 +94,18 @@ class StreamingParsersSpec extends AnyFreeSpec with Matchers with TestActorSyste
           secondString <- stream()
         } yield Ok(Json.obj("first" -> firstString, "second" -> secondString))
     }
+
+    def resultStream: Action[Source[ByteString, _]] = Action.stream {
+      request =>
+        (for {
+          a <- request.body.runWith(Sink.head)
+          b <- request.body.runWith(Sink.head)
+        } yield (a ++ b).utf8String)
+          .map(
+            r => Ok(r)
+          )
+    }
+
   }
 
   @tailrec
@@ -101,12 +126,19 @@ class StreamingParsersSpec extends AnyFreeSpec with Matchers with TestActorSyste
           s"~$value kb string is created" in {
             val byteString = generateByteString(value)
             val request    = FakeRequest("POST", "/", headers, generateSource(byteString))
-            val sut        = new Harness()
-            val result     = sut.testFromMemory()(request)
+            val result     = Harness.testFromMemory()(request)
             status(result) mustBe OK
             contentAsString(result) mustBe byteString.decodeString(StandardCharsets.UTF_8)
           }
       }
+    }
+
+    "via the stream extension method" in {
+      val string  = Gen.stringOfN(20, Gen.alphaNumChar).sample.value
+      val request = FakeRequest("POST", "/", headers, singleUseStringSource(string))
+      val result  = Harness.resultStream()(request)
+      status(result) mustBe OK
+      contentAsString(result) mustBe (string ++ string)
     }
   }
 
@@ -123,8 +155,7 @@ class StreamingParsersSpec extends AnyFreeSpec with Matchers with TestActorSyste
           generateSource(byteString).runWith(FileIO.toPath(file.path)).map {
             _ =>
               val request = FakeRequest("POST", "/", headers, file)
-              val sut     = new Harness()
-              val result  = sut.testFile()(request)
+              val result  = Harness.testFile()(request)
               status(result) mustBe OK
               Json.parse(contentAsString(result)) mustBe Json.obj("first" -> expectedString, "second" -> expectedString)
           },

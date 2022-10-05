@@ -68,6 +68,8 @@ import scala.xml.NodeSeq
 
 class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSystem with BeforeAndAfterEach {
 
+  implicit val tfc = SingletonTemporaryFileCreator
+
   val eori         = EoriNumber("eori")
   val movementType = MovementType("departures")
   val movementId   = MovementId("ABC123")
