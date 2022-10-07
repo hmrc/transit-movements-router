@@ -68,16 +68,16 @@ class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers with 
       "CustomsOfficeOfDestinationActual parser" - new Setup {
         s"when provided with a valid ${messageType.code} message" in {
           val stream       = createParsingEventStream(arrivalMessageOfficeOfDestinationActual(messageType.rootNode))
-          val parsedResult = stream.via(XmlParser.customsOfficeOfDestinationActualExtractor(messageType)).runWith(Sink.head)
+          val parsedResult = stream.via(XmlParser.customsOfficeExtractor(messageType, "CustomsOfficeOfDestinationActual")).runWith(Sink.head)
 
           whenReady(parsedResult) {
-            _.right.get mustBe referenceNumberDestinationActual
+            _.right.get mustBe referenceNumber
           }
         }
 
         s"when ${messageType.code} is provided without a reference number value" in {
           val stream       = createParsingEventStream(arrivalMessageWithoutRefNumber(messageType.rootNode))
-          val parsedResult = stream.via(XmlParser.customsOfficeOfDestinationActualExtractor(messageType)).runWith(Sink.head)
+          val parsedResult = stream.via(XmlParser.customsOfficeExtractor(messageType, "CustomsOfficeOfDestinationActual")).runWith(Sink.head)
 
           whenReady(parsedResult) {
             _.mustBe(Left(NoElementFound("referenceNumber")))
@@ -86,7 +86,7 @@ class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers with 
 
         s"when ${messageType.code} is provided without a MessageOfficeOfDestinationActual node" in {
           val stream       = createParsingEventStream(arrivalMessageWithoutCustomsOfficeOfDestinationActual(messageType.rootNode))
-          val parsedResult = stream.via(XmlParser.customsOfficeOfDestinationActualExtractor(messageType)).runWith(Sink.head)
+          val parsedResult = stream.via(XmlParser.customsOfficeExtractor(messageType, "CustomsOfficeOfDestinationActual")).runWith(Sink.head)
 
           whenReady(parsedResult) {
             _.mustBe(Left(NoElementFound("referenceNumber")))
@@ -100,7 +100,7 @@ class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers with 
       "OfficeOfDeparture parser" - new Setup {
         s"when provided with a valid ${messageType.code} message it extracts the OfficeOfDeparture" in {
           val stream       = createParsingEventStream(messageWithoutMessageSender(messageType.rootNode))
-          val parsedResult = stream.via(XmlParser.officeOfDepartureExtractor(messageType)).runWith(Sink.head)
+          val parsedResult = stream.via(XmlParser.customsOfficeExtractor(messageType, "CustomsOfficeOfDeparture")).runWith(Sink.head)
 
           whenReady(parsedResult) {
             _.right.get mustBe referenceNumber
@@ -109,7 +109,7 @@ class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers with 
 
         s"when provided with a missing OfficeOfDeparture node in ${messageType.code} message it returns NoElementFound" in {
           val stream       = createParsingEventStream(messageWithoutOfficeOfDeparture(messageType.rootNode))
-          val parsedResult = stream.via(XmlParser.officeOfDepartureExtractor(MessageType.DeclarationData)).runWith(Sink.head)
+          val parsedResult = stream.via(XmlParser.customsOfficeExtractor(MessageType.DeclarationData, "CustomsOfficeOfDeparture")).runWith(Sink.head)
 
           whenReady(parsedResult) {
             _.mustBe(Left(NoElementFound("referenceNumber")))
@@ -118,7 +118,7 @@ class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers with 
 
         s"when provided with a missing ReferenceNumber node in ${messageType.code} message it returns NoElementFound" in {
           val stream       = createParsingEventStream(messageWithoutRefNumber(messageType.rootNode))
-          val parsedResult = stream.via(XmlParser.officeOfDepartureExtractor(MessageType.DeclarationData)).runWith(Sink.head)
+          val parsedResult = stream.via(XmlParser.customsOfficeExtractor(MessageType.DeclarationData, "CustomsOfficeOfDeparture")).runWith(Sink.head)
 
           whenReady(parsedResult) {
             _.mustBe(Left(NoElementFound("referenceNumber")))
@@ -147,10 +147,9 @@ class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers with 
 
   trait Setup {
 
-    val referenceNumber                  = arbitraryOfficeOfDeparture.arbitrary.sample.get
-    val referenceNumberDestinationActual = arbitraryCustomsOfficeOfDestinationActual.arbitrary.sample.get
-    val messageSender                    = arbitraryMessageSender.arbitrary.sample.get
-    val preparationDateAndTime           = arbitraryOffsetDateTime.arbitrary.sample.get.toLocalDateTime.format(DateTimeFormatter.ISO_DATE_TIME)
+    val referenceNumber        = arbitraryCustomsOffice.arbitrary.sample.get
+    val messageSender          = arbitraryMessageSender.arbitrary.sample.get
+    val preparationDateAndTime = arbitraryOffsetDateTime.arbitrary.sample.get.toLocalDateTime.format(DateTimeFormatter.ISO_DATE_TIME)
 
     def messageWithoutMessageSender(messageTypeNode: String): NodeSeq = {
       val strMessage =
@@ -187,7 +186,7 @@ class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers with 
         s"""<ncts:$messageTypeNode PhaseID="NCTS5.0" xmlns:ncts="http://ncts.dgtaxud.ec">
            |<messageType>$messageTypeNode</messageType>
            |<CustomsOfficeOfDestinationActual>
-           |  <referenceNumber>${referenceNumberDestinationActual.value}</referenceNumber>
+           |  <referenceNumber>${referenceNumber.value}</referenceNumber>
            |</CustomsOfficeOfDestinationActual>
            |</ncts:$messageTypeNode>""".stripMargin
       XML.loadString(strMessage)

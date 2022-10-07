@@ -18,12 +18,11 @@ package uk.gov.hmrc.transitmovementsrouter.generators
 
 import org.scalacheck.Arbitrary
 import org.scalacheck.Gen
-import uk.gov.hmrc.transitmovementsrouter.models.CustomsOfficeOfDestinationActual
+import uk.gov.hmrc.transitmovementsrouter.models.CustomsOffice
 import uk.gov.hmrc.transitmovementsrouter.models.MessageId
 import uk.gov.hmrc.transitmovementsrouter.models.MessageSender
 import uk.gov.hmrc.transitmovementsrouter.models.MessageType
 import uk.gov.hmrc.transitmovementsrouter.models.MovementId
-import uk.gov.hmrc.transitmovementsrouter.models.OfficeOfDeparture
 
 import java.time.Instant
 import java.time.OffsetDateTime
@@ -31,21 +30,12 @@ import java.time.ZoneOffset
 
 trait ModelGenerators extends BaseGenerators {
 
-  implicit lazy val arbitraryOfficeOfDeparture: Arbitrary[OfficeOfDeparture] =
+  implicit lazy val arbitraryCustomsOffice: Arbitrary[CustomsOffice] =
     Arbitrary {
       for {
         destination <- Gen.oneOf(Seq("GB", "XI"))
         id          <- intWithMaxLength(7, 7)
-      } yield OfficeOfDeparture(s"$destination$id")
-    }
-
-  // generic?
-  implicit lazy val arbitraryCustomsOfficeOfDestinationActual: Arbitrary[CustomsOfficeOfDestinationActual] =
-    Arbitrary {
-      for {
-        destination <- Gen.oneOf(Seq("GB", "XI"))
-        id          <- intWithMaxLength(7, 7)
-      } yield CustomsOfficeOfDestinationActual(s"$destination$id")
+      } yield CustomsOffice(s"$destination$id")
     }
 
   implicit lazy val arbitraryMessageSender: Arbitrary[MessageSender] =

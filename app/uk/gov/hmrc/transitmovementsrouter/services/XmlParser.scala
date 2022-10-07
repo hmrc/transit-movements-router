@@ -31,19 +31,13 @@ object XmlParser extends XmlParsingServiceHelpers {
     }
     .single("messageSender")
 
-  def officeOfDepartureExtractor(messageType: MessageType): Flow[ParseEvent, ParseResult[OfficeOfDeparture], NotUsed] = XmlParsing
-    .subtree(messageType.rootNode :: "CustomsOfficeOfDeparture" :: "referenceNumber" :: Nil)
+  def customsOfficeExtractor(
+    messageType: MessageType,
+    officeNode: String
+  ): Flow[ParseEvent, ParseResult[CustomsOffice], NotUsed] = XmlParsing
+    .subtree(messageType.rootNode :: officeNode :: "referenceNumber" :: Nil)
     .collect {
-      case element if element.getTextContent.nonEmpty => OfficeOfDeparture(element.getTextContent)
-    }
-    .single("referenceNumber")
-
-  def customsOfficeOfDestinationActualExtractor(
-    arrivalMessageType: ArrivalMessageType
-  ): Flow[ParseEvent, ParseResult[CustomsOfficeOfDestinationActual], NotUsed] = XmlParsing
-    .subtree(arrivalMessageType.rootNode :: "CustomsOfficeOfDestinationActual" :: "referenceNumber" :: Nil)
-    .collect {
-      case element if element.getTextContent.nonEmpty => CustomsOfficeOfDestinationActual(element.getTextContent)
+      case element if element.getTextContent.nonEmpty => CustomsOffice(element.getTextContent)
     }
     .single("referenceNumber")
 

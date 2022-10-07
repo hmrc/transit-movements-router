@@ -35,6 +35,7 @@ import uk.gov.hmrc.transitmovementsrouter.connectors._
 import uk.gov.hmrc.transitmovementsrouter.generators.ModelGenerators
 import uk.gov.hmrc.transitmovementsrouter.models._
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError.NoElementFound
+import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError.Unexpected
 
 import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
@@ -117,6 +118,73 @@ class RoutingServiceSpec
             }
         }
     }
+
+    MessageType.arrivalRequestValues.foreach {
+      messageType =>
+        s"${messageType.code} should generate a valid office of destination and updated payload for a GB payload" in forAll(
+          arbitrary[MessageId],
+          arbitrary[MovementId],
+          messageOfficeOfDestinationActual(messageType.rootNode, "GB")
+        ) {
+          (messageId, movementId, officeOfDestinationXML) =>
+            val serviceUnderTest = new RoutingServiceImpl(mockMessageConnectorProvider)
+            val payload          = createStream(officeOfDestinationXML)
+            val response = serviceUnderTest.submitMessage(
+              MovementType("arrivals"),
+              movementId,
+              messageId,
+              messageType,
+              payload
+            )(hc)
+
+            whenReady(response.value, Timeout(2 seconds)) {
+              _.mustBe(Right(()))
+            }
+        }
+
+        s"${messageType.code} should generate a valid office of destination and updated payload for a XI payload" in forAll(
+          arbitrary[MessageId],
+          arbitrary[MovementId],
+          messageOfficeOfDestinationActual(messageType.rootNode, "XI")
+        ) {
+          (messageId, movementId, officeOfDestinationXML) =>
+            val serviceUnderTest = new RoutingServiceImpl(mockMessageConnectorProvider)
+            val payload          = createStream(officeOfDestinationXML)
+            val response = serviceUnderTest.submitMessage(
+              MovementType("arrivals"),
+              movementId,
+              messageId,
+              messageType,
+              payload
+            )(hc)
+
+            whenReady(response.value, Timeout(2 seconds)) {
+              _.mustBe(Right(()))
+            }
+        }
+
+    }
+
+    "A message which is not an arrival or departure should return  an unexpected exception" in {
+
+      val messageId              = arbitrary[MessageId].sample.get
+      val movementId             = arbitrary[MovementId].sample.get
+      val officeOfDestinationXML = messageOfficeOfDestinationActual(MessageType.DestinationOfficeRejection.rootNode, "GB").sample.get
+
+      val serviceUnderTest = new RoutingServiceImpl(mockMessageConnectorProvider)
+      val payload          = createStream(officeOfDestinationXML)
+      val response = serviceUnderTest.submitMessage(
+        MovementType("arrivals"),
+        movementId,
+        messageId,
+        MessageType.DestinationOfficeRejection,
+        payload
+      )(hc)
+
+      whenReady(response.value, Timeout(2 seconds)) {
+        _.mustBe(Left(Unexpected("An unexpected error occurred - got a IE057", None)))
+      }
+    }
   }
 
   trait Setup {
@@ -144,6 +212,19 @@ class RoutingServiceSpec
           n => s"$referenceType$n"
         )
       } yield s"<$messageTypeNode><preparationDateAndTime>$dateTime</preparationDateAndTime><CustomsOfficeOfDeparture><referenceNumber>$referenceNumber</referenceNumber></CustomsOfficeOfDeparture></$messageTypeNode>"
+
+    def messageOfficeOfDestinationActual(messageTypeNode: String, referenceType: String): Gen[String] =
+      for {
+        dateTime <- arbitrary[OffsetDateTime].map(_.toLocalDateTime.truncatedTo(ChronoUnit.SECONDS).format(DateTimeFormatter.ISO_LOCAL_DATE))
+        referenceNumber <- intWithMaxLength(7, 7).map(
+          n => s"$referenceType$n"
+        )
+      } yield s"""<$messageTypeNode>
+                           |<messageType>$messageTypeNode</messageType>
+                           |<CustomsOfficeOfDestinationActual>
+                           |  <referenceNumber>$referenceNumber</referenceNumber>
+                           |</CustomsOfficeOfDestinationActual>
+                           |</$messageTypeNode>""".stripMargin
 
     def emptyMessage(messageTypeNode: String): String = s"<$messageTypeNode/>"
   }
