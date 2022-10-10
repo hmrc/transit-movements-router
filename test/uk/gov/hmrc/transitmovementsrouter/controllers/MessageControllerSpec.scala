@@ -56,6 +56,7 @@ import uk.gov.hmrc.transitmovementsrouter.models.MessageType
 import uk.gov.hmrc.transitmovementsrouter.models.MovementId
 import uk.gov.hmrc.transitmovementsrouter.models.MovementType
 import uk.gov.hmrc.transitmovementsrouter.models.PersistenceResponse
+import uk.gov.hmrc.transitmovementsrouter.models.RequestMessageType
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.MovementNotFound
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.Unexpected
 import uk.gov.hmrc.transitmovementsrouter.services.RoutingService
@@ -132,7 +133,7 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
           any[String].asInstanceOf[MovementType],
           any[String].asInstanceOf[MovementId],
           any[String].asInstanceOf[MessageId],
-          any[MessageType],
+          any[RequestMessageType],
           any[Source[ByteString, _]]
         )(any[HeaderCarrier])
       ).thenReturn(submitDeclarationEither)
@@ -151,7 +152,7 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
             any[String].asInstanceOf[MovementType],
             any[String].asInstanceOf[MovementId],
             any[String].asInstanceOf[MessageId],
-            any[MessageType],
+            any[RequestMessageType],
             any[Source[ByteString, _]]
           )(any[HeaderCarrier])
         ).thenReturn(EitherT[Future, RoutingError, Unit](Future.successful(Left(RoutingError.NoElementFound("messageSender")))))
@@ -172,7 +173,7 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
             any[String].asInstanceOf[MovementType],
             any[String].asInstanceOf[MovementId],
             any[String].asInstanceOf[MessageId],
-            any[MessageType],
+            any[RequestMessageType],
             any[Source[ByteString, _]]
           )(any[HeaderCarrier])
         ).thenReturn(EitherT[Future, RoutingError, Unit](Future.successful(Left(RoutingError.TooManyElementsFound("eori")))))
@@ -193,7 +194,7 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
             any[String].asInstanceOf[MovementType],
             any[String].asInstanceOf[MovementId],
             any[String].asInstanceOf[MessageId],
-            any[MessageType],
+            any[RequestMessageType],
             any[Source[ByteString, _]]
           )(any[HeaderCarrier])
         ).thenReturn(EitherT[Future, RoutingError, Unit](Future.successful(Left(RoutingError.NoElementFound("messageSender")))))
@@ -214,7 +215,7 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
             any[String].asInstanceOf[MovementType],
             any[String].asInstanceOf[MovementId],
             any[String].asInstanceOf[MessageId],
-            any[MessageType],
+            any[RequestMessageType],
             any[Source[ByteString, _]]
           )(any[HeaderCarrier])
         ).thenReturn(EitherT[Future, RoutingError, Unit](Future.successful(Left(RoutingError.NoElementFound("messageSender")))))
@@ -238,7 +239,7 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
           any[String].asInstanceOf[MovementType],
           any[String].asInstanceOf[MovementId],
           any[String].asInstanceOf[MessageId],
-          any[MessageType],
+          any[RequestMessageType],
           any[Source[ByteString, _]]
         )(any[HeaderCarrier])
       ).thenReturn(

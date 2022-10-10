@@ -32,10 +32,9 @@ object XmlParser extends XmlParsingServiceHelpers {
     .single("messageSender")
 
   def customsOfficeExtractor(
-    messageType: MessageType,
-    officeNode: String
+    messageType: RequestMessageType
   ): Flow[ParseEvent, ParseResult[CustomsOffice], NotUsed] = XmlParsing
-    .subtree(messageType.rootNode :: officeNode :: "referenceNumber" :: Nil)
+    .subtree(messageType.rootNode :: messageType.officeNode :: "referenceNumber" :: Nil)
     .collect {
       case element if element.getTextContent.nonEmpty => CustomsOffice(element.getTextContent)
     }

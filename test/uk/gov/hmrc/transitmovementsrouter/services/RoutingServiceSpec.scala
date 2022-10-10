@@ -35,7 +35,6 @@ import uk.gov.hmrc.transitmovementsrouter.connectors._
 import uk.gov.hmrc.transitmovementsrouter.generators.ModelGenerators
 import uk.gov.hmrc.transitmovementsrouter.models._
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError.NoElementFound
-import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError.Unexpected
 
 import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
@@ -162,28 +161,6 @@ class RoutingServiceSpec
               _.mustBe(Right(()))
             }
         }
-
-    }
-
-    "A message which is not an arrival or departure should return  an unexpected exception" in {
-
-      val messageId              = arbitrary[MessageId].sample.get
-      val movementId             = arbitrary[MovementId].sample.get
-      val officeOfDestinationXML = messageOfficeOfDestinationActual(MessageType.DestinationOfficeRejection.rootNode, "GB").sample.get
-
-      val serviceUnderTest = new RoutingServiceImpl(mockMessageConnectorProvider)
-      val payload          = createStream(officeOfDestinationXML)
-      val response = serviceUnderTest.submitMessage(
-        MovementType("arrivals"),
-        movementId,
-        messageId,
-        MessageType.DestinationOfficeRejection,
-        payload
-      )(hc)
-
-      whenReady(response.value, Timeout(2 seconds)) {
-        _.mustBe(Left(Unexpected("An unexpected error occurred - got a IE057", None)))
-      }
     }
   }
 

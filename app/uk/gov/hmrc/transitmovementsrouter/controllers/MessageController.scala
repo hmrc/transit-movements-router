@@ -35,9 +35,10 @@ import uk.gov.hmrc.transitmovementsrouter.controllers.stream.StreamingParsers
 import uk.gov.hmrc.transitmovementsrouter.models.EoriNumber
 import uk.gov.hmrc.transitmovementsrouter.models.MessageId
 import uk.gov.hmrc.transitmovementsrouter.models.MessageType
-import uk.gov.hmrc.transitmovementsrouter.models.MessageType._
 import uk.gov.hmrc.transitmovementsrouter.models.MovementId
 import uk.gov.hmrc.transitmovementsrouter.models.MovementType
+import uk.gov.hmrc.transitmovementsrouter.models.RequestMessageType
+import uk.gov.hmrc.transitmovementsrouter.models.MessageType._
 import uk.gov.hmrc.transitmovementsrouter.services.MessageTypeHeaderExtractor
 import uk.gov.hmrc.transitmovementsrouter.services.RoutingService
 import uk.gov.hmrc.transitmovementsrouter.services.StreamingMessageTrimmer
@@ -97,7 +98,8 @@ class MessagesController @Inject() (
     payload: Source[ByteString, _]
   )(implicit hc: HeaderCarrier) =
     if (isRequestMessageType(messageType)) {
-      routingService.submitMessage(movementType, movementId, messageId, messageType, payload).asPresentation
+      val requestMessage = messageType.asInstanceOf[RequestMessageType]
+      routingService.submitMessage(movementType, movementId, messageId, requestMessage, payload).asPresentation
     } else {
       val message                                              = s"An unexpected error occurred - got a ${messageType.code}"
       val unexpectedError: EitherT[Future, RoutingError, Unit] = EitherT.left(Future.successful(RoutingError.Unexpected(message, None)))

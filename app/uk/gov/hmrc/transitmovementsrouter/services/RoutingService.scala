@@ -22,7 +22,6 @@ import akka.stream.alpakka.xml.ParseEvent
 import akka.stream.alpakka.xml.scaladsl._
 import akka.stream.scaladsl.Flow
 import akka.stream.scaladsl.GraphDSL
-import akka.stream.scaladsl.Keep
 import akka.stream.scaladsl.Sink
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
@@ -43,7 +42,7 @@ trait RoutingService {
     movementType: MovementType,
     movementId: MovementId,
     messageId: MessageId,
-    messageType: MessageType,
+    messageType: RequestMessageType,
     payload: Source[ByteString, _]
   )(implicit hc: HeaderCarrier): EitherT[Future, RoutingError, Unit]
 
@@ -56,33 +55,19 @@ class RoutingServiceImpl @Inject() (messageConnectorProvider: EISConnectorProvid
 
   val office = Sink.head[ParseResult[CustomsOffice]]
 
-  private def officeOfDepartureSink(messageType: MessageType): Sink[ByteString, Future[ParseResult[CustomsOffice]]] = Sink.fromGraph(
+  private def officeSink(messageType: RequestMessageType): Sink[ByteString, Future[ParseResult[CustomsOffice]]] = Sink.fromGraph(
     GraphDSL.createGraph(office) {
       implicit builder => officeShape =>
         import GraphDSL.Implicits._
 
         val xmlParsing: FlowShape[ByteString, ParseEvent] = builder.add(XmlParsing.parser)
         val customsOffice: FlowShape[ParseEvent, ParseResult[CustomsOffice]] =
-          builder.add(XmlParser.customsOfficeExtractor(messageType, "CustomsOfficeOfDeparture"))
+          builder.add(XmlParser.customsOfficeExtractor(messageType))
         xmlParsing ~> customsOffice ~> officeShape
 
         SinkShape(xmlParsing.in)
     }
   )
-
-  private def officeOfDestinationActualSink(messageType: MessageType): Sink[ByteString, Future[ParseResult[CustomsOffice]]] =
-    Sink.fromGraph(
-      GraphDSL.createGraph(office) {
-        implicit builder => officeShape =>
-          import GraphDSL.Implicits._
-
-          val xmlParsing    = builder.add(XmlParsing.parser)
-          val customsOffice = builder.add(XmlParser.customsOfficeExtractor(messageType, "CustomsOfficeOfDestinationActual"))
-          xmlParsing ~> customsOffice ~> officeShape
-
-          SinkShape(xmlParsing.in)
-      }
-    )
 
   def buildMessage(messageType: MessageType, messageSender: MessageSender): Flow[ByteString, ByteString, NotUsed] =
     Flow.fromGraph(
@@ -103,51 +88,23 @@ class RoutingServiceImpl @Inject() (messageConnectorProvider: EISConnectorProvid
     movementType: MovementType,
     movementId: MovementId,
     messageId: MessageId,
-    messageType: MessageType,
+    messageType: RequestMessageType,
     payload: Source[ByteString, _]
   )(implicit hc: HeaderCarrier): EitherT[Future, RoutingError, Unit] = {
 
-    val sink: Either[RoutingError, Sink[ByteString, Future[ParseResult[CustomsOffice]]]] = messageType match {
-      case _: ArrivalRequestMessageType   => Right(officeOfDestinationActualSink(messageType))
-      case _: DepartureRequestMessageType => Right(officeOfDepartureSink(messageType))
-      case msgTypeError =>
-        val message = s"An unexpected error occurred - got a ${msgTypeError.code}"
-        logger.error(message)
-        Left(RoutingError.Unexpected(message, None))
-    }
-
-    val materializedResult: Either[RoutingError, Future[ParseResult[CustomsOffice]]] = sink
-      .map(
-        payload
-          .toMat(_)(Keep.right)
-          .run()
-      )
-
+    val materializedResult      = payload.runWith(officeSink(messageType))
     implicit val messageSender  = MessageSender(movementId, messageId)
     implicit val updatedPayload = payload.via(buildMessage(messageType, messageSender))
 
-    val maybeACustomsOffice = materializedResult match {
-      case Right(customsOffice) => post(customsOffice)
-      case Left(routingError)   => Future.successful(Left(routingError))
+    val maybeACustomsOffice = {
+      import concurrent.ExecutionContext.Implicits.global
+      materializedResult flatMap {
+        case Right(customsOffice) => postToEis(customsOffice)
+        case Left(routingError)   => Future.successful(Left(routingError))
+      }
     }
 
     EitherT(maybeACustomsOffice)
-  }
-
-  private def post(
-    office: Future[ParseResult[CustomsOffice]]
-  )(implicit messageSender: MessageSender, body: Source[ByteString, _], hc: HeaderCarrier): Future[Either[RoutingError, Unit]] = {
-    import concurrent.ExecutionContext.Implicits.global
-    office.flatMap {
-      case Right(office) =>
-        postToEis(office).map {
-          case Right(_)    => Right(())
-          case Left(error) => Left(error)
-        }
-      case Left(routingError) =>
-        logger.error(s"Unable to extract customs office: $routingError")
-        Future.successful(Left(routingError));
-    }
   }
 
   private def postToEis(
@@ -155,7 +112,9 @@ class RoutingServiceImpl @Inject() (messageConnectorProvider: EISConnectorProvid
   )(implicit messageSender: MessageSender, body: Source[ByteString, _], hc: HeaderCarrier): Future[Either[RoutingError, Unit]] =
     if (office.isGB) {
       messageConnectorProvider.gb.post(messageSender, body, hc)
-    } else {
+    } else if (office.isXi) {
       messageConnectorProvider.xi.post(messageSender, body, hc)
+    } else {
+      Future.successful(Left(RoutingError.Unexpected(s"An unexpected error occurred - got a customs office value of: ${office.value}", None)))
     }
 }
