@@ -33,6 +33,7 @@ import uk.gov.hmrc.transitmovementsrouter.models._
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
 import cats.data.EitherT
 
+import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 
 @ImplementedBy(classOf[RoutingServiceImpl])
@@ -44,7 +45,7 @@ trait RoutingService {
     messageId: MessageId,
     messageType: RequestMessageType,
     payload: Source[ByteString, _]
-  )(implicit hc: HeaderCarrier): EitherT[Future, RoutingError, Unit]
+  )(implicit hc: HeaderCarrier, ec: ExecutionContext): EitherT[Future, RoutingError, Unit]
 
 }
 
@@ -90,14 +91,13 @@ class RoutingServiceImpl @Inject() (messageConnectorProvider: EISConnectorProvid
     messageId: MessageId,
     messageType: RequestMessageType,
     payload: Source[ByteString, _]
-  )(implicit hc: HeaderCarrier): EitherT[Future, RoutingError, Unit] = {
+  )(implicit hc: HeaderCarrier, ec: ExecutionContext): EitherT[Future, RoutingError, Unit] = {
 
     val materializedResult      = payload.runWith(officeSink(messageType))
     implicit val messageSender  = MessageSender(movementId, messageId)
     implicit val updatedPayload = payload.via(buildMessage(messageType, messageSender))
 
     val maybeACustomsOffice = {
-      import concurrent.ExecutionContext.Implicits.global
       materializedResult flatMap {
         case Right(customsOffice) => postToEis(customsOffice)
         case Left(routingError)   => Future.successful(Left(routingError))
@@ -112,7 +112,7 @@ class RoutingServiceImpl @Inject() (messageConnectorProvider: EISConnectorProvid
   )(implicit messageSender: MessageSender, body: Source[ByteString, _], hc: HeaderCarrier): Future[Either[RoutingError, Unit]] =
     if (office.isGB) {
       messageConnectorProvider.gb.post(messageSender, body, hc)
-    } else if (office.isXi) {
+    } else if (office.isXI) {
       messageConnectorProvider.xi.post(messageSender, body, hc)
     } else {
       Future.successful(Left(RoutingError.Unexpected(s"An unexpected error occurred - got a customs office value of: ${office.value}", None)))

@@ -40,6 +40,7 @@ import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import scala.concurrent.Future
+import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.DurationInt
 
 class RoutingServiceSpec
@@ -69,7 +70,7 @@ class RoutingServiceSpec
               messageId,
               messageType,
               payload
-            )(hc)
+            )(hc, ec)
 
             whenReady(response.value, Timeout(2 seconds)) {
               _.mustBe(Right(()))
@@ -90,7 +91,7 @@ class RoutingServiceSpec
               messageId,
               messageType,
               payload
-            )(hc)
+            )(hc, ec)
 
             whenReady(response.value, Timeout(2 seconds)) {
               _.mustBe(Right(()))
@@ -110,7 +111,7 @@ class RoutingServiceSpec
               messageId,
               messageType,
               payload
-            )(hc)
+            )(hc, ec)
 
             whenReady(response.value, Timeout(2 seconds)) {
               _.mustBe(Left(NoElementFound("referenceNumber")))
@@ -134,7 +135,7 @@ class RoutingServiceSpec
               messageId,
               messageType,
               payload
-            )(hc)
+            )(hc, ec)
 
             whenReady(response.value, Timeout(2 seconds)) {
               _.mustBe(Right(()))
@@ -155,7 +156,7 @@ class RoutingServiceSpec
               messageId,
               messageType,
               payload
-            )(hc)
+            )(hc, ec)
 
             whenReady(response.value, Timeout(2 seconds)) {
               _.mustBe(Right(()))
@@ -165,6 +166,9 @@ class RoutingServiceSpec
   }
 
   trait Setup {
+
+    val hc = HeaderCarrier()
+    val ec = ExecutionContext.Implicits.global
 
     val mockMessageConnectorProvider = mock[EISConnectorProvider]
     val mockMessageConnector         = mock[EISConnector]
@@ -179,8 +183,6 @@ class RoutingServiceSpec
       )
     )
       .thenReturn(Future.successful(Right(())))
-
-    val hc = HeaderCarrier()
 
     def messageOfficeOfDeparture(messageTypeNode: String, referenceType: String): Gen[String] =
       for {

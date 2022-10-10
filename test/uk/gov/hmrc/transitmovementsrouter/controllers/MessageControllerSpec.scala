@@ -64,6 +64,7 @@ import uk.gov.hmrc.transitmovementsrouter.services.StreamingMessageTrimmer
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
 
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.xml.NodeSeq
 
@@ -135,7 +136,7 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
           any[String].asInstanceOf[MessageId],
           any[RequestMessageType],
           any[Source[ByteString, _]]
-        )(any[HeaderCarrier])
+        )(any[HeaderCarrier], any[ExecutionContext])
       ).thenReturn(submitDeclarationEither)
 
       val result = controller().outgoing(eori, movementType, movementId, messageId)(fakeRequest(cc015cOfficeOfDepartureGB, outgoing, messageTypeHeader))
@@ -154,7 +155,7 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
             any[String].asInstanceOf[MessageId],
             any[RequestMessageType],
             any[Source[ByteString, _]]
-          )(any[HeaderCarrier])
+          )(any[HeaderCarrier], any[ExecutionContext])
         ).thenReturn(EitherT[Future, RoutingError, Unit](Future.successful(Left(RoutingError.NoElementFound("messageSender")))))
 
         val result = controller().outgoing(eori, movementType, movementId, messageId)(fakeRequest(cc015cOfficeOfDepartureGB, outgoing, messageTypeHeader))
@@ -175,7 +176,7 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
             any[String].asInstanceOf[MessageId],
             any[RequestMessageType],
             any[Source[ByteString, _]]
-          )(any[HeaderCarrier])
+          )(any[HeaderCarrier], any[ExecutionContext])
         ).thenReturn(EitherT[Future, RoutingError, Unit](Future.successful(Left(RoutingError.TooManyElementsFound("eori")))))
 
         val result = controller().outgoing(eori, movementType, movementId, messageId)(fakeRequest(cc015cOfficeOfDepartureGB, outgoing, messageTypeHeader))
@@ -196,7 +197,7 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
             any[String].asInstanceOf[MessageId],
             any[RequestMessageType],
             any[Source[ByteString, _]]
-          )(any[HeaderCarrier])
+          )(any[HeaderCarrier], any[ExecutionContext])
         ).thenReturn(EitherT[Future, RoutingError, Unit](Future.successful(Left(RoutingError.NoElementFound("messageSender")))))
 
         val result = controller().outgoing(eori, movementType, movementId, messageId)(fakeRequest(cc015cOfficeOfDepartureGB, outgoing))
@@ -217,7 +218,7 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
             any[String].asInstanceOf[MessageId],
             any[RequestMessageType],
             any[Source[ByteString, _]]
-          )(any[HeaderCarrier])
+          )(any[HeaderCarrier], any[ExecutionContext])
         ).thenReturn(EitherT[Future, RoutingError, Unit](Future.successful(Left(RoutingError.NoElementFound("messageSender")))))
 
         val result = controller().outgoing(eori, movementType, movementId, messageId)(
@@ -241,7 +242,7 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
           any[String].asInstanceOf[MessageId],
           any[RequestMessageType],
           any[Source[ByteString, _]]
-        )(any[HeaderCarrier])
+        )(any[HeaderCarrier], any[ExecutionContext])
       ).thenReturn(
         EitherT[Future, RoutingError, Unit](
           Future.successful(Left(RoutingError.Unexpected("unexpected error", Some(new Exception("An unexpected error occurred")))))
@@ -262,10 +263,10 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
       lazy val messageTypeHeader = FakeHeaders(Seq(("X-Message-Type", MessageType.Discrepancies.code)))
       val result                 = controller().outgoing(eori, movementType, movementId, messageId)(fakeRequest(cc015cOfficeOfDepartureGB, outgoing, messageTypeHeader))
 
-      status(result) mustBe INTERNAL_SERVER_ERROR
+      status(result) mustBe BAD_REQUEST
       contentAsJson(result) mustBe Json.obj(
-        "code"    -> "INTERNAL_SERVER_ERROR",
-        "message" -> "Internal server error"
+        "code"    -> "BAD_REQUEST",
+        "message" -> s"${MessageType.Discrepancies.code} is not valid for requests"
       )
     }
 
