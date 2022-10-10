@@ -255,6 +255,19 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
         "message" -> "Internal server error"
       )
     }
+
+    "must return INTERNAL_SERVER_ERROR when a message is not a request message" in {
+
+      lazy val messageTypeHeader = FakeHeaders(Seq(("X-Message-Type", MessageType.Discrepancies.code)))
+      val result                 = controller().outgoing(eori, movementType, movementId, messageId)(fakeRequest(cc015cOfficeOfDepartureGB, outgoing, messageTypeHeader))
+
+      status(result) mustBe INTERNAL_SERVER_ERROR
+      contentAsJson(result) mustBe Json.obj(
+        "code"    -> "INTERNAL_SERVER_ERROR",
+        "message" -> "Internal server error"
+      )
+    }
+
   }
 
   "POST incoming" - {

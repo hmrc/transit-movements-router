@@ -19,6 +19,7 @@ package uk.gov.hmrc.transitmovementsrouter.controllers
 import akka.stream.Materializer
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
+import cats.data.EitherT
 import play.api.libs.json.Json
 import play.api.mvc.Action
 import play.api.mvc.ControllerComponents
@@ -33,13 +34,17 @@ import uk.gov.hmrc.transitmovementsrouter.controllers.errors.ConvertError
 import uk.gov.hmrc.transitmovementsrouter.controllers.stream.StreamingParsers
 import uk.gov.hmrc.transitmovementsrouter.models.EoriNumber
 import uk.gov.hmrc.transitmovementsrouter.models.MessageId
+import uk.gov.hmrc.transitmovementsrouter.models.MessageType
+import uk.gov.hmrc.transitmovementsrouter.models.MessageType._
 import uk.gov.hmrc.transitmovementsrouter.models.MovementId
 import uk.gov.hmrc.transitmovementsrouter.models.MovementType
 import uk.gov.hmrc.transitmovementsrouter.services.MessageTypeHeaderExtractor
 import uk.gov.hmrc.transitmovementsrouter.services.RoutingService
 import uk.gov.hmrc.transitmovementsrouter.services.StreamingMessageTrimmer
+import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
 
 import javax.inject.Inject
+import scala.concurrent.Future
 
 class MessagesController @Inject() (
   cc: ControllerComponents,
@@ -60,7 +65,7 @@ class MessagesController @Inject() (
       implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
       (for {
         messageType <- MessageTypeHeaderExtractor.extract(request.headers).asPresentation
-        submitted   <- routingService.submitMessage(movementType, movementId, messageId, messageType, request.body).asPresentation
+        submitted   <- submit(movementType, movementId, messageId, messageType, request.body)
       } yield submitted).fold[Result](
         error => Status(error.code.statusCode)(Json.toJson(error)),
         _ => Accepted
@@ -82,7 +87,21 @@ class MessagesController @Inject() (
             error => Status(error.code.statusCode)(Json.toJson(error)),
             response => Created.withHeaders("X-Message-Id" -> response.messageId.value)
           )
+    }
 
+  private def submit(
+    movementType: MovementType,
+    movementId: MovementId,
+    messageId: MessageId,
+    messageType: MessageType,
+    payload: Source[ByteString, _]
+  )(implicit hc: HeaderCarrier) =
+    if (isRequestMessageType(messageType)) {
+      routingService.submitMessage(movementType, movementId, messageId, messageType, payload).asPresentation
+    } else {
+      val message                                              = s"An unexpected error occurred - got a ${messageType.code}"
+      val unexpectedError: EitherT[Future, RoutingError, Unit] = EitherT.left(Future.successful(RoutingError.Unexpected(message, None)))
+      unexpectedError.asPresentation
     }
 
 }

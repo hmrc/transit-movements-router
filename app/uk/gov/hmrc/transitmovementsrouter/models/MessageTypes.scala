@@ -25,7 +25,9 @@ sealed trait ArrivalMessageType extends MessageType
 
 sealed trait DepartureMessageType extends MessageType
 
-sealed trait RequestMessageType extends MessageType
+sealed trait RequestMessageType extends MessageType {
+  val officeNode: String
+}
 
 sealed trait ResponseMessageType extends MessageType
 
@@ -64,19 +66,29 @@ object MessageType {
   // *******************
 
   /** E_DEC_AMD (IE013) */
-  case object DeclarationAmendment extends DepartureRequestMessageType("IE013", "CC013C")
+  case object DeclarationAmendment extends DepartureRequestMessageType("IE013", "CC013C") {
+    override val officeNode: String = "CustomsOfficeOfDeparture"
+  }
 
   /** E_DEC_INV (IE014) */
-  case object DeclarationInvalidation extends DepartureRequestMessageType("IE014", "CC014C")
+  case object DeclarationInvalidation extends DepartureRequestMessageType("IE014", "CC014C") {
+    override val officeNode: String = "CustomsOfficeOfDeparture"
+  }
 
   /** E_DEC_DAT (IE015) */
-  case object DeclarationData extends DepartureRequestMessageType("IE015", "CC015C")
+  case object DeclarationData extends DepartureRequestMessageType("IE015", "CC015C") {
+    override val officeNode: String = "CustomsOfficeOfDeparture"
+  }
 
   /** E_REQ_REL (IE054) */
-  case object RequestOfRelease extends DepartureRequestMessageType("IE054", "CC054C")
+  case object RequestOfRelease extends DepartureRequestMessageType("IE054", "CC054C") {
+    override val officeNode: String = "CustomsOfficeOfDeparture"
+  }
 
   /** E_PRE_NOT (IE170) */
-  case object PresentationNotification extends DepartureRequestMessageType("IE170", "CC170C")
+  case object PresentationNotification extends DepartureRequestMessageType("IE170", "CC170C") {
+    override val officeNode: String = "CustomsOfficeOfDeparture"
+  }
 
   val departureRequestValues = Set(
     DeclarationAmendment,
@@ -152,10 +164,14 @@ object MessageType {
   // ****************
 
   /** E_REQ_REL (IE054) */
-  case object ArrivalNotification extends ArrivalRequestMessageType("IE007", "CC007C")
+  case object ArrivalNotification extends ArrivalRequestMessageType("IE007", "CC007C") {
+    override val officeNode: String = "CustomsOfficeOfDestinationActual"
+  }
 
   /** E_PRE_NOT (IE170) */
-  case object UnloadingRemarks extends ArrivalRequestMessageType("IE044", "CC044C")
+  case object UnloadingRemarks extends ArrivalRequestMessageType("IE044", "CC044C") {
+    override val officeNode: String = "CustomsOfficeOfDestinationActual"
+  }
 
   val arrivalRequestValues = Set(
     ArrivalNotification,
@@ -199,4 +215,11 @@ object MessageType {
 
   def withCode(name: String): Option[MessageType] =
     values.find(_.code == name)
+
+  def isRequestMessageType(message: MessageType): Boolean =
+    message match {
+      case _: RequestMessageType => true
+      case _                     => false
+    }
+
 }
