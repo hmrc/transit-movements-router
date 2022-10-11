@@ -258,7 +258,7 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
       )
     }
 
-    "must return INTERNAL_SERVER_ERROR when a message is not a request message" in {
+    "must return BAD_REQUEST when a message is not a request message" in {
 
       lazy val messageTypeHeader = FakeHeaders(Seq(("X-Message-Type", MessageType.Discrepancies.code)))
       val result                 = controller().outgoing(eori, movementType, movementId, messageId)(fakeRequest(cc015cOfficeOfDepartureGB, outgoing, messageTypeHeader))
