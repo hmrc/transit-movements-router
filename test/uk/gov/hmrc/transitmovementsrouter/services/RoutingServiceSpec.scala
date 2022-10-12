@@ -40,6 +40,7 @@ import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import scala.concurrent.Future
+import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.DurationInt
 
 class RoutingServiceSpec
@@ -69,7 +70,7 @@ class RoutingServiceSpec
               messageId,
               messageType,
               payload
-            )(hc)
+            )(hc, ec)
 
             whenReady(response.value, Timeout(2 seconds)) {
               _.mustBe(Right(()))
@@ -90,7 +91,7 @@ class RoutingServiceSpec
               messageId,
               messageType,
               payload
-            )(hc)
+            )(hc, ec)
 
             whenReady(response.value, Timeout(2 seconds)) {
               _.mustBe(Right(()))
@@ -110,16 +111,64 @@ class RoutingServiceSpec
               messageId,
               messageType,
               payload
-            )(hc)
+            )(hc, ec)
 
             whenReady(response.value, Timeout(2 seconds)) {
               _.mustBe(Left(NoElementFound("referenceNumber")))
             }
         }
     }
+
+    MessageType.arrivalRequestValues.foreach {
+      messageType =>
+        s"${messageType.code} should generate a valid office of destination and updated payload for a GB payload" in forAll(
+          arbitrary[MessageId],
+          arbitrary[MovementId],
+          messageOfficeOfDestinationActual(messageType.rootNode, "GB")
+        ) {
+          (messageId, movementId, officeOfDestinationXML) =>
+            val serviceUnderTest = new RoutingServiceImpl(mockMessageConnectorProvider)
+            val payload          = createStream(officeOfDestinationXML)
+            val response = serviceUnderTest.submitMessage(
+              MovementType("arrivals"),
+              movementId,
+              messageId,
+              messageType,
+              payload
+            )(hc, ec)
+
+            whenReady(response.value, Timeout(2 seconds)) {
+              _.mustBe(Right(()))
+            }
+        }
+
+        s"${messageType.code} should generate a valid office of destination and updated payload for a XI payload" in forAll(
+          arbitrary[MessageId],
+          arbitrary[MovementId],
+          messageOfficeOfDestinationActual(messageType.rootNode, "XI")
+        ) {
+          (messageId, movementId, officeOfDestinationXML) =>
+            val serviceUnderTest = new RoutingServiceImpl(mockMessageConnectorProvider)
+            val payload          = createStream(officeOfDestinationXML)
+            val response = serviceUnderTest.submitMessage(
+              MovementType("arrivals"),
+              movementId,
+              messageId,
+              messageType,
+              payload
+            )(hc, ec)
+
+            whenReady(response.value, Timeout(2 seconds)) {
+              _.mustBe(Right(()))
+            }
+        }
+    }
   }
 
   trait Setup {
+
+    val hc = HeaderCarrier()
+    val ec = ExecutionContext.Implicits.global
 
     val mockMessageConnectorProvider = mock[EISConnectorProvider]
     val mockMessageConnector         = mock[EISConnector]
@@ -135,8 +184,6 @@ class RoutingServiceSpec
     )
       .thenReturn(Future.successful(Right(())))
 
-    val hc = HeaderCarrier()
-
     def messageOfficeOfDeparture(messageTypeNode: String, referenceType: String): Gen[String] =
       for {
         dateTime <- arbitrary[OffsetDateTime].map(_.toLocalDateTime.truncatedTo(ChronoUnit.SECONDS).format(DateTimeFormatter.ISO_LOCAL_DATE))
@@ -144,6 +191,19 @@ class RoutingServiceSpec
           n => s"$referenceType$n"
         )
       } yield s"<$messageTypeNode><preparationDateAndTime>$dateTime</preparationDateAndTime><CustomsOfficeOfDeparture><referenceNumber>$referenceNumber</referenceNumber></CustomsOfficeOfDeparture></$messageTypeNode>"
+
+    def messageOfficeOfDestinationActual(messageTypeNode: String, referenceType: String): Gen[String] =
+      for {
+        dateTime <- arbitrary[OffsetDateTime].map(_.toLocalDateTime.truncatedTo(ChronoUnit.SECONDS).format(DateTimeFormatter.ISO_LOCAL_DATE))
+        referenceNumber <- intWithMaxLength(7, 7).map(
+          n => s"$referenceType$n"
+        )
+      } yield s"""<$messageTypeNode>
+                           |<messageType>$messageTypeNode</messageType>
+                           |<CustomsOfficeOfDestinationActual>
+                           |  <referenceNumber>$referenceNumber</referenceNumber>
+                           |</CustomsOfficeOfDestinationActual>
+                           |</$messageTypeNode>""".stripMargin
 
     def emptyMessage(messageTypeNode: String): String = s"<$messageTypeNode/>"
   }

@@ -25,13 +25,16 @@ sealed trait ArrivalMessageType extends MessageType
 
 sealed trait DepartureMessageType extends MessageType
 
-sealed trait RequestMessageType extends MessageType
+sealed trait RequestMessageType extends MessageType {
+  val officeNode: String
+}
 
 sealed trait ResponseMessageType extends MessageType
 
 sealed abstract class DepartureRequestMessageType(
   val code: String,
-  val rootNode: String
+  val rootNode: String,
+  override val officeNode: String = "CustomsOfficeOfDeparture"
 ) extends RequestMessageType
     with DepartureMessageType
 
@@ -43,7 +46,8 @@ sealed abstract class DepartureResponseMessageType(
 
 sealed abstract class ArrivalRequestMessageType(
   val code: String,
-  val rootNode: String
+  val rootNode: String,
+  override val officeNode: String = "CustomsOfficeOfDestinationActual"
 ) extends RequestMessageType
     with ArrivalMessageType
 
@@ -199,4 +203,11 @@ object MessageType {
 
   def withCode(name: String): Option[MessageType] =
     values.find(_.code == name)
+
+  def isRequestMessageType(message: MessageType): Boolean =
+    message match {
+      case _: RequestMessageType => true
+      case _                     => false
+    }
+
 }

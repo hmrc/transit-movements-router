@@ -16,7 +16,7 @@
 
 package uk.gov.hmrc.transitmovementsrouter.models
 
-case class OfficeOfDeparture(value: String) extends AnyVal {
+case class CustomsOffice(value: String) extends AnyVal {
   def isGB: Boolean = value.startsWith("GB")
-  def isXi: Boolean = !isGB
+  def isXI: Boolean = value.startsWith("XI")
 }

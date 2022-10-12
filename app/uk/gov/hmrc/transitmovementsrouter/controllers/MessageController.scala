@@ -19,6 +19,7 @@ package uk.gov.hmrc.transitmovementsrouter.controllers
 import akka.stream.Materializer
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
+import cats.data.EitherT
 import play.api.libs.json.Json
 import play.api.mvc.Action
 import play.api.mvc.ControllerComponents
@@ -30,16 +31,20 @@ import uk.gov.hmrc.play.http.HeaderCarrierConverter
 import uk.gov.hmrc.transitmovementsrouter.connectors.PersistenceConnector
 import uk.gov.hmrc.transitmovementsrouter.controllers.actions.MessageSizeActionProvider
 import uk.gov.hmrc.transitmovementsrouter.controllers.errors.ConvertError
+import uk.gov.hmrc.transitmovementsrouter.controllers.errors.PresentationError
 import uk.gov.hmrc.transitmovementsrouter.controllers.stream.StreamingParsers
 import uk.gov.hmrc.transitmovementsrouter.models.EoriNumber
 import uk.gov.hmrc.transitmovementsrouter.models.MessageId
+import uk.gov.hmrc.transitmovementsrouter.models.MessageType
 import uk.gov.hmrc.transitmovementsrouter.models.MovementId
 import uk.gov.hmrc.transitmovementsrouter.models.MovementType
+import uk.gov.hmrc.transitmovementsrouter.models.RequestMessageType
 import uk.gov.hmrc.transitmovementsrouter.services.MessageTypeHeaderExtractor
 import uk.gov.hmrc.transitmovementsrouter.services.RoutingService
 import uk.gov.hmrc.transitmovementsrouter.services.StreamingMessageTrimmer
 
 import javax.inject.Inject
+import scala.concurrent.Future
 
 class MessagesController @Inject() (
   cc: ControllerComponents,
@@ -59,8 +64,9 @@ class MessagesController @Inject() (
     implicit request =>
       implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
       (for {
-        messageType <- MessageTypeHeaderExtractor.extract(request.headers).asPresentation
-        submitted   <- routingService.submitMessage(movementType, movementId, messageId, messageType, request.body).asPresentation
+        messageType        <- MessageTypeHeaderExtractor.extract(request.headers).asPresentation
+        requestMessageType <- filterRequestMessageType(messageType)
+        submitted          <- routingService.submitMessage(movementType, movementId, messageId, requestMessageType, request.body).asPresentation
       } yield submitted).fold[Result](
         error => Status(error.code.statusCode)(Json.toJson(error)),
         _ => Accepted
@@ -82,7 +88,11 @@ class MessagesController @Inject() (
             error => Status(error.code.statusCode)(Json.toJson(error)),
             response => Created.withHeaders("X-Message-Id" -> response.messageId.value)
           )
-
     }
+
+  private def filterRequestMessageType(messageType: MessageType): EitherT[Future, PresentationError, RequestMessageType] = messageType match {
+    case t: RequestMessageType => EitherT.rightT(t)
+    case _                     => EitherT.leftT(PresentationError.badRequestError(s"${messageType.code} is not valid for requests"))
+  }
 
 }

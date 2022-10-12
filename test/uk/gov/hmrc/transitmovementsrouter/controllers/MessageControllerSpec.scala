@@ -56,6 +56,7 @@ import uk.gov.hmrc.transitmovementsrouter.models.MessageType
 import uk.gov.hmrc.transitmovementsrouter.models.MovementId
 import uk.gov.hmrc.transitmovementsrouter.models.MovementType
 import uk.gov.hmrc.transitmovementsrouter.models.PersistenceResponse
+import uk.gov.hmrc.transitmovementsrouter.models.RequestMessageType
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.MovementNotFound
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.Unexpected
 import uk.gov.hmrc.transitmovementsrouter.services.RoutingService
@@ -63,6 +64,7 @@ import uk.gov.hmrc.transitmovementsrouter.services.StreamingMessageTrimmer
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
 
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.xml.NodeSeq
 
@@ -132,9 +134,9 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
           any[String].asInstanceOf[MovementType],
           any[String].asInstanceOf[MovementId],
           any[String].asInstanceOf[MessageId],
-          any[MessageType],
+          any[RequestMessageType],
           any[Source[ByteString, _]]
-        )(any[HeaderCarrier])
+        )(any[HeaderCarrier], any[ExecutionContext])
       ).thenReturn(submitDeclarationEither)
 
       val result = controller().outgoing(eori, movementType, movementId, messageId)(fakeRequest(cc015cOfficeOfDepartureGB, outgoing, messageTypeHeader))
@@ -151,9 +153,9 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
             any[String].asInstanceOf[MovementType],
             any[String].asInstanceOf[MovementId],
             any[String].asInstanceOf[MessageId],
-            any[MessageType],
+            any[RequestMessageType],
             any[Source[ByteString, _]]
-          )(any[HeaderCarrier])
+          )(any[HeaderCarrier], any[ExecutionContext])
         ).thenReturn(EitherT[Future, RoutingError, Unit](Future.successful(Left(RoutingError.NoElementFound("messageSender")))))
 
         val result = controller().outgoing(eori, movementType, movementId, messageId)(fakeRequest(cc015cOfficeOfDepartureGB, outgoing, messageTypeHeader))
@@ -172,9 +174,9 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
             any[String].asInstanceOf[MovementType],
             any[String].asInstanceOf[MovementId],
             any[String].asInstanceOf[MessageId],
-            any[MessageType],
+            any[RequestMessageType],
             any[Source[ByteString, _]]
-          )(any[HeaderCarrier])
+          )(any[HeaderCarrier], any[ExecutionContext])
         ).thenReturn(EitherT[Future, RoutingError, Unit](Future.successful(Left(RoutingError.TooManyElementsFound("eori")))))
 
         val result = controller().outgoing(eori, movementType, movementId, messageId)(fakeRequest(cc015cOfficeOfDepartureGB, outgoing, messageTypeHeader))
@@ -193,9 +195,9 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
             any[String].asInstanceOf[MovementType],
             any[String].asInstanceOf[MovementId],
             any[String].asInstanceOf[MessageId],
-            any[MessageType],
+            any[RequestMessageType],
             any[Source[ByteString, _]]
-          )(any[HeaderCarrier])
+          )(any[HeaderCarrier], any[ExecutionContext])
         ).thenReturn(EitherT[Future, RoutingError, Unit](Future.successful(Left(RoutingError.NoElementFound("messageSender")))))
 
         val result = controller().outgoing(eori, movementType, movementId, messageId)(fakeRequest(cc015cOfficeOfDepartureGB, outgoing))
@@ -214,9 +216,9 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
             any[String].asInstanceOf[MovementType],
             any[String].asInstanceOf[MovementId],
             any[String].asInstanceOf[MessageId],
-            any[MessageType],
+            any[RequestMessageType],
             any[Source[ByteString, _]]
-          )(any[HeaderCarrier])
+          )(any[HeaderCarrier], any[ExecutionContext])
         ).thenReturn(EitherT[Future, RoutingError, Unit](Future.successful(Left(RoutingError.NoElementFound("messageSender")))))
 
         val result = controller().outgoing(eori, movementType, movementId, messageId)(
@@ -238,9 +240,9 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
           any[String].asInstanceOf[MovementType],
           any[String].asInstanceOf[MovementId],
           any[String].asInstanceOf[MessageId],
-          any[MessageType],
+          any[RequestMessageType],
           any[Source[ByteString, _]]
-        )(any[HeaderCarrier])
+        )(any[HeaderCarrier], any[ExecutionContext])
       ).thenReturn(
         EitherT[Future, RoutingError, Unit](
           Future.successful(Left(RoutingError.Unexpected("unexpected error", Some(new Exception("An unexpected error occurred")))))
@@ -255,6 +257,19 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
         "message" -> "Internal server error"
       )
     }
+
+    "must return BAD_REQUEST when a message is not a request message" in {
+
+      lazy val messageTypeHeader = FakeHeaders(Seq(("X-Message-Type", MessageType.Discrepancies.code)))
+      val result                 = controller().outgoing(eori, movementType, movementId, messageId)(fakeRequest(cc015cOfficeOfDepartureGB, outgoing, messageTypeHeader))
+
+      status(result) mustBe BAD_REQUEST
+      contentAsJson(result) mustBe Json.obj(
+        "code"    -> "BAD_REQUEST",
+        "message" -> s"${MessageType.Discrepancies.code} is not valid for requests"
+      )
+    }
+
   }
 
   "POST incoming" - {
