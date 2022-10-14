@@ -110,11 +110,9 @@ class RoutingServiceImpl @Inject() (messageConnectorProvider: EISConnectorProvid
   private def postToEis(
     office: CustomsOffice
   )(implicit messageSender: MessageSender, body: Source[ByteString, _], hc: HeaderCarrier): Future[Either[RoutingError, Unit]] =
-    if (office.isGB) {
+    if (office.isGB)
       messageConnectorProvider.gb.post(messageSender, body, hc)
-    } else if (office.isXI) {
+    else
       messageConnectorProvider.xi.post(messageSender, body, hc)
-    } else {
-      Future.successful(Left(RoutingError.Unexpected(s"An unexpected error occurred - got a customs office value of: ${office.value}", None)))
-    }
+
 }
