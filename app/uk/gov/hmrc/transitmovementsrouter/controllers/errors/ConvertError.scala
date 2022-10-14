@@ -45,6 +45,7 @@ trait ConvertError {
       case NoElementFound(element)         => PresentationError.badRequestError(s"Element $element not found")
       case TooManyElementsFound(element)   => PresentationError.badRequestError(s"Found too many elements of type $element")
       case BadDateTime(element, ex)        => PresentationError.badRequestError(s"Could not parse datetime for $element: ${ex.getMessage}")
+      case UnrecognisedOffice(message)     => PresentationError.badRequestError(message)
     }
 
   }
