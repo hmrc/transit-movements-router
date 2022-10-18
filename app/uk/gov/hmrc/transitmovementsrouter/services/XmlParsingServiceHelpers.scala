@@ -35,6 +35,15 @@ trait XmlParsingServiceHelpers {
             case _                                    => Left(RoutingError.TooManyElementsFound(element))
           }
       )
+
+    def singleAsGeneric[B <: RoutingError](element: String, zero: B): Flow[ParseEvent, ParseResult[A], NotUsed] =
+      value.fold[Either[RoutingError, A]](Left(zero))(
+        (current, next) =>
+          current match {
+            case Left(???) => Right(next)
+            case _         => Left(RoutingError.TooManyElementsFound(element))
+          }
+      )
   }
 
 }
