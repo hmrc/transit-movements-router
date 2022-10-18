@@ -25,6 +25,7 @@ import org.scalatestplus.mockito.MockitoSugar
 import uk.gov.hmrc.transitmovementsrouter.models.errors.ErrorCode.BadRequest
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError.NoElementFound
+import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError.UnrecognisedOffice
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -47,6 +48,13 @@ class ConvertErrorSpec extends AnyFreeSpec with Matchers with OptionValues with 
       val input = Left[RoutingError, Unit](NoElementFound("test")).toEitherT[Future]
       whenReady(input.asPresentation.value) {
         _ mustBe Left(StandardError("Element test not found", BadRequest))
+      }
+    }
+
+    "for a validation error return UnrecognisedOffice" in {
+      val input = Left[RoutingError, Unit](UnrecognisedOffice("Did not recognise office:AB123456")).toEitherT[Future]
+      whenReady(input.asPresentation.value) {
+        _ mustBe Left(StandardError("Did not recognise office:AB123456", BadRequest))
       }
     }
   }
