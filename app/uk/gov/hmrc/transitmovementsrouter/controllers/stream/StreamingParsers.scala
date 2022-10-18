@@ -16,23 +16,26 @@
 
 package uk.gov.hmrc.transitmovementsrouter.controllers.stream
 
-import akka.stream.IOResult
 import akka.stream.Materializer
-import akka.stream.scaladsl.FileIO
-import akka.stream.scaladsl.RunnableGraph
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
-import play.api.libs.Files
+import play.api.libs.Files.TemporaryFileCreator
 import play.api.libs.streams.Accumulator
+import play.api.mvc.Action
+import play.api.mvc.ActionBuilder
 import play.api.mvc.BaseControllerHelpers
 import play.api.mvc.BodyParser
 import play.api.mvc.Request
+import play.api.mvc.Result
+import uk.gov.hmrc.transitmovementsrouter.controllers.request.BodyReplaceableRequest
+import uk.gov.hmrc.transitmovementsrouter.utils.FutureConversions
+import uk.gov.hmrc.transitmovementsrouter.utils.StreamWithFile
 
 import java.util.concurrent.Executors
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 
-trait StreamingParsers {
+trait StreamingParsers extends StreamWithFile with FutureConversions {
   self: BaseControllerHelpers =>
 
   implicit val materializer: Materializer
@@ -43,19 +46,23 @@ trait StreamingParsers {
   implicit val materializerExecutionContext: ExecutionContext =
     ExecutionContext.fromExecutorService(Executors.newFixedThreadPool(4))
 
-  def streamFromTemporaryFile[A](block: Source[ByteString, Future[IOResult]] => RunnableGraph[Future[A]])(implicit
-    request: Request[Files.TemporaryFile]
-  ): Future[A] =
-    block(FileIO.fromPath(request.body.path)).run()
-
-  lazy val streamFromFile: BodyParser[Source[ByteString, _]] = parse.temporaryFile.map {
-    tempFile =>
-      FileIO.fromPath(tempFile.path)
-  }
-
   lazy val streamFromMemory: BodyParser[Source[ByteString, _]] = BodyParser {
     _ =>
       Accumulator.source[ByteString].map(Right.apply)
+  }
+
+  implicit class ActionBuilderStreamHelpers(actionBuilder: ActionBuilder[Request, _]) {
+
+    def stream(
+      block: Request[Source[ByteString, _]] => Future[Result]
+    )(implicit temporaryFileCreator: TemporaryFileCreator): Action[Source[ByteString, _]] =
+      actionBuilder.async(streamFromMemory) {
+        request =>
+          withReusableSource(request.body) {
+            memoryOrFileSource =>
+              block(request.withBody(memoryOrFileSource))
+          }
+      }
   }
 
 }

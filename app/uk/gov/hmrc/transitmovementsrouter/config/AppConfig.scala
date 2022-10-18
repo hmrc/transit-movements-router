@@ -36,6 +36,8 @@ class AppConfig @Inject() (config: Configuration, servicesConfig: ServicesConfig
 
   lazy val persistenceServiceBaseUrl: Url = Url.parse(servicesConfig.baseUrl("transit-movements"))
 
+  val transitMovementsPushNotificationsUrl = Url.parse(servicesConfig.baseUrl("transit-movements-push-notifications"))
+
   lazy val messageSizeLimit: Int = config.get[Int]("messageSizeLimit")
 
 }

@@ -19,6 +19,7 @@ package uk.gov.hmrc.transitmovementsrouter.controllers.errors
 import cats.data.EitherT
 import uk.gov.hmrc.transitmovementsrouter.models.errors.HeaderExtractError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError
+import uk.gov.hmrc.transitmovementsrouter.models.errors.PushNotificationError
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError._
 
@@ -53,6 +54,15 @@ trait ConvertError {
     import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError._
 
     def convert(error: PersistenceError): PresentationError = error match {
+      case MovementNotFound(movementId) => PresentationError.notFoundError(s"Movement ${movementId.value} not found")
+      case Unexpected(error)            => PresentationError.internalServiceError(cause = error)
+    }
+  }
+
+  implicit val pushNotificationsErrorConverter = new Converter[PushNotificationError] {
+    import uk.gov.hmrc.transitmovementsrouter.models.errors.PushNotificationError._
+
+    def convert(error: PushNotificationError): PresentationError = error match {
       case MovementNotFound(movementId) => PresentationError.notFoundError(s"Movement ${movementId.value} not found")
       case Unexpected(error)            => PresentationError.internalServiceError(cause = error)
     }

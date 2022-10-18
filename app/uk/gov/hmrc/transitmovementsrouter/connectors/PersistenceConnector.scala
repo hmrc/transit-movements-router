@@ -25,7 +25,6 @@ import com.google.inject.Singleton
 import io.lemonlabs.uri.QueryString
 import io.lemonlabs.uri.Url
 import io.lemonlabs.uri.UrlPath
-import play.api.Logging
 import play.api.http.HeaderNames
 import play.api.http.MimeTypes
 import play.api.http.Status.BAD_REQUEST
@@ -61,7 +60,7 @@ trait PersistenceConnector {
 }
 
 @Singleton
-class PersistenceConnectorImpl @Inject() (httpClientV2: HttpClientV2, appConfig: AppConfig) extends PersistenceConnector with Logging {
+class PersistenceConnectorImpl @Inject() (httpClientV2: HttpClientV2, appConfig: AppConfig) extends PersistenceConnector {
 
   val baseUrl           = appConfig.persistenceServiceBaseUrl
   val baseRoute: String = "/transit-movements"
