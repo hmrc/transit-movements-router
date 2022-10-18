@@ -26,6 +26,7 @@ object RoutingError {
   case class NoElementFound(element: String)                                 extends RoutingError
   case class TooManyElementsFound(element: String)                           extends RoutingError
   case class BadDateTime(element: String, exception: DateTimeParseException) extends RoutingError
+  case class UnrecognisedOffice(message: String)                             extends RoutingError
 }
 
 sealed trait RoutingError
