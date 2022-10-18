@@ -34,6 +34,7 @@ import uk.gov.hmrc.transitmovementsrouter.base._
 import uk.gov.hmrc.transitmovementsrouter.connectors._
 import uk.gov.hmrc.transitmovementsrouter.generators.ModelGenerators
 import uk.gov.hmrc.transitmovementsrouter.models._
+import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError.NoElementFound
 
 import java.time.OffsetDateTime
@@ -162,6 +163,29 @@ class RoutingServiceSpec
               _.mustBe(Right(()))
             }
         }
+
+        s"${messageType.code} should generate an invalid office of destination for a non GB/XI payload" in forAll(
+          arbitrary[MessageId],
+          arbitrary[MovementId],
+          messageOfficeOfDestinationActual(messageType.rootNode, "FR")
+        ) {
+          (messageId, movementId, officeOfDestinationXML) =>
+            val serviceUnderTest = new RoutingServiceImpl(mockMessageConnectorProvider)
+            val payload          = createStream(officeOfDestinationXML)
+
+            val response = serviceUnderTest.submitMessage(
+              MovementType("arrivals"),
+              movementId,
+              messageId,
+              messageType,
+              payload
+            )(hc, ec)
+
+            whenReady(response.value, Timeout(2 seconds)) {
+              _.mustBe(Left(RoutingError.UnrecognisedOffice("FR")))
+            }
+        }
+
     }
   }
 
