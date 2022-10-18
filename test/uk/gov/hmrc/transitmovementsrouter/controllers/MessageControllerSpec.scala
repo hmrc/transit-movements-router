@@ -46,6 +46,7 @@ import uk.gov.hmrc.http.HttpVerbs.POST
 import uk.gov.hmrc.transitmovementsrouter.base.StreamTestHelpers.createStream
 import uk.gov.hmrc.transitmovementsrouter.base.TestActorSystem
 import uk.gov.hmrc.transitmovementsrouter.connectors.PersistenceConnector
+import uk.gov.hmrc.transitmovementsrouter.connectors.PushNotificationsConnector
 import uk.gov.hmrc.transitmovementsrouter.controllers.actions.MessageSizeActionProvider
 import uk.gov.hmrc.transitmovementsrouter.fakes.actions.FakeMessageSizeAction
 import uk.gov.hmrc.transitmovementsrouter.fakes.actions.FakeXmlTrimmer
@@ -62,6 +63,7 @@ import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.Unexpec
 import uk.gov.hmrc.transitmovementsrouter.services.RoutingService
 import uk.gov.hmrc.transitmovementsrouter.services.StreamingMessageTrimmer
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
+import play.api.libs.Files.SingletonTemporaryFileCreator
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.ExecutionContext
@@ -87,8 +89,10 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
     <TraderChannelResponse><ncts:CC013C PhaseID="NCTS5.0" xmlns:ncts="http://ncts.dgtaxud.ec">text</ncts:CC013C></TraderChannelResponse>
   val trimmedXml: NodeSeq = <ncts:CC013C PhaseID="NCTS5.0" xmlns:ncts="http://ncts.dgtaxud.ec">text</ncts:CC013C>
 
-  val mockRoutingService       = mock[RoutingService]
-  val mockPersistenceConnector = mock[PersistenceConnector]
+  val mockRoutingService             = mock[RoutingService]
+  val mockPersistenceConnector       = mock[PersistenceConnector]
+  val mockPushNotificationsConnector = mock[PushNotificationsConnector]
+  implicit val temporaryFileCreator  = SingletonTemporaryFileCreator
 
   val mockProvider = mock[MessageSizeActionProvider]
   when(mockProvider.apply()).thenReturn(new FakeMessageSizeAction[Nothing])
@@ -97,7 +101,7 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
   val controllerComponentWithTempFile = stubControllerComponents(playBodyParsers = PlayBodyParsers(SingletonTemporaryFileCreator, errorHandler)(materializer))
 
   def controller(trimmer: StreamingMessageTrimmer = new FakeXmlTrimmer(trimmedXml)) =
-    new MessagesController(controllerComponentWithTempFile, mockRoutingService, mockPersistenceConnector, trimmer, mockProvider)
+    new MessagesController(controllerComponentWithTempFile, mockRoutingService, mockPersistenceConnector, mockPushNotificationsConnector, trimmer, mockProvider)
 
   def source = createStream(cc015cOfficeOfDepartureGB)
 
@@ -138,6 +142,14 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
           any[Source[ByteString, _]]
         )(any[HeaderCarrier], any[ExecutionContext])
       ).thenReturn(submitDeclarationEither)
+
+      when(
+        mockPushNotificationsConnector
+          .post(any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId], any[Source[ByteString, _]])(
+            any[HeaderCarrier],
+            any[ExecutionContext]
+          )
+      ).thenReturn(EitherT.rightT(()))
 
       val result = controller().outgoing(eori, movementType, movementId, messageId)(fakeRequest(cc015cOfficeOfDepartureGB, outgoing, messageTypeHeader))
 

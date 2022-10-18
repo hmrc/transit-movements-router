@@ -27,7 +27,6 @@ import play.api.mvc.BaseControllerHelpers
 import play.api.mvc.BodyParser
 import play.api.mvc.Request
 import play.api.mvc.Result
-import uk.gov.hmrc.transitmovementsrouter.controllers.request.BodyReplaceableRequest
 import uk.gov.hmrc.transitmovementsrouter.utils.FutureConversions
 import uk.gov.hmrc.transitmovementsrouter.utils.StreamWithFile
 
