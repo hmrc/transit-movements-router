@@ -67,25 +67,28 @@ class PushNotificationsConnectorImpl @Inject() (httpClientV2: HttpClientV2, appC
     ec: ExecutionContext
   ): EitherT[Future, PushNotificationError, Unit] =
     EitherT {
-      val url = baseUrl.withPath(pushNotificationMessageUpdate(movementId, messageId))
+      if (!appConfig.pushNotificationsEnabled) Future.successful(Right(()))
+      else {
+        val url = baseUrl.withPath(pushNotificationMessageUpdate(movementId, messageId))
 
-      httpClientV2
-        .post(url"$url")
-        .addHeaders(HeaderNames.CONTENT_TYPE -> MimeTypes.XML)
-        .withBody(source)
-        .execute[Either[UpstreamErrorResponse, HttpResponse]]
-        .map {
-          case Right(_) =>
-            Right(())
-          case Left(error) =>
-            error.statusCode match {
-              case NOT_FOUND             => Left(MovementNotFound(movementId))
-              case INTERNAL_SERVER_ERROR => Left(Unexpected(Some(error.getCause)))
-            }
-        }
-        .recover {
-          case NonFatal(ex) => Left(Unexpected(Some(ex)))
-        }
+        httpClientV2
+          .post(url"$url")
+          .addHeaders(HeaderNames.CONTENT_TYPE -> MimeTypes.XML)
+          .withBody(source)
+          .execute[Either[UpstreamErrorResponse, HttpResponse]]
+          .map {
+            case Right(_) =>
+              Right(())
+            case Left(error) =>
+              error.statusCode match {
+                case NOT_FOUND             => Left(MovementNotFound(movementId))
+                case INTERNAL_SERVER_ERROR => Left(Unexpected(Some(error.getCause)))
+              }
+          }
+          .recover {
+            case NonFatal(ex) => Left(Unexpected(Some(ex)))
+          }
+      }
     }
 
 }

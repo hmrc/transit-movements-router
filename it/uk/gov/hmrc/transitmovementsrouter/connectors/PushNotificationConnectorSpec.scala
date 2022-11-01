@@ -61,16 +61,16 @@ class PushNotificationConnectorSpec
   val uriPushNotifications =
     UrlPath.parse(s"/transit-movements-push-notifications/traders/movements/${movementId.value}/messages/${messageId.value}").toString()
 
-  val appConfig = mock[AppConfig]
+  val mockAppConfig = mock[AppConfig]
 
-  when(appConfig.transitMovementsPushNotificationsUrl).thenAnswer {
+  when(mockAppConfig.transitMovementsPushNotificationsUrl).thenAnswer {
     _ =>
       Url.parse(server.baseUrl())
   }
 
   implicit val hc = HeaderCarrier()
 
-  lazy val connector = new PushNotificationsConnectorImpl(httpClientV2, appConfig)
+  lazy val connector = new PushNotificationsConnectorImpl(httpClientV2, mockAppConfig)
 
   val errorCodes = Gen.oneOf(
     Seq(
@@ -89,6 +89,7 @@ class PushNotificationConnectorSpec
 
   "post" should {
     "return unit when post is successful" in {
+      when(mockAppConfig.pushNotificationsEnabled).thenReturn(true)
 
       stub(OK)
 
@@ -101,6 +102,8 @@ class PushNotificationConnectorSpec
     "return a PushNotificationError when unsuccessful" in forAll(errorCodes) {
       statusCode =>
         server.resetAll()
+
+        when(mockAppConfig.pushNotificationsEnabled).thenReturn(true)
 
         stub(statusCode)
 
@@ -119,6 +122,8 @@ class PushNotificationConnectorSpec
     "return Unexpected(throwable) when NonFatal exception is thrown" in {
       server.resetAll()
 
+      when(mockAppConfig.pushNotificationsEnabled).thenReturn(true)
+
       stub(OK)
 
       val failingSource = new StreamingMessageTrimmerImpl().trim(Source.single(ByteString.fromString("{}")))
@@ -130,5 +135,16 @@ class PushNotificationConnectorSpec
       }
     }
 
+    "when the service is disabled, return a unit" in {
+      when(mockAppConfig.pushNotificationsEnabled).thenReturn(false)
+
+      stub(OK)
+
+      whenReady(connector.post(movementId, messageId, source).value) {
+        x =>
+          x mustBe Right(())
+      }
+
+    }
   }
 }

@@ -22,10 +22,9 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import play.api.Configuration
 import uk.gov.hmrc.http.HeaderCarrier
-import uk.gov.hmrc.play.bootstrap.config.ServicesConfig
 
 @Singleton
-class AppConfig @Inject() (config: Configuration, servicesConfig: ServicesConfig) {
+class AppConfig @Inject() (config: Configuration, servicesConfig: CTCServicesConfig) {
 
   lazy val appName: String = config.get[String]("appName")
 
@@ -37,6 +36,8 @@ class AppConfig @Inject() (config: Configuration, servicesConfig: ServicesConfig
   lazy val persistenceServiceBaseUrl: Url = Url.parse(servicesConfig.baseUrl("transit-movements"))
 
   val transitMovementsPushNotificationsUrl = Url.parse(servicesConfig.baseUrl("transit-movements-push-notifications"))
+
+  val pushNotificationsEnabled = servicesConfig.config("transit-movements-push-notifications").get[Boolean]("enabled")
 
   lazy val messageSizeLimit: Int = config.get[Int]("messageSizeLimit")
 
