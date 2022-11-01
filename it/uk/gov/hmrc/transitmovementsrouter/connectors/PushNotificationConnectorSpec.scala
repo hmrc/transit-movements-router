@@ -138,11 +138,11 @@ class PushNotificationConnectorSpec
     "when the service is disabled, return a unit" in {
       when(mockAppConfig.pushNotificationsEnabled).thenReturn(false)
 
-      stub(OK)
+      stub(INTERNAL_SERVER_ERROR)
 
       whenReady(connector.post(movementId, messageId, source).value) {
-        x =>
-          x mustBe Right(())
+        case Left(_)  => fail("The stub should never have been hit and therefore should always return a right")
+        case Right(_) =>
       }
 
     }
