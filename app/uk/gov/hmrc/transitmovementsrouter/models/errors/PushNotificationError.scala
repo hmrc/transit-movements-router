@@ -14,15 +14,13 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovementsrouter.config
+package uk.gov.hmrc.transitmovementsrouter.models.errors
 
-import com.google.inject.AbstractModule
+import uk.gov.hmrc.transitmovementsrouter.models.MovementId
 
-class Module extends AbstractModule {
+sealed trait PushNotificationError
 
-  override def configure(): Unit = {
-    bind(classOf[AppConfig]).asEagerSingleton()
-    bind(classOf[CTCServicesConfig])
-  }
-
+object PushNotificationError {
+  case class MovementNotFound(movementId: MovementId) extends PushNotificationError
+  case class Unexpected(exception: Option[Throwable]) extends PushNotificationError
 }
