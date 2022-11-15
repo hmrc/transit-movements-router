@@ -161,9 +161,12 @@ object MessageType {
   /** E_PRE_NOT (IE170) */
   case object UnloadingRemarks extends ArrivalRequestMessageType("IE044", "CC044C")
 
+  case object InformationAboutNonArrivedMovement extends ArrivalRequestMessageType("IE141", "CC141C")
+
   val arrivalRequestValues = Set(
     ArrivalNotification,
-    UnloadingRemarks
+    UnloadingRemarks,
+    InformationAboutNonArrivedMovement
   )
 
   // ****************
@@ -179,10 +182,13 @@ object MessageType {
   /** E_ULD_PER (IE025) */
   case object UnloadingPermission extends ArrivalResponseMessageType("IE043", "CC043C")
 
+  case object RequestOnNonArrivedMovement extends ArrivalResponseMessageType("IE140", "CC140C")
+
   val arrivalResponseValues = Set(
     DestinationOfficeRejection,
     GoodsReleaseNotification,
-    UnloadingPermission
+    UnloadingPermission,
+    RequestOnNonArrivedMovement
   )
 
   val arrivalValues = arrivalRequestValues ++ arrivalResponseValues
