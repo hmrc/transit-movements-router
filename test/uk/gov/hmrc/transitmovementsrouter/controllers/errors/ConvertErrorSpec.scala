@@ -110,7 +110,7 @@ class ConvertErrorSpec extends AnyFreeSpec with Matchers with OptionValues with 
 
   }
 
-  "PushNotificationError error" - {
+  "PersistenceError error" - {
     "an Unexpected Error with exception returns an internal service error with an exception" in {
       val exception = new IllegalStateException()
       val input     = Left[PersistenceError, Unit](PersistenceError.Unexpected(Some(exception))).toEitherT[Future]
