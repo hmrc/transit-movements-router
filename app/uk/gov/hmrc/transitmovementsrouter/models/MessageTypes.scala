@@ -133,6 +133,9 @@ object MessageType {
   /** E_INC_NOT (IE182) */
   case object IncidentNotification extends DepartureResponseMessageType("IE182", "CC182C")
 
+  /** E_REC_NOT (IE035) */
+  case object RecoveryNotification extends DepartureResponseMessageType("IE035", "CC035C")
+
   val departureResponseValues = Set(
     AmendmentAcceptance,
     DepartureOfficeRejection,
@@ -146,7 +149,8 @@ object MessageType {
     NoReleaseForTransit,
     ControlDecisionNotification,
     NotificationToAmend,
-    IncidentNotification
+    IncidentNotification,
+    RecoveryNotification
   )
 
   val departureValues = departureRequestValues ++ departureResponseValues
