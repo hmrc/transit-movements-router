@@ -26,6 +26,7 @@ import uk.gov.hmrc.http.UpstreamErrorResponse
 import uk.gov.hmrc.transitmovementsrouter.models.MovementId
 import uk.gov.hmrc.transitmovementsrouter.models.errors.HeaderExtractError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError
+import uk.gov.hmrc.transitmovementsrouter.models.errors.PushNotificationError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.ErrorCode.BadRequest
 import uk.gov.hmrc.transitmovementsrouter.models.errors.ErrorCode.InternalServerError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.ErrorCode.NotFound
@@ -128,6 +129,30 @@ class ConvertErrorSpec extends AnyFreeSpec with Matchers with OptionValues with 
 
     "for a failure - handle MovementNotFound error" in {
       val input = Left[PersistenceError, Unit](PersistenceError.MovementNotFound(MovementId("345"))).toEitherT[Future]
+      whenReady(input.asPresentation.value) {
+        _ mustBe Left(StandardError("Movement 345 not found", NotFound))
+      }
+    }
+  }
+
+  "PushNotificationError error" - {
+    "an Unexpected Error with exception returns an internal service error with an exception" in {
+      val exception = new IllegalStateException()
+      val input     = Left[PushNotificationError, Unit](PushNotificationError.Unexpected(Some(exception))).toEitherT[Future]
+      whenReady(input.asPresentation.value) {
+        _ mustBe Left(InternalServiceError("Internal server error", InternalServerError, Some(exception)))
+      }
+    }
+
+    "an Unexpected Error with no exception returns an internal service error with no exception" in {
+      val input = Left[PushNotificationError, Unit](PushNotificationError.Unexpected(None)).toEitherT[Future]
+      whenReady(input.asPresentation.value) {
+        _ mustBe Left(InternalServiceError("Internal server error", InternalServerError, None))
+      }
+    }
+
+    "for a failure - handle MovementNotFound error" in {
+      val input = Left[PushNotificationError, Unit](PushNotificationError.MovementNotFound(MovementId("345"))).toEitherT[Future]
       whenReady(input.asPresentation.value) {
         _ mustBe Left(StandardError("Movement 345 not found", NotFound))
       }
