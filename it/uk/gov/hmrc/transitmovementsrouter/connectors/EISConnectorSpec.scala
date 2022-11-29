@@ -169,6 +169,7 @@ class EISConnectorSpec
               .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
               .withHeader("X-Message-Sender", equalTo(messageSender.value))
               .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
+              .withHeader("X-Conversation-Id", matching(RegexPatterns.UUID))
               .inScenario("Standard Call")
               .whenScenarioStateIs(currentState)
               .willReturn(aResponse().withStatus(codeToReturn))
@@ -200,6 +201,7 @@ class EISConnectorSpec
             .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
             .withHeader("X-Message-Sender", equalTo(messageSender.value))
             .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
+            .withHeader("X-Conversation-Id", matching(RegexPatterns.UUID))
             .willReturn(aResponse().withStatus(codeToReturn))
         )
 

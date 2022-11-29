@@ -14,19 +14,16 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovementsrouter.connectors
+package uk.gov.hmrc.transitmovementsrouter.models
 
-import play.api.http.HeaderNames
-import uk.gov.hmrc.http.{HeaderNames => HMRCHeaderNames}
+import org.scalatest.freespec.AnyFreeSpec
+import org.scalatest.matchers.must.Matchers
 
-object OutgoingHeaders {
+class CorrelationIdSpec extends AnyFreeSpec with Matchers {
 
-  val headers = Seq(
-    HeaderNames.DATE,
-    HeaderNames.CONTENT_TYPE,
-    HeaderNames.X_FORWARDED_HOST,
-    "X-Message-Type",
-    "X-Message-Sender",
-    HMRCHeaderNames.xRequestId
-  )
+  "build CorrelationId from MovementId and MessageId" in {
+    val correlationId = CorrelationId(MovementId("63629b56d8d9c033"), MessageId("63629b4d1d74477e"))
+    correlationId.value mustBe "63629b56-d8d9-c033-63629b4d-1d74477e"
+  }
+
 }

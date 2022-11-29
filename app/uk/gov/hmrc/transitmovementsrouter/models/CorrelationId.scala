@@ -14,19 +14,20 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovementsrouter.connectors
+package uk.gov.hmrc.transitmovementsrouter.models
 
-import play.api.http.HeaderNames
-import uk.gov.hmrc.http.{HeaderNames => HMRCHeaderNames}
+case class CorrelationId(value: String) extends AnyVal
 
-object OutgoingHeaders {
+object CorrelationId {
 
-  val headers = Seq(
-    HeaderNames.DATE,
-    HeaderNames.CONTENT_TYPE,
-    HeaderNames.X_FORWARDED_HOST,
-    "X-Message-Type",
-    "X-Message-Sender",
-    HMRCHeaderNames.xRequestId
-  )
+  def apply(movementId: MovementId, messageId: MessageId): CorrelationId = {
+    val movementId1 = movementId.value.slice(0, 8)
+    val movementId2 = movementId.value.slice(8, 12)
+    val movementId3 = movementId.value.slice(12, 16)
+
+    val messageId1 = messageId.value.slice(0, 8)
+    val messageId2 = messageId.value.slice(8, 16)
+
+    CorrelationId(s"$movementId1-$movementId2-$movementId3-$messageId1-$messageId2")
+  }
 }
