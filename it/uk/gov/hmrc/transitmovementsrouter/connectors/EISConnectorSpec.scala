@@ -217,6 +217,37 @@ class EISConnectorSpec
       }
     }
 
+    "generate X-Correlation-Id headers based on movementId and messageId" in forAll(connectorGen) {
+      connector =>
+        server.resetAll()
+
+        val messageSender1 = MessageSender("63629b56d8d9c033-63629b4d1d74477e")
+        def stub(currentState: String, targetState: String, codeToReturn: Int) =
+          server.stubFor(
+            post(
+              urlEqualTo(uriStub)
+            )
+              .inScenario("Standard Call")
+              .whenScenarioStateIs(currentState)
+              .withHeader("X-Correlation-Id", equalTo("63629b56-d8d9-c033-63629b4d-1d74477e"))
+              .withHeader("X-Message-Sender", equalTo(messageSender1.value))
+              .withHeader("CustomProcessHost", equalTo("Digital"))
+              .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
+              .willReturn(aResponse().withStatus(codeToReturn))
+              .willSetStateTo(targetState)
+          )
+
+        val secondState = "should now fail"
+
+        stub(Scenario.STARTED, secondState, ACCEPTED)
+
+        val hc = HeaderCarrier()
+
+        whenReady(connector().post(messageSender1, source, hc)) {
+          _.isRight mustBe true
+        }
+    }
+
     val errorCodes = Gen.oneOf(
       Seq(
         BAD_REQUEST,
