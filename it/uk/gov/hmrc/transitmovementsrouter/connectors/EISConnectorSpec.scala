@@ -229,7 +229,7 @@ class EISConnectorSpec
             )
               .inScenario("Standard Call")
               .whenScenarioStateIs(currentState)
-              .withHeader("X-Correlation-Id", equalTo("63629b56-d8d9-c033-63629b4d-1d74477e"))
+              .withHeader("X-Correlation-Id", equalTo("63629b56-d8d9-c033-6362-9b4d1d74477e"))
               .withHeader("X-Message-Sender", equalTo(messageSender1.value))
               .withHeader("CustomProcessHost", equalTo("Digital"))
               .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))

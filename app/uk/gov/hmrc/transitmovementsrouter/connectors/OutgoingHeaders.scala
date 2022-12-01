@@ -26,7 +26,6 @@ object OutgoingHeaders {
     HeaderNames.CONTENT_TYPE,
     HeaderNames.X_FORWARDED_HOST,
     "X-Message-Type",
-    "X-Message-Sender",
     HMRCHeaderNames.xRequestId
   )
 }

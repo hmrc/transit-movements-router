@@ -25,8 +25,8 @@ object CorrelationId {
     val movementId2 = movementId.value.slice(8, 12)
     val movementId3 = movementId.value.slice(12, 16)
 
-    val messageId1 = messageId.value.slice(0, 8)
-    val messageId2 = messageId.value.slice(8, 16)
+    val messageId1 = messageId.value.slice(0, 4)
+    val messageId2 = messageId.value.slice(4, 16)
 
     CorrelationId(s"$movementId1-$movementId2-$movementId3-$messageId1-$messageId2")
   }

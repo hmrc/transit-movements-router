@@ -92,10 +92,11 @@ class EISConnectorImpl(
       (t: Either[RoutingError, Unit]) => Future.successful(t.isRight),
       onFailure
     ) {
-      val data          = messageSender.value.split("-")
-      var correlationId = UUID.randomUUID().toString
-      if (data.size == 2) {
-        correlationId = CorrelationId(MovementId(data(0)), MessageId(data(1))).value
+      val data = messageSender.value.split("-")
+
+      val correlationId = data match {
+        case array if array.size == 2 => CorrelationId(MovementId(data(0)), MessageId(data(1))).value
+        case _                        => UUID.randomUUID().toString
       }
       val requestHeaders = hc.headers(OutgoingHeaders.headers) ++ Seq(
         "X-Correlation-Id"        -> correlationId,
