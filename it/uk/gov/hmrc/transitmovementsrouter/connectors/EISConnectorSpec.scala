@@ -24,6 +24,8 @@ import com.github.tomakehurst.wiremock.stubbing.Scenario
 import org.mockito.ArgumentMatchers
 import org.mockito.Mockito.when
 import org.scalacheck.Gen
+import org.scalacheck.Gen.hexChar
+import org.scalacheck.Gen.listOfN
 import org.scalatest.concurrent.IntegrationPatience
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.matchers.must.Matchers
@@ -47,7 +49,9 @@ import uk.gov.hmrc.transitmovementsrouter.config.CircuitBreakerConfig
 import uk.gov.hmrc.transitmovementsrouter.config.EISInstanceConfig
 import uk.gov.hmrc.transitmovementsrouter.config.Headers
 import uk.gov.hmrc.transitmovementsrouter.config.RetryConfig
+import uk.gov.hmrc.transitmovementsrouter.models.MessageId
 import uk.gov.hmrc.transitmovementsrouter.models.MessageSender
+import uk.gov.hmrc.transitmovementsrouter.models.MovementId
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
 
 import java.net.URL
@@ -83,8 +87,10 @@ class EISConnectorSpec
       RetryPolicies.limitRetries[Future](1)(cats.implicits.catsStdInstancesForFuture(ec))
   }
 
-  val messageSender: MessageSender = Gen.alphaNumStr.map(MessageSender(_)).sample.get
-  val uriStub                      = "/transit-movements-eis-stub/movements/messages"
+  val messageSender: MessageSender =
+    MessageSender(MovementId(listOfN(16, hexChar).sample.get.mkString), MessageId(listOfN(16, hexChar).sample.get.mkString))
+
+  val uriStub = "/transit-movements-eis-stub/ncts/trader/channelresponsegb/v2"
 
   val connectorConfig: EISInstanceConfig = EISInstanceConfig(
     "http",
@@ -169,7 +175,6 @@ class EISConnectorSpec
               .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
               .withHeader("X-Message-Sender", equalTo(messageSender.value))
               .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
-              .withHeader("X-Conversation-Id", matching(RegexPatterns.UUID))
               .inScenario("Standard Call")
               .whenScenarioStateIs(currentState)
               .willReturn(aResponse().withStatus(codeToReturn))
@@ -201,7 +206,6 @@ class EISConnectorSpec
             .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
             .withHeader("X-Message-Sender", equalTo(messageSender.value))
             .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
-            .withHeader("X-Conversation-Id", matching(RegexPatterns.UUID))
             .willReturn(aResponse().withStatus(codeToReturn))
         )
 

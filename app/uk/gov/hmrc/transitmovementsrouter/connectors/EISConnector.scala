@@ -38,7 +38,6 @@ import uk.gov.hmrc.transitmovementsrouter.models.MessageSender
 import uk.gov.hmrc.transitmovementsrouter.models.MovementId
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
 import uk.gov.hmrc.http.HttpReads.Implicits._
-import java.util.UUID
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.util.Try
@@ -94,15 +93,10 @@ class EISConnectorImpl(
     ) {
       val data = messageSender.value.split("-")
 
-      val correlationId = data match {
-        case array if array.size == 2 => CorrelationId(MovementId(data(0)), MessageId(data(1))).value
-        case _                        => UUID.randomUUID().toString
-      }
       val requestHeaders = hc.headers(OutgoingHeaders.headers) ++ Seq(
-        "X-Correlation-Id"        -> correlationId,
+        "X-Correlation-Id"        -> CorrelationId(MovementId(data(0)), MessageId(data(1))).value,
         "CustomProcessHost"       -> "Digital",
         "X-Message-Sender"        -> messageSender.value,
-        "X-Conversation-Id"       -> UUID.randomUUID().toString,
         HeaderNames.ACCEPT        -> MimeTypes.XML, // TODO: is this still relevant? Can't use ContentTypes.XML because EIS will not accept "application/xml; charset=utf-8"
         HeaderNames.AUTHORIZATION -> s"Bearer ${eisInstanceConfig.headers.bearerToken}"
       )
