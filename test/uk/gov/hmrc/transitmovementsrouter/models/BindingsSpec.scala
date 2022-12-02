@@ -53,25 +53,27 @@ class BindingsSpec extends AnyFreeSpec with Matchers with ScalaCheckDrivenProper
   val lead  = validHexString.sample.get
   val trail = validHexString.sample.get
 
-  val valid = s"$lead-$trail"
+  val movementId = "63629b56d8d9c033"
+  val messageId  = "73629b4d1d74477e"
+  val valid      = "63629b56-d8d9-c033-7362-9b4d1d74477e"
 
   val testBinding = Bindings.dualBinding
 
   "dual binding" - {
 
     "bind" - {
-      "if it obeys the 16 char hyphen 16 char pattern must be accepted" in {
-        testBinding.bind("test", valid) mustBe Right((MovementId(lead), MessageId(trail)))
+      "check if it obeys 32 character hexadecimal string's split by 4 hyphen's pattern must be accepted" in {
+        testBinding.bind("test", valid) mustBe Right((MovementId(movementId), MessageId(messageId)))
       }
 
       "an invalid dual hex string must not be accepted" in invalidSet.foreach {
         value =>
-          testBinding.bind("test", value) mustBe Left(s"test: Value $value is not a pair of 16 character hexadecimal string's split by a hyphen")
+          testBinding.bind("test", value) mustBe Left(s"test: Value $value is not a pair of 32 character hexadecimal string's split by a hyphen")
       }
     }
 
     "unbind of the (MovementId, MessageId) tuple" in {
-      testBinding.unbind("test", (MovementId(lead), MessageId(trail))) mustBe valid
+      testBinding.unbind("test", (MovementId(movementId), MessageId(messageId))) mustBe valid
     }
 
   }
