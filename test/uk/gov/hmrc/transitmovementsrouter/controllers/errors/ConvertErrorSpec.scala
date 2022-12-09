@@ -17,18 +17,22 @@
 package uk.gov.hmrc.transitmovementsrouter.controllers.errors
 
 import cats.syntax.all._
+import org.scalacheck.Gen
 import org.scalatest.OptionValues
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
 import org.scalatestplus.mockito.MockitoSugar
+import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 import uk.gov.hmrc.http.UpstreamErrorResponse
+import uk.gov.hmrc.transitmovementsrouter.models.CustomsOffice
 import uk.gov.hmrc.transitmovementsrouter.models.MovementId
 import uk.gov.hmrc.transitmovementsrouter.models.errors.HeaderExtractError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PushNotificationError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.ErrorCode.BadRequest
 import uk.gov.hmrc.transitmovementsrouter.models.errors.ErrorCode.InternalServerError
+import uk.gov.hmrc.transitmovementsrouter.models.errors.ErrorCode.InvalidOffice
 import uk.gov.hmrc.transitmovementsrouter.models.errors.ErrorCode.NotFound
 import uk.gov.hmrc.transitmovementsrouter.models.errors.HeaderExtractError.InvalidMessageType
 import uk.gov.hmrc.transitmovementsrouter.models.errors.HeaderExtractError.NoHeaderFound
@@ -44,7 +48,7 @@ import java.time.format.DateTimeParseException
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
-class ConvertErrorSpec extends AnyFreeSpec with Matchers with OptionValues with ScalaFutures with MockitoSugar {
+class ConvertErrorSpec extends AnyFreeSpec with Matchers with OptionValues with ScalaFutures with MockitoSugar with ScalaCheckDrivenPropertyChecks {
 
   object Harness extends ConvertError
 
@@ -65,11 +69,12 @@ class ConvertErrorSpec extends AnyFreeSpec with Matchers with OptionValues with 
       }
     }
 
-    "for a validation error return UnrecognisedOffice" in {
-      val input = Left[RoutingError, Unit](UnrecognisedOffice("Did not recognise office:AB123456")).toEitherT[Future]
-      whenReady(input.asPresentation.value) {
-        _ mustBe Left(StandardError("Did not recognise office:AB123456", BadRequest))
-      }
+    "for a validation error return UnrecognisedOffice" in forAll(Gen.alphaNumStr, Gen.alphaStr) {
+      (office, field) =>
+        val input = Left[RoutingError, Unit](UnrecognisedOffice(s"Did not recognise office:$office", CustomsOffice(office), field)).toEitherT[Future]
+        whenReady(input.asPresentation.value) {
+          _ mustBe Left(InvalidOfficeError(s"Did not recognise office:$office", office, field, InvalidOffice))
+        }
     }
 
     "an Unexpected Error with exception returns an internal service error with an exception" in {

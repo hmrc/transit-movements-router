@@ -22,6 +22,7 @@ import play.api.libs.json.OWrites
 import play.api.libs.json.Reads
 import play.api.libs.json.__
 import uk.gov.hmrc.http.UpstreamErrorResponse
+import uk.gov.hmrc.transitmovementsrouter.models.CustomsOffice
 import uk.gov.hmrc.transitmovementsrouter.models.errors.ErrorCode
 import uk.gov.hmrc.transitmovementsrouter.models.formats.CommonFormats
 
@@ -35,6 +36,9 @@ object PresentationError extends CommonFormats {
 
   def badRequestError(message: String): PresentationError =
     StandardError(message, ErrorCode.BadRequest)
+
+  def invalidOfficeError(message: String, customsOffice: CustomsOffice, field: String): PresentationError =
+    InvalidOfficeError(message, customsOffice.value, field, ErrorCode.InvalidOffice)
 
   def notFoundError(message: String): PresentationError =
     StandardError(message, ErrorCode.NotFound)
@@ -61,7 +65,20 @@ object PresentationError extends CommonFormats {
 
   def unapply(error: PresentationError): Option[(String, ErrorCode)] = Some((error.message, error.code))
 
-  implicit val baseErrorWrites: OWrites[PresentationError] =
+  implicit val presentationErrorWrites: OWrites[PresentationError] = OWrites {
+    case invalidOfficeError: InvalidOfficeError => invalidOfficeWrites.writes(invalidOfficeError)
+    case presentationError: PresentationError   => basePresentationErrorWrites.writes(presentationError)
+  }
+
+  lazy val invalidOfficeWrites: OWrites[InvalidOfficeError] =
+    (
+      (__ \ MessageFieldName).write[String] and
+        (__ \ "office").write[String] and
+        (__ \ "field").write[String] and
+        (__ \ CodeFieldName).write[ErrorCode]
+    )(unlift(InvalidOfficeError.unapply))
+
+  lazy val basePresentationErrorWrites: OWrites[PresentationError] =
     (
       (__ \ MessageFieldName).write[String] and
         (__ \ CodeFieldName).write[ErrorCode]
@@ -80,7 +97,8 @@ sealed abstract class PresentationError extends Product with Serializable {
   def code: ErrorCode
 }
 
-case class StandardError(message: String, code: ErrorCode) extends PresentationError
+case class StandardError(message: String, code: ErrorCode)                                     extends PresentationError
+case class InvalidOfficeError(message: String, office: String, field: String, code: ErrorCode) extends PresentationError
 
 case class UpstreamServiceError(
   message: String = "Internal server error",

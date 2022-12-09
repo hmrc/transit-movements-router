@@ -23,6 +23,7 @@ import uk.gov.hmrc.transitmovementsrouter.models.MessageId
 import uk.gov.hmrc.transitmovementsrouter.models.MessageSender
 import uk.gov.hmrc.transitmovementsrouter.models.MessageType
 import uk.gov.hmrc.transitmovementsrouter.models.MovementId
+import uk.gov.hmrc.transitmovementsrouter.models.RequestMessageType
 
 import java.time.Instant
 import java.time.OffsetDateTime
@@ -58,6 +59,9 @@ trait ModelGenerators extends BaseGenerators {
 
   implicit lazy val arbitraryMessageType: Arbitrary[MessageType] =
     Arbitrary(Gen.oneOf(MessageType.values))
+
+  implicit lazy val arbitraryRequestMessageType: Arbitrary[RequestMessageType] =
+    Arbitrary(Gen.oneOf(MessageType.requestValues))
 
   // Restricts the date times to the range of positive long numbers to avoid overflows.
   implicit lazy val arbitraryOffsetDateTime: Arbitrary[OffsetDateTime] =

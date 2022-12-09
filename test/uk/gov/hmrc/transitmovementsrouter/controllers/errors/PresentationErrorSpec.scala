@@ -16,13 +16,16 @@
 
 package uk.gov.hmrc.transitmovementsrouter.controllers.errors
 
+import org.scalacheck.Gen
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
 import org.scalatestplus.mockito.MockitoSugar
+import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 import play.api.libs.json.Json
 import uk.gov.hmrc.http.UpstreamErrorResponse
+import uk.gov.hmrc.transitmovementsrouter.models.CustomsOffice
 
-class PresentationErrorSpec extends AnyFreeSpec with Matchers with MockitoSugar {
+class PresentationErrorSpec extends AnyFreeSpec with Matchers with MockitoSugar with ScalaCheckDrivenPropertyChecks {
 
   "Test Json is as expected" - {
     def testStandard(function: String => PresentationError, message: String, code: String) = {
@@ -39,6 +42,14 @@ class PresentationErrorSpec extends AnyFreeSpec with Matchers with MockitoSugar 
     "for NotFound" in testStandard(PresentationError.notFoundError, "not found", "NOT_FOUND")
 
     "for NotImplemented" in testStandard(PresentationError.notImplemented, "Not Implemented", "NOT_IMPLEMENTED")
+
+    "for InvalidOffice" in forAll(Gen.alphaNumStr, Gen.alphaStr) {
+      (office, field) =>
+        val error  = PresentationError.invalidOfficeError("Invalid Office", CustomsOffice(office), field)
+        val result = Json.toJson(error)
+
+        result mustBe Json.obj("message" -> "Invalid Office", "office" -> office, "field" -> field, "code" -> "INVALID_OFFICE")
+    }
 
     Seq(Some(new IllegalStateException("message")), None).foreach {
       exception =>

@@ -41,12 +41,12 @@ trait ConvertError {
   implicit val routingErrorConverter = new Converter[RoutingError] {
 
     def convert(routingError: RoutingError): PresentationError = routingError match {
-      case Upstream(upstreamErrorResponse) => PresentationError.internalServiceError(cause = Some(upstreamErrorResponse.getCause))
-      case Unexpected(_, cause)            => PresentationError.internalServiceError(cause = cause)
-      case NoElementFound(element)         => PresentationError.badRequestError(s"Element $element not found")
-      case TooManyElementsFound(element)   => PresentationError.badRequestError(s"Found too many elements of type $element")
-      case BadDateTime(element, ex)        => PresentationError.badRequestError(s"Could not parse datetime for $element: ${ex.getMessage}")
-      case UnrecognisedOffice(message)     => PresentationError.badRequestError(message)
+      case Upstream(upstreamErrorResponse)            => PresentationError.internalServiceError(cause = Some(upstreamErrorResponse.getCause))
+      case Unexpected(_, cause)                       => PresentationError.internalServiceError(cause = cause)
+      case NoElementFound(element)                    => PresentationError.badRequestError(s"Element $element not found")
+      case TooManyElementsFound(element)              => PresentationError.badRequestError(s"Found too many elements of type $element")
+      case BadDateTime(element, ex)                   => PresentationError.badRequestError(s"Could not parse datetime for $element: ${ex.getMessage}")
+      case UnrecognisedOffice(message, office, field) => PresentationError.invalidOfficeError(message, office, field)
     }
 
   }
