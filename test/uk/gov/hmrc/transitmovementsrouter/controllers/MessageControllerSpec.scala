@@ -22,11 +22,13 @@ import cats.data.EitherT
 import org.mockito.ArgumentMatchers.any
 import org.mockito.MockitoSugar.reset
 import org.mockito.MockitoSugar.when
+import org.scalacheck.Gen
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers.convertToAnyMustWrapper
 import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.mockito.MockitoSugar.mock
+import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 import play.api.http.DefaultHttpErrorHandler
 import play.api.http.HttpErrorConfig
 import play.api.http.Status._
@@ -64,13 +66,14 @@ import uk.gov.hmrc.transitmovementsrouter.services.RoutingService
 import uk.gov.hmrc.transitmovementsrouter.services.StreamingMessageTrimmer
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
 import play.api.libs.Files.SingletonTemporaryFileCreator
+import uk.gov.hmrc.transitmovementsrouter.models.CustomsOffice
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.xml.NodeSeq
 
-class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSystem with BeforeAndAfterEach {
+class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSystem with BeforeAndAfterEach with ScalaCheckDrivenPropertyChecks {
 
   val eori         = EoriNumber("eori")
   val movementType = MovementType("departures")
@@ -154,6 +157,33 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
       val result = controller().outgoing(eori, movementType, movementId, messageId)(fakeRequest(cc015cOfficeOfDepartureGB, outgoing, messageTypeHeader))
 
       status(result) mustBe ACCEPTED
+    }
+
+    "must return INVALID_OFFICE when the routing cannot determine where to send a message to" - {
+
+      "returns message to indicate invalid office" in forAll(Gen.alphaNumStr, Gen.alphaStr) {
+        (office, field) =>
+          when(
+            mockRoutingService.submitMessage(
+              any[String].asInstanceOf[MovementType],
+              any[String].asInstanceOf[MovementId],
+              any[String].asInstanceOf[MessageId],
+              any[RequestMessageType],
+              any[Source[ByteString, _]]
+            )(any[HeaderCarrier], any[ExecutionContext])
+          ).thenReturn(EitherT[Future, RoutingError, Unit](Future.successful(Left(RoutingError.UnrecognisedOffice("office", CustomsOffice(office), field)))))
+
+          val result = controller().outgoing(eori, movementType, movementId, messageId)(fakeRequest(cc015cOfficeOfDepartureGB, outgoing, messageTypeHeader))
+
+          status(result) mustBe BAD_REQUEST
+          contentAsJson(result) mustBe Json.obj(
+            "code"    -> "INVALID_OFFICE",
+            "message" -> "office",
+            "office"  -> office,
+            "field"   -> field
+          )
+      }
+
     }
 
     "must return BAD_REQUEST when declaration submission fails" - {

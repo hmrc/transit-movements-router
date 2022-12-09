@@ -32,6 +32,7 @@ import uk.gov.hmrc.transitmovementsrouter.connectors.EISConnectorProvider
 import uk.gov.hmrc.transitmovementsrouter.models._
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
 import cats.data.EitherT
+import uk.gov.hmrc.transitmovementsrouter.connectors.EISConnector
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
@@ -54,17 +55,19 @@ class RoutingServiceImpl @Inject() (messageConnectorProvider: EISConnectorProvid
     with XmlParsingServiceHelpers
     with Logging {
 
-  val office = Sink.head[ParseResult[CustomsOffice]]
+  private val connectorSinkShape = Sink.head[ParseResult[EISConnector]]
 
-  private def officeSink(messageType: RequestMessageType): Sink[ByteString, Future[ParseResult[CustomsOffice]]] = Sink.fromGraph(
-    GraphDSL.createGraph(office) {
+  private def officeExtractor(messageType: RequestMessageType): Sink[ByteString, Future[ParseResult[EISConnector]]] = Sink.fromGraph(
+    GraphDSL.createGraph(connectorSinkShape) {
       implicit builder => officeShape =>
         import GraphDSL.Implicits._
 
         val xmlParsing: FlowShape[ByteString, ParseEvent] = builder.add(XmlParsing.parser)
         val customsOffice: FlowShape[ParseEvent, ParseResult[CustomsOffice]] =
           builder.add(XmlParser.customsOfficeExtractor(messageType))
-        xmlParsing ~> customsOffice ~> officeShape
+        val validateOffice: FlowShape[ParseResult[CustomsOffice], ParseResult[EISConnector]] =
+          builder.add(Flow.fromFunction(selectConnector(_, messageType)))
+        xmlParsing ~> customsOffice ~> validateOffice ~> officeShape
 
         SinkShape(xmlParsing.in)
     }
@@ -91,30 +94,20 @@ class RoutingServiceImpl @Inject() (messageConnectorProvider: EISConnectorProvid
     messageId: MessageId,
     messageType: RequestMessageType,
     payload: Source[ByteString, _]
-  )(implicit hc: HeaderCarrier, ec: ExecutionContext): EitherT[Future, RoutingError, Unit] = {
+  )(implicit hc: HeaderCarrier, ec: ExecutionContext): EitherT[Future, RoutingError, Unit] =
+    for {
+      connector <- EitherT[Future, RoutingError, EISConnector](payload.runWith(officeExtractor(messageType)))
+      messageSender  = MessageSender(movementId, messageId)
+      updatedPayload = payload.via(buildMessage(messageType, messageSender))
+      _ <- EitherT(connector.post(messageSender, updatedPayload, hc))
+    } yield ()
 
-    val materializedResult      = payload.runWith(officeSink(messageType))
-    implicit val messageSender  = MessageSender(movementId, messageId)
-    implicit val updatedPayload = payload.via(buildMessage(messageType, messageSender))
-
-    val maybeACustomsOffice = {
-      materializedResult flatMap {
-        case Right(customsOffice) => postToEis(customsOffice)
-        case Left(routingError)   => Future.successful(Left(routingError))
-      }
+  def selectConnector(maybeOffice: ParseResult[CustomsOffice], messageType: RequestMessageType): ParseResult[EISConnector] =
+    maybeOffice.flatMap {
+      office =>
+        if (office.isGB) Right(messageConnectorProvider.gb)
+        else if (office.isXI) Right(messageConnectorProvider.xi)
+        else Left(RoutingError.UnrecognisedOffice(s"Did not recognise office: ${office.value}", office, messageType.officeNode))
     }
 
-    EitherT(maybeACustomsOffice)
-  }
-
-  private def postToEis(
-    office: CustomsOffice
-  )(implicit messageSender: MessageSender, body: Source[ByteString, _], hc: HeaderCarrier): Future[Either[RoutingError, Unit]] =
-    if (office.isGB) {
-      messageConnectorProvider.gb.post(messageSender, body, hc)
-    } else if (office.isXI) {
-      messageConnectorProvider.xi.post(messageSender, body, hc)
-    } else {
-      Future.successful(Left(RoutingError.UnrecognisedOffice(s"Did not recognise office: ${office.value}", office)))
-    }
 }

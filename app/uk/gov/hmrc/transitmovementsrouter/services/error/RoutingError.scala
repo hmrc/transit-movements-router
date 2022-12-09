@@ -22,12 +22,12 @@ import uk.gov.hmrc.transitmovementsrouter.models.CustomsOffice
 import java.time.format.DateTimeParseException
 
 object RoutingError {
-  case class Upstream(upstreamErrorResponse: UpstreamErrorResponse)          extends RoutingError
-  case class Unexpected(message: String, cause: Option[Throwable])           extends RoutingError
-  case class NoElementFound(element: String)                                 extends RoutingError
-  case class TooManyElementsFound(element: String)                           extends RoutingError
-  case class BadDateTime(element: String, exception: DateTimeParseException) extends RoutingError
-  case class UnrecognisedOffice(message: String, office: CustomsOffice)      extends RoutingError
+  case class Upstream(upstreamErrorResponse: UpstreamErrorResponse)                    extends RoutingError
+  case class Unexpected(message: String, cause: Option[Throwable])                     extends RoutingError
+  case class NoElementFound(element: String)                                           extends RoutingError
+  case class TooManyElementsFound(element: String)                                     extends RoutingError
+  case class BadDateTime(element: String, exception: DateTimeParseException)           extends RoutingError
+  case class UnrecognisedOffice(message: String, office: CustomsOffice, field: String) extends RoutingError
 }
 
 sealed trait RoutingError

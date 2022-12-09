@@ -37,8 +37,8 @@ object PresentationError extends CommonFormats {
   def badRequestError(message: String): PresentationError =
     StandardError(message, ErrorCode.BadRequest)
 
-  def invalidOfficeError(message: String, customsOffice: CustomsOffice): PresentationError =
-    InvalidOfficeError(message, customsOffice.value, ErrorCode.InvalidOffice)
+  def invalidOfficeError(message: String, customsOffice: CustomsOffice, field: String): PresentationError =
+    InvalidOfficeError(message, customsOffice.value, field, ErrorCode.InvalidOffice)
 
   def notFoundError(message: String): PresentationError =
     StandardError(message, ErrorCode.NotFound)
@@ -74,6 +74,7 @@ object PresentationError extends CommonFormats {
     (
       (__ \ MessageFieldName).write[String] and
         (__ \ "office").write[String] and
+        (__ \ "field").write[String] and
         (__ \ CodeFieldName).write[ErrorCode]
     )(unlift(InvalidOfficeError.unapply))
 
@@ -96,8 +97,8 @@ sealed abstract class PresentationError extends Product with Serializable {
   def code: ErrorCode
 }
 
-case class StandardError(message: String, code: ErrorCode)                      extends PresentationError
-case class InvalidOfficeError(message: String, office: String, code: ErrorCode) extends PresentationError
+case class StandardError(message: String, code: ErrorCode)                                     extends PresentationError
+case class InvalidOfficeError(message: String, office: String, field: String, code: ErrorCode) extends PresentationError
 
 case class UpstreamServiceError(
   message: String = "Internal server error",

@@ -82,8 +82,8 @@ class StreamingParsersSpec extends AnyFreeSpec with Matchers with TestActorSyste
     def resultStream: Action[Source[ByteString, _]] = Action.andThen(TestActionBuilder).stream {
       request =>
         (for {
-          a <- request.body.runWith(Sink.head)
-          b <- request.body.runWith(Sink.head)
+          a <- request.body.runWith(Sink.last)
+          b <- request.body.runWith(Sink.last)
         } yield (a ++ b).utf8String)
           .map(
             r => Ok(r)
