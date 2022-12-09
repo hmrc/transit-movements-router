@@ -21,6 +21,7 @@ import org.scalatest.matchers.must.Matchers
 import org.scalatestplus.mockito.MockitoSugar
 import play.api.libs.json.Json
 import uk.gov.hmrc.http.UpstreamErrorResponse
+import uk.gov.hmrc.transitmovementsrouter.models.CustomsOffice
 
 class PresentationErrorSpec extends AnyFreeSpec with Matchers with MockitoSugar {
 
@@ -39,6 +40,13 @@ class PresentationErrorSpec extends AnyFreeSpec with Matchers with MockitoSugar 
     "for NotFound" in testStandard(PresentationError.notFoundError, "not found", "NOT_FOUND")
 
     "for NotImplemented" in testStandard(PresentationError.notImplemented, "Not Implemented", "NOT_IMPLEMENTED")
+
+    "for InvalidOffice" in {
+      val error  = PresentationError.invalidOfficeError("Invalid Office", CustomsOffice("abc"))
+      val result = Json.toJson(error)
+
+      result mustBe Json.obj("message" -> "Invalid Office", "office" -> "abc", "code" -> "INVALID_OFFICE")
+    }
 
     Seq(Some(new IllegalStateException("message")), None).foreach {
       exception =>

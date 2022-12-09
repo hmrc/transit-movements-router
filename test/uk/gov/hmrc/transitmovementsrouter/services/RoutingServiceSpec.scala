@@ -185,7 +185,9 @@ class RoutingServiceSpec
             )(hc, ec)
 
             whenReady(response.value, Timeout(2 seconds)) {
-              _.mustBe(Left(RoutingError.UnrecognisedOffice(s"Did not recognise office: ${officeOfDestinationXML._2}")))
+              _.mustBe(
+                Left(RoutingError.UnrecognisedOffice(s"Did not recognise office: ${officeOfDestinationXML._2}", CustomsOffice(officeOfDestinationXML._2)))
+              )
             }
         }
 

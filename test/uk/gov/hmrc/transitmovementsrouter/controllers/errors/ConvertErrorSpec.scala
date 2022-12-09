@@ -23,12 +23,14 @@ import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
 import org.scalatestplus.mockito.MockitoSugar
 import uk.gov.hmrc.http.UpstreamErrorResponse
+import uk.gov.hmrc.transitmovementsrouter.models.CustomsOffice
 import uk.gov.hmrc.transitmovementsrouter.models.MovementId
 import uk.gov.hmrc.transitmovementsrouter.models.errors.HeaderExtractError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PushNotificationError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.ErrorCode.BadRequest
 import uk.gov.hmrc.transitmovementsrouter.models.errors.ErrorCode.InternalServerError
+import uk.gov.hmrc.transitmovementsrouter.models.errors.ErrorCode.InvalidOffice
 import uk.gov.hmrc.transitmovementsrouter.models.errors.ErrorCode.NotFound
 import uk.gov.hmrc.transitmovementsrouter.models.errors.HeaderExtractError.InvalidMessageType
 import uk.gov.hmrc.transitmovementsrouter.models.errors.HeaderExtractError.NoHeaderFound
@@ -66,9 +68,9 @@ class ConvertErrorSpec extends AnyFreeSpec with Matchers with OptionValues with 
     }
 
     "for a validation error return UnrecognisedOffice" in {
-      val input = Left[RoutingError, Unit](UnrecognisedOffice("Did not recognise office:AB123456")).toEitherT[Future]
+      val input = Left[RoutingError, Unit](UnrecognisedOffice("Did not recognise office:AB123456", CustomsOffice("AB123456"))).toEitherT[Future]
       whenReady(input.asPresentation.value) {
-        _ mustBe Left(StandardError("Did not recognise office:AB123456", BadRequest))
+        _ mustBe Left(InvalidOfficeError("Did not recognise office:AB123456", "AB123456", InvalidOffice))
       }
     }
 

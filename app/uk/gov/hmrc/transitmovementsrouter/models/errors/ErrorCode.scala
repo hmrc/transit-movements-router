@@ -35,6 +35,7 @@ sealed abstract class ErrorCode(val code: String, val statusCode: Int) extends P
 
 object ErrorCode {
   case object BadRequest           extends ErrorCode("BAD_REQUEST", BAD_REQUEST)
+  case object InvalidOffice        extends ErrorCode("INVALID_OFFICE", BAD_REQUEST)
   case object NotFound             extends ErrorCode("NOT_FOUND", NOT_FOUND)
   case object Forbidden            extends ErrorCode("FORBIDDEN", FORBIDDEN)
   case object InternalServerError  extends ErrorCode("INTERNAL_SERVER_ERROR", INTERNAL_SERVER_ERROR)
@@ -47,6 +48,7 @@ object ErrorCode {
 
   lazy val errorCodes: Seq[ErrorCode] = Seq(
     BadRequest,
+    InvalidOffice,
     NotFound,
     Forbidden,
     InternalServerError,

@@ -115,6 +115,6 @@ class RoutingServiceImpl @Inject() (messageConnectorProvider: EISConnectorProvid
     } else if (office.isXI) {
       messageConnectorProvider.xi.post(messageSender, body, hc)
     } else {
-      Future.successful(Left(RoutingError.UnrecognisedOffice(s"Did not recognise office: ${office.value}")))
+      Future.successful(Left(RoutingError.UnrecognisedOffice(s"Did not recognise office: ${office.value}", office)))
     }
 }
