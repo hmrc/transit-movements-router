@@ -57,17 +57,17 @@ class RoutingServiceImpl @Inject() (messageConnectorProvider: EISConnectorProvid
 
   private val connectorSinkShape = Sink.head[ParseResult[EISConnector]]
 
-  private def officeExtractor(messageType: RequestMessageType): Sink[ByteString, Future[ParseResult[EISConnector]]] = Sink.fromGraph(
+  private def eisConnectorSelector(messageType: RequestMessageType): Sink[ByteString, Future[ParseResult[EISConnector]]] = Sink.fromGraph(
     GraphDSL.createGraph(connectorSinkShape) {
-      implicit builder => officeShape =>
+      implicit builder => sink =>
         import GraphDSL.Implicits._
 
         val xmlParsing: FlowShape[ByteString, ParseEvent] = builder.add(XmlParsing.parser)
-        val customsOffice: FlowShape[ParseEvent, ParseResult[CustomsOffice]] =
+        val customsOfficeSelector: FlowShape[ParseEvent, ParseResult[CustomsOffice]] =
           builder.add(XmlParser.customsOfficeExtractor(messageType))
-        val validateOffice: FlowShape[ParseResult[CustomsOffice], ParseResult[EISConnector]] =
+        val eisConnectorSelector: FlowShape[ParseResult[CustomsOffice], ParseResult[EISConnector]] =
           builder.add(Flow.fromFunction(selectConnector(_, messageType)))
-        xmlParsing ~> customsOffice ~> validateOffice ~> officeShape
+        xmlParsing ~> customsOfficeSelector ~> eisConnectorSelector ~> sink
 
         SinkShape(xmlParsing.in)
     }
@@ -96,7 +96,7 @@ class RoutingServiceImpl @Inject() (messageConnectorProvider: EISConnectorProvid
     payload: Source[ByteString, _]
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): EitherT[Future, RoutingError, Unit] =
     for {
-      connector <- EitherT[Future, RoutingError, EISConnector](payload.runWith(officeExtractor(messageType)))
+      connector <- EitherT[Future, RoutingError, EISConnector](payload.runWith(eisConnectorSelector(messageType)))
       messageSender  = MessageSender(movementId, messageId)
       updatedPayload = payload.via(buildMessage(messageType, messageSender))
       _ <- EitherT(connector.post(messageSender, updatedPayload, hc))
