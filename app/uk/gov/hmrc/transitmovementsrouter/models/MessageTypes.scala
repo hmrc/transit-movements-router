@@ -173,8 +173,7 @@ object MessageType {
 
   val arrivalRequestValues = Set(
     ArrivalNotification,
-    UnloadingRemarks,
-    InformationAboutNonArrivedMovement
+    UnloadingRemarks
   )
 
   // ****************
