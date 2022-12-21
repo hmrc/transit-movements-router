@@ -34,7 +34,7 @@ sealed trait ResponseMessageType extends MessageType
 sealed abstract class DepartureRequestMessageType(
   val code: String,
   val rootNode: String,
-  override val officeNode: String = "CustomsOfficeOfDeparture"
+  val officeNode: String = "CustomsOfficeOfDeparture"
 ) extends RequestMessageType
     with DepartureMessageType
 
@@ -82,12 +82,15 @@ object MessageType {
   /** E_PRE_NOT (IE170) */
   case object PresentationNotification extends DepartureRequestMessageType("IE170", "CC170C")
 
+  case object InformationAboutNonArrivedMovement extends DepartureRequestMessageType("IE141", "CC141C", "CustomsOfficeOfEnquiryAtDeparture")
+
   val departureRequestValues = Set(
     DeclarationAmendment,
     DeclarationInvalidation,
     DeclarationData,
     RequestOfRelease,
-    PresentationNotification
+    PresentationNotification,
+    InformationAboutNonArrivedMovement
   )
 
   // ********************
@@ -136,6 +139,8 @@ object MessageType {
   /** E_REC_NOT (IE035) */
   case object RecoveryNotification extends DepartureResponseMessageType("IE035", "CC035C")
 
+  case object RequestOnNonArrivedMovement extends DepartureResponseMessageType("IE140", "CC140C")
+
   val departureResponseValues = Set(
     AmendmentAcceptance,
     DepartureOfficeRejection,
@@ -150,7 +155,8 @@ object MessageType {
     ControlDecisionNotification,
     NotificationToAmend,
     IncidentNotification,
-    RecoveryNotification
+    RecoveryNotification,
+    RequestOnNonArrivedMovement
   )
 
   val departureValues = departureRequestValues ++ departureResponseValues
@@ -165,12 +171,9 @@ object MessageType {
   /** E_PRE_NOT (IE170) */
   case object UnloadingRemarks extends ArrivalRequestMessageType("IE044", "CC044C")
 
-  case object InformationAboutNonArrivedMovement extends ArrivalRequestMessageType("IE141", "CC141C")
-
   val arrivalRequestValues = Set(
     ArrivalNotification,
-    UnloadingRemarks,
-    InformationAboutNonArrivedMovement
+    UnloadingRemarks
   )
 
   // ****************
@@ -186,13 +189,10 @@ object MessageType {
   /** E_ULD_PER (IE025) */
   case object UnloadingPermission extends ArrivalResponseMessageType("IE043", "CC043C")
 
-  case object RequestOnNonArrivedMovement extends ArrivalResponseMessageType("IE140", "CC140C")
-
   val arrivalResponseValues = Set(
     DestinationOfficeRejection,
     GoodsReleaseNotification,
-    UnloadingPermission,
-    RequestOnNonArrivedMovement
+    UnloadingPermission
   )
 
   val arrivalValues = arrivalRequestValues ++ arrivalResponseValues
