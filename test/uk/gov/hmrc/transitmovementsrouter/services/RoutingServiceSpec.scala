@@ -64,7 +64,7 @@ class RoutingServiceSpec
         s"${messageType.code} should generate a valid departure office and updated payload for a GB payload" in forAll(
           arbitrary[MessageId],
           arbitrary[MovementId],
-          messageOfficeOfDeparture(messageType.rootNode, "GB")
+          messageWithDepartureOfficeNode(messageType, "GB")
         ) {
           (messageId, movementId, officeOfDepartureXML) =>
             val serviceUnderTest = new RoutingServiceImpl(mockMessageConnectorProvider)
@@ -85,7 +85,7 @@ class RoutingServiceSpec
         s"${messageType.code} should generate a valid departure office and updated payload for a Xi payload" in forAll(
           arbitrary[MessageId],
           arbitrary[MovementId],
-          messageOfficeOfDeparture(messageType.rootNode, "XI")
+          messageWithDepartureOfficeNode(messageType, "XI")
         ) {
           (messageId, movementId, officeOfDepartureXML) =>
             val serviceUnderTest = new RoutingServiceImpl(mockMessageConnectorProvider)
@@ -106,7 +106,7 @@ class RoutingServiceSpec
         s"${messageType.code} should generate an invalid office of destination for a non GB/XI payload" in forAll(
           arbitrary[MessageId],
           arbitrary[MovementId],
-          messageOfficeOfDeparture(messageType.rootNode, "FR")
+          messageWithDepartureOfficeNode(messageType, "FR")
         ) {
           (messageId, movementId, officeOfDeparture) =>
             val serviceUnderTest = new RoutingServiceImpl(mockMessageConnectorProvider)
@@ -122,7 +122,7 @@ class RoutingServiceSpec
 
             whenReady(response.value, Timeout(2 seconds)) {
               _.mustBe(
-                Left(RoutingError.UnrecognisedOffice(s"Did not recognise office: $referenceNumber", CustomsOffice(referenceNumber), "CustomsOfficeOfDeparture"))
+                Left(RoutingError.UnrecognisedOffice(s"Did not recognise office: $referenceNumber", CustomsOffice(referenceNumber), messageType.officeNode))
               )
             }
         }
@@ -153,7 +153,7 @@ class RoutingServiceSpec
         s"${messageType.code} should generate a valid office of destination and updated payload for a GB payload" in forAll(
           arbitrary[MessageId],
           arbitrary[MovementId],
-          messageOfficeOfDestinationActual(messageType.rootNode, "GB")
+          messageWithDestinationOfficeNode(messageType, "GB")
         ) {
           (messageId, movementId, officeOfDestinationXML) =>
             val serviceUnderTest = new RoutingServiceImpl(mockMessageConnectorProvider)
@@ -174,7 +174,7 @@ class RoutingServiceSpec
         s"${messageType.code} should generate a valid office of destination and updated payload for a XI payload" in forAll(
           arbitrary[MessageId],
           arbitrary[MovementId],
-          messageOfficeOfDestinationActual(messageType.rootNode, "XI")
+          messageWithDestinationOfficeNode(messageType, "XI")
         ) {
           (messageId, movementId, officeOfDestinationXML) =>
             val serviceUnderTest = new RoutingServiceImpl(mockMessageConnectorProvider)
@@ -192,7 +192,7 @@ class RoutingServiceSpec
             }
         }
 
-        val officeOfDestinationXML = messageOfficeOfDestinationActual(messageType.rootNode, "FR").sample.value
+        val officeOfDestinationXML = messageWithDestinationOfficeNode(messageType, "FR").sample.value
 
         s"${messageType.code} should generate an invalid office of destination for a non GB/XI payload" in forAll(
           arbitrary[MessageId],
@@ -216,7 +216,7 @@ class RoutingServiceSpec
                   RoutingError.UnrecognisedOffice(
                     s"Did not recognise office: ${officeOfDestinationXML._2}",
                     CustomsOffice(officeOfDestinationXML._2),
-                    "CustomsOfficeOfDestinationActual"
+                    messageType.officeNode
                   )
                 )
               )
@@ -237,26 +237,29 @@ class RoutingServiceSpec
       override def gb: EISConnector = mockGbEISConnector
       override def xi: EISConnector = mockXiEISConnector
     }
+
     val sut = new RoutingServiceImpl(provider)
 
-    "GB returns the GB EIS connector" in forAll(createReferenceNumberWithPrefix("GB"), arbitrary[RequestMessageType]) {
+    val requestMessageTypes = Gen.oneOf(MessageType.departureRequestValues ++ MessageType.arrivalRequestValues)
+
+    "GB returns the GB EIS connector" in forAll(createReferenceNumberWithPrefix("GB"), requestMessageTypes) {
       (office, messageType) =>
         sut.selectConnector(Right(CustomsOffice(office)), messageType) mustBe Right(mockGbEISConnector)
     }
 
-    "XI returns the XI EIS connector" in forAll(createReferenceNumberWithPrefix("XI"), arbitrary[RequestMessageType]) {
+    "XI returns the XI EIS connector" in forAll(createReferenceNumberWithPrefix("XI"), requestMessageTypes) {
       (office, messageType) =>
         sut.selectConnector(Right(CustomsOffice(office)), messageType) mustBe Right(mockXiEISConnector)
     }
 
-    "Other offices returns a RoutingError" in forAll(createReferenceNumberWithPrefix("FR"), arbitrary[RequestMessageType]) {
+    "Other offices returns a RoutingError" in forAll(createReferenceNumberWithPrefix("FR"), requestMessageTypes) {
       (office, messageType) =>
         sut.selectConnector(Right(CustomsOffice(office)), messageType) mustBe Left(
           RoutingError.UnrecognisedOffice(s"Did not recognise office: $office", CustomsOffice(office), messageType.officeNode)
         )
     }
 
-    "Pre-existing error must be preserved" in forAll(arbitrary[RequestMessageType]) {
+    "Pre-existing error must be preserved" in forAll(requestMessageTypes) {
       messageType =>
         val error = RoutingError.Unexpected("error", Some(new IllegalStateException()))
         sut.selectConnector(Left(error), messageType) mustBe Left(error)
@@ -284,26 +287,25 @@ class RoutingServiceSpec
     )
       .thenReturn(Future.successful(Right(())))
 
-    def messageOfficeOfDeparture(messageTypeNode: String, referenceType: String): Gen[(String, String)] =
+    def messageWithDepartureOfficeNode(messageType: RequestMessageType, referenceType: String): Gen[(String, String)] =
       for {
         dateTime        <- arbitrary[OffsetDateTime].map(_.toLocalDateTime.truncatedTo(ChronoUnit.SECONDS).format(DateTimeFormatter.ISO_LOCAL_DATE))
         referenceNumber <- createReferenceNumberWithPrefix(referenceType)
       } yield (
-        s"<$messageTypeNode><preparationDateAndTime>$dateTime</preparationDateAndTime><CustomsOfficeOfDeparture><referenceNumber>$referenceNumber</referenceNumber></CustomsOfficeOfDeparture></$messageTypeNode>",
+        s"<${messageType.rootNode}><preparationDateAndTime>$dateTime</preparationDateAndTime><${messageType.officeNode}><referenceNumber>$referenceNumber</referenceNumber></${messageType.officeNode}></${messageType.rootNode}>",
         referenceNumber
       )
 
-    def messageOfficeOfDestinationActual(messageTypeNode: String, referenceType: String): Gen[(String, String)] =
+    def messageWithDestinationOfficeNode(messageType: RequestMessageType, referenceType: String): Gen[(String, String)] =
       for {
-        dateTime        <- arbitrary[OffsetDateTime].map(_.toLocalDateTime.truncatedTo(ChronoUnit.SECONDS).format(DateTimeFormatter.ISO_LOCAL_DATE))
         referenceNumber <- createReferenceNumberWithPrefix(referenceType)
       } yield (
-        s"""<$messageTypeNode>
-                           |<messageType>$messageTypeNode</messageType>
-                           |<CustomsOfficeOfDestinationActual>
+        s"""<${messageType.rootNode}>
+                           |<messageType>${messageType.code}</messageType>
+                           |<${messageType.officeNode}>
                            |  <referenceNumber>$referenceNumber</referenceNumber>
-                           |</CustomsOfficeOfDestinationActual>
-                           |</$messageTypeNode>""".stripMargin,
+                           |</${messageType.officeNode}>
+                           |</${messageType.rootNode}>""".stripMargin,
         referenceNumber
       )
 
