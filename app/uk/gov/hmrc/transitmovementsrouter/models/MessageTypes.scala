@@ -47,7 +47,7 @@ sealed abstract class DepartureResponseMessageType(
 sealed abstract class ArrivalRequestMessageType(
   val code: String,
   val rootNode: String,
-  val officeNode: String = "CustomsOfficeOfDestinationActual"
+  override val officeNode: String = "CustomsOfficeOfDestinationActual"
 ) extends RequestMessageType
     with ArrivalMessageType
 
