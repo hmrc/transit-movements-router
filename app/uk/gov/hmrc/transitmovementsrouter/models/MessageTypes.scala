@@ -47,7 +47,7 @@ sealed abstract class DepartureResponseMessageType(
 sealed abstract class ArrivalRequestMessageType(
   val code: String,
   val rootNode: String,
-  val officeNode: String = "CustomsOfficeOfDestinationActual"
+  override val officeNode: String = "CustomsOfficeOfDestinationActual"
 ) extends RequestMessageType
     with ArrivalMessageType
 
@@ -165,7 +165,7 @@ object MessageType {
   /** E_PRE_NOT (IE170) */
   case object UnloadingRemarks extends ArrivalRequestMessageType("IE044", "CC044C")
 
-  case object InformationAboutNonArrivedMovement extends ArrivalRequestMessageType("IE141", "CC141C", "CustomsOfficeOfEnquiryAtDeparture")
+  case object InformationAboutNonArrivedMovement extends ArrivalRequestMessageType("IE141", "CC141C")
 
   val arrivalRequestValues = Set(
     ArrivalNotification,
