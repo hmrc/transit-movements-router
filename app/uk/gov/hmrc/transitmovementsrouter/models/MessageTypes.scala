@@ -34,7 +34,7 @@ sealed trait ResponseMessageType extends MessageType
 sealed abstract class DepartureRequestMessageType(
   val code: String,
   val rootNode: String,
-  override val officeNode: String = "CustomsOfficeOfDeparture"
+  val officeNode: String = "CustomsOfficeOfDeparture"
 ) extends RequestMessageType
     with DepartureMessageType
 
@@ -82,7 +82,7 @@ object MessageType {
   /** E_PRE_NOT (IE170) */
   case object PresentationNotification extends DepartureRequestMessageType("IE170", "CC170C")
 
-  case object InformationAboutNonArrivedMovement extends DepartureRequestMessageType("IE141", "CC141C")
+  case object InformationAboutNonArrivedMovement extends DepartureRequestMessageType("IE141", "CC141C", "CustomsOfficeOfEnquiryAtDeparture")
 
   val departureRequestValues = Set(
     DeclarationAmendment,
