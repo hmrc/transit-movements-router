@@ -131,7 +131,7 @@ class PushNotificationConnectorSpec
       whenReady(connector.post(movementId, messageId, failingSource).value) {
         res =>
           res mustBe a[Left[Unexpected, _]]
-          res.left.get.asInstanceOf[Unexpected].exception.isDefined
+          res.left.toOption.get.asInstanceOf[Unexpected].exception.isDefined
       }
     }
 

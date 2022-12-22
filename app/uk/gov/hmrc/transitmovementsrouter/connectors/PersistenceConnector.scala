@@ -76,7 +76,7 @@ class PersistenceConnectorImpl @Inject() (httpClientV2: HttpClientV2, appConfig:
       val url = baseUrl.withPath(persistenceSendMessage(movementId, messageId))
       httpClientV2
         .post(url"$url")
-        .addHeaders(HeaderNames.CONTENT_TYPE -> MimeTypes.XML, "X-Message-Type" -> messageType.code)
+        .transform(_.addHttpHeaders(HeaderNames.CONTENT_TYPE -> MimeTypes.XML, "X-Message-Type" -> messageType.code))
         .withBody(source)
         .execute[Either[UpstreamErrorResponse, HttpResponse]]
         .map {
