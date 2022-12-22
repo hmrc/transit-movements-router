@@ -8,7 +8,7 @@ object AppDependencies {
 
   private val catsVersion         = "2.7.0"
   private val catsRetryVersion    = "3.1.0"
-  private val boostrapPlayVersion = "6.2.0"
+  private val boostrapPlayVersion = "7.12.0"
 
   val compile = Seq(
     "uk.gov.hmrc"        %% "bootstrap-backend-play-28" % boostrapPlayVersion,
