@@ -40,7 +40,7 @@ class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers with 
       val parsedResult = stream.via(XmlParser.messageSenderExtractor).runWith(Sink.head)
 
       whenReady(parsedResult) {
-        _.right.get mustBe messageSender
+        _.toOption.get mustBe messageSender
       }
     }
 
@@ -71,7 +71,7 @@ class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers with 
           val parsedResult = stream.via(XmlParser.customsOfficeExtractor(messageType)).runWith(Sink.head)
 
           whenReady(parsedResult) {
-            _.right.get mustBe referenceNumber
+            _.toOption.get mustBe referenceNumber
           }
         }
 
@@ -103,7 +103,7 @@ class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers with 
           val parsedResult = stream.via(XmlParser.customsOfficeExtractor(messageType)).runWith(Sink.head)
 
           whenReady(parsedResult) {
-            _.right.get mustBe referenceNumber
+            _.toOption.get mustBe referenceNumber
           }
         }
 

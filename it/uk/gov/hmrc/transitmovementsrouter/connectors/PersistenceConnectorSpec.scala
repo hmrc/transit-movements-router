@@ -141,7 +141,7 @@ class PersistenceConnectorSpec
       whenReady(connector.post(movementId, messageId, DeclarationAmendment, failingSource).value) {
         res =>
           res mustBe a[Left[Unexpected, _]]
-          res.left.get.asInstanceOf[Unexpected].thr.isDefined
+          res.left.toOption.get.asInstanceOf[Unexpected].thr.isDefined
       }
     }
 

@@ -77,7 +77,7 @@ class RoutingServiceSpec
               payload
             )
 
-            whenReady(response.value, Timeout(2 seconds)) {
+            whenReady(response.value, Timeout(2.seconds)) {
               _.mustBe(Right(()))
             }
         }
@@ -98,7 +98,7 @@ class RoutingServiceSpec
               payload
             )
 
-            whenReady(response.value, Timeout(2 seconds)) {
+            whenReady(response.value, Timeout(2.seconds)) {
               _.mustBe(Right(()))
             }
         }
@@ -120,7 +120,7 @@ class RoutingServiceSpec
               payload
             )
 
-            whenReady(response.value, Timeout(2 seconds)) {
+            whenReady(response.value, Timeout(2.seconds)) {
               _.mustBe(
                 Left(RoutingError.UnrecognisedOffice(s"Did not recognise office: $referenceNumber", CustomsOffice(referenceNumber), messageType.officeNode))
               )
@@ -142,7 +142,7 @@ class RoutingServiceSpec
               payload
             )
 
-            whenReady(response.value, Timeout(2 seconds)) {
+            whenReady(response.value, Timeout(2.seconds)) {
               _.mustBe(Left(NoElementFound("referenceNumber")))
             }
         }
@@ -166,7 +166,7 @@ class RoutingServiceSpec
               payload
             )
 
-            whenReady(response.value, Timeout(2 seconds)) {
+            whenReady(response.value, Timeout(2.seconds)) {
               _.mustBe(Right(()))
             }
         }
@@ -187,7 +187,7 @@ class RoutingServiceSpec
               payload
             )
 
-            whenReady(response.value, Timeout(2 seconds)) {
+            whenReady(response.value, Timeout(2.seconds)) {
               _.mustBe(Right(()))
             }
         }
@@ -210,7 +210,7 @@ class RoutingServiceSpec
               payload
             )
 
-            whenReady(response.value, Timeout(2 seconds)) {
+            whenReady(response.value, Timeout(2.seconds)) {
               _.mustBe(
                 Left(
                   RoutingError.UnrecognisedOffice(

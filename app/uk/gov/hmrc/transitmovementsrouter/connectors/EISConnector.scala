@@ -75,7 +75,7 @@ class EISConnectorImpl(
     result.map(_.isLeft).getOrElse(true)
 
   def onFailure(response: Either[RoutingError, Unit], retryDetails: RetryDetails): Future[Unit] =
-    response.left.get match {
+    response.left.toOption.get match {
       case RoutingError.Upstream(upstreamErrorResponse) => attemptRetry(s"with status code ${upstreamErrorResponse.statusCode}", retryDetails)
       case RoutingError.Unexpected(message, _)          => attemptRetry(s"with error $message", retryDetails)
       case x: RoutingError =>
@@ -117,7 +117,7 @@ class EISConnectorImpl(
         httpClientV2
           .post(url"${eisInstanceConfig.url}")
           .withBody(body)
-          .addHeaders(headerCarrier.headersForUrl(headerCarrierConfig)(eisInstanceConfig.url): _*)
+          .transform(_.addHttpHeaders(headerCarrier.headersForUrl(headerCarrierConfig)(eisInstanceConfig.url): _*))
           .execute[Either[UpstreamErrorResponse, HttpResponse]]
           .map {
             case Right(result) =>

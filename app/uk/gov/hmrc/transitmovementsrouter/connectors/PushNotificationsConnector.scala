@@ -73,7 +73,7 @@ class PushNotificationsConnectorImpl @Inject() (httpClientV2: HttpClientV2, appC
 
         httpClientV2
           .post(url"$url")
-          .addHeaders(HeaderNames.CONTENT_TYPE -> MimeTypes.XML)
+          .transform(_.addHttpHeaders(HeaderNames.CONTENT_TYPE -> MimeTypes.XML))
           .withBody(source)
           .execute[Either[UpstreamErrorResponse, HttpResponse]]
           .map {

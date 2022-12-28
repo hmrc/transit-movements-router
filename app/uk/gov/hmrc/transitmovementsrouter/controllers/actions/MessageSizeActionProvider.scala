@@ -22,7 +22,6 @@ import play.api.mvc.Request
 import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 
 @ImplementedBy(classOf[MessageSizeActionProviderImpl])
 trait MessageSizeActionProvider {

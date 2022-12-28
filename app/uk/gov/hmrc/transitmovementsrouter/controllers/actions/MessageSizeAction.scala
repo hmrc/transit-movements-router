@@ -28,7 +28,6 @@ import uk.gov.hmrc.transitmovementsrouter.controllers.errors.PresentationError
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
-import scala.language.higherKinds
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Try

@@ -65,7 +65,6 @@ import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.Unexpec
 import uk.gov.hmrc.transitmovementsrouter.services.RoutingService
 import uk.gov.hmrc.transitmovementsrouter.services.StreamingMessageTrimmer
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
-import play.api.libs.Files.SingletonTemporaryFileCreator
 import uk.gov.hmrc.transitmovementsrouter.models.CustomsOffice
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -123,7 +122,7 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
       body = createStream(body)
     )
 
-  override def afterEach() {
+  override def afterEach(): Unit = {
     reset(mockRoutingService)
     super.afterEach()
   }

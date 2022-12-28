@@ -100,7 +100,7 @@ class StreamingParsersSpec extends AnyFreeSpec with Matchers with TestActorSyste
     }
 
   private def generateSource(byteString: ByteString): Source[ByteString, NotUsed] =
-    Source(byteString.grouped(1024).to[immutable.Iterable])
+    Source(byteString.grouped(1024).toSeq)
 
   "Streaming" - {
     "from Memory" - {
