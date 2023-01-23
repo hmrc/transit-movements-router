@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 HM Revenue & Customs
+ * Copyright 2023 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,6 @@
 
 package uk.gov.hmrc.transitmovementsrouter.services
 
-import akka.NotUsed
 import akka.stream._
 import akka.stream.alpakka.xml.ParseEvent
 import akka.stream.alpakka.xml.scaladsl._
@@ -73,21 +72,6 @@ class RoutingServiceImpl @Inject() (messageConnectorProvider: EISConnectorProvid
     }
   )
 
-  def buildMessage(messageType: MessageType, messageSender: MessageSender): Flow[ByteString, ByteString, NotUsed] =
-    Flow.fromGraph(
-      GraphDSL.create() {
-        implicit builder =>
-          import GraphDSL.Implicits._
-
-          val xmlParsing: FlowShape[ByteString, ParseEvent]         = builder.add(XmlParsing.parser)
-          val insertSenderWriter: FlowShape[ParseEvent, ParseEvent] = builder.add(XmlParser.messageSenderWriter(messageType, messageSender))
-          val toByteString                                          = builder.add(XmlWriting.writer)
-          xmlParsing ~> insertSenderWriter ~> toByteString
-
-          FlowShape(xmlParsing.in, toByteString.out)
-      }
-    )
-
   override def submitMessage(
     movementType: MovementType,
     movementId: MovementId,
@@ -97,9 +81,7 @@ class RoutingServiceImpl @Inject() (messageConnectorProvider: EISConnectorProvid
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): EitherT[Future, RoutingError, Unit] =
     for {
       connector <- EitherT[Future, RoutingError, EISConnector](payload.runWith(eisConnectorSelector(messageType)))
-      messageSender  = MessageSender(movementId, messageId)
-      updatedPayload = payload.via(buildMessage(messageType, messageSender))
-      _ <- EitherT(connector.post(messageSender, updatedPayload, hc))
+      _         <- EitherT(connector.post(payload, hc))
     } yield ()
 
   def selectConnector(maybeOffice: ParseResult[CustomsOffice], messageType: RequestMessageType): ParseResult[EISConnector] =

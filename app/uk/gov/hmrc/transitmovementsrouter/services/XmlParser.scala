@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 HM Revenue & Customs
+ * Copyright 2023 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,14 +39,6 @@ object XmlParser extends XmlParsingServiceHelpers {
       case element if element.getTextContent.nonEmpty => CustomsOffice(element.getTextContent)
     }
     .single("referenceNumber")
-
-  def messageSenderWriter(messageType: MessageType, messageSender: MessageSender): Flow[ParseEvent, ParseEvent, NotUsed] = Flow[ParseEvent]
-    .mapConcat(
-      element =>
-        if (isElement(messageType.rootNode, element))
-          Seq(element, StartElement("messageSender"), Characters(s"${messageSender.value}"), EndElement("messageSender"))
-        else Seq(element)
-    )
 
   private def isElement(name: String, event: ParseEvent): Boolean = event match {
     case s: StartElement if s.localName == name => true

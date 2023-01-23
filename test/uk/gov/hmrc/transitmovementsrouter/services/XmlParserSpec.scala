@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 HM Revenue & Customs
+ * Copyright 2023 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -123,24 +123,6 @@ class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers with 
           whenReady(parsedResult) {
             _.mustBe(Left(NoElementFound("referenceNumber")))
           }
-        }
-      }
-
-      s"MessageSenderElement parser should add the messageSender node with the movement Id in ${messageType.code} message" in new Setup {
-
-        val stream = createStream(messageWithoutMessageSender(messageType))
-
-        val parsedResult = stream
-          .via(XmlParsing.parser)
-          .via(XmlParser.messageSenderWriter(messageType, messageSender)) // testing this
-          .via(XmlWriting.writer)
-          .fold(ByteString())(_ ++ _)
-          .map(_.utf8String)
-          .runWith(Sink.head)
-
-        whenReady(parsedResult) {
-          result =>
-            XML.loadString(result) shouldBe messageWithMessageSender(messageType)
         }
       }
   }
