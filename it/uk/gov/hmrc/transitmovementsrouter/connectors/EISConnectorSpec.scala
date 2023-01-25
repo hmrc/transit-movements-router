@@ -47,7 +47,6 @@ import uk.gov.hmrc.transitmovementsrouter.config.CircuitBreakerConfig
 import uk.gov.hmrc.transitmovementsrouter.config.EISInstanceConfig
 import uk.gov.hmrc.transitmovementsrouter.config.Headers
 import uk.gov.hmrc.transitmovementsrouter.config.RetryConfig
-import uk.gov.hmrc.transitmovementsrouter.models.MessageSender
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
 
 import java.net.URL
@@ -83,8 +82,7 @@ class EISConnectorSpec
       RetryPolicies.limitRetries[Future](1)(cats.implicits.catsStdInstancesForFuture(ec))
   }
 
-  val messageSender: MessageSender = Gen.alphaNumStr.map(MessageSender(_)).sample.get
-  val uriStub                      = "/transit-movements-eis-stub/movements/messages"
+  val uriStub = "/transit-movements-eis-stub/movements/messages"
 
   val connectorConfig: EISInstanceConfig = EISInstanceConfig(
     "http",

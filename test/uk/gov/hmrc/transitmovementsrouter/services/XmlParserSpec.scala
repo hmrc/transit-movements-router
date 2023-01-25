@@ -34,35 +34,6 @@ import scala.xml._
 
 class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers with ModelGenerators {
 
-  "MessageSender parser" - new Setup {
-    "when provided with a valid message it extracts the message sender" in {
-      val stream       = createParsingEventStream(messageWithMessageSender(MessageType.DeclarationData))
-      val parsedResult = stream.via(XmlParser.messageSenderExtractor).runWith(Sink.head)
-
-      whenReady(parsedResult) {
-        _.toOption.get mustBe messageSender
-      }
-    }
-
-    "when provided with a missing messageSender node it returns NoElementFound" in {
-      val stream       = createParsingEventStream(messageWithoutMessageSender(MessageType.DeclarationData))
-      val parsedResult = stream.via(XmlParser.messageSenderExtractor).runWith(Sink.head)
-
-      whenReady(parsedResult) {
-        _.mustBe(Left(NoElementFound("messageSender")))
-      }
-    }
-
-    "when provided with a no value for messageSender node it returns NoElementFound" in {
-      val stream       = createParsingEventStream(cc015cWithoutMessageSenderValue)
-      val parsedResult = stream.via(XmlParser.messageSenderExtractor).runWith(Sink.head)
-
-      whenReady(parsedResult) {
-        _.mustBe(Left(NoElementFound("messageSender")))
-      }
-    }
-  }
-
   MessageType.arrivalRequestValues.foreach {
     messageType =>
       "Arrival office node parser" - new Setup {
@@ -130,7 +101,6 @@ class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers with 
   trait Setup {
 
     val referenceNumber        = arbitraryCustomsOffice.arbitrary.sample.get
-    val messageSender          = arbitraryMessageSender.arbitrary.sample.get
     val preparationDateAndTime = arbitraryOffsetDateTime.arbitrary.sample.get.toLocalDateTime.format(DateTimeFormatter.ISO_DATE_TIME)
 
     def messageWithoutMessageSender(messageType: RequestMessageType): NodeSeq = {
@@ -153,7 +123,7 @@ class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers with 
 
     def messageWithMessageSender(messageType: RequestMessageType): NodeSeq = {
       val strMessage =
-        s"""<ncts:${messageType.rootNode} PhaseID="NCTS5.0" xmlns:ncts="http://ncts.dgtaxud.ec"><messageSender>${messageSender.value}</messageSender><preparationDateAndTime>$preparationDateAndTime</preparationDateAndTime><${messageType.officeNode}><referenceNumber>${referenceNumber.value}</referenceNumber></${messageType.officeNode}></ncts:${messageType.rootNode}>"""
+        s"""<ncts:${messageType.rootNode} PhaseID="NCTS5.0" xmlns:ncts="http://ncts.dgtaxud.ec"><preparationDateAndTime>$preparationDateAndTime</preparationDateAndTime><${messageType.officeNode}><referenceNumber>${referenceNumber.value}</referenceNumber></${messageType.officeNode}></ncts:${messageType.rootNode}>"""
       XML.loadString(strMessage)
     }
 

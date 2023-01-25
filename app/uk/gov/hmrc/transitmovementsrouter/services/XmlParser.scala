@@ -24,13 +24,6 @@ import uk.gov.hmrc.transitmovementsrouter.models._
 
 object XmlParser extends XmlParsingServiceHelpers {
 
-  val messageSenderExtractor: Flow[ParseEvent, ParseResult[MessageSender], NotUsed] = XmlParsing
-    .subtree("CC015C" :: "messageSender" :: Nil)
-    .collect {
-      case element if element.getTextContent.nonEmpty => MessageSender(element.getTextContent)
-    }
-    .single("messageSender")
-
   def customsOfficeExtractor(
     messageType: RequestMessageType
   ): Flow[ParseEvent, ParseResult[CustomsOffice], NotUsed] = XmlParsing
