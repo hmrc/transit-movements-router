@@ -121,12 +121,6 @@ class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers with 
       XML.loadString(strMessage)
     }
 
-    def messageWithMessageSender(messageType: RequestMessageType): NodeSeq = {
-      val strMessage =
-        s"""<ncts:${messageType.rootNode} PhaseID="NCTS5.0" xmlns:ncts="http://ncts.dgtaxud.ec"><preparationDateAndTime>$preparationDateAndTime</preparationDateAndTime><${messageType.officeNode}><referenceNumber>${referenceNumber.value}</referenceNumber></${messageType.officeNode}></ncts:${messageType.rootNode}>"""
-      XML.loadString(strMessage)
-    }
-
     val cc015cWithoutMessageSenderValue = {
       val strMessage =
         s"""<ncts:CC015C PhaseID="NCTS5.0" xmlns:ncts="http://ncts.dgtaxud.ec"><messageSender></messageSender><preparationDateAndTime>$preparationDateAndTime</preparationDateAndTime><CustomsOfficeOfDeparture><referenceNumber>${referenceNumber.value}</referenceNumber></CustomsOfficeOfDeparture></ncts:CC015C>"""
