@@ -33,9 +33,4 @@ object XmlParser extends XmlParsingServiceHelpers {
     }
     .single("referenceNumber")
 
-  private def isElement(name: String, event: ParseEvent): Boolean = event match {
-    case s: StartElement if s.localName == name => true
-    case _                                      => false
-  }
-
 }
