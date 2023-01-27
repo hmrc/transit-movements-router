@@ -20,7 +20,6 @@ import org.scalacheck.Arbitrary
 import org.scalacheck.Gen
 import uk.gov.hmrc.transitmovementsrouter.models.CustomsOffice
 import uk.gov.hmrc.transitmovementsrouter.models.MessageId
-import uk.gov.hmrc.transitmovementsrouter.models.MessageSender
 import uk.gov.hmrc.transitmovementsrouter.models.MessageType
 import uk.gov.hmrc.transitmovementsrouter.models.MovementId
 import uk.gov.hmrc.transitmovementsrouter.models.RequestMessageType
@@ -37,14 +36,6 @@ trait ModelGenerators extends BaseGenerators {
         destination <- Gen.oneOf(Seq("GB", "XI"))
         id          <- intWithMaxLength(7, 7)
       } yield CustomsOffice(s"$destination$id")
-    }
-
-  implicit lazy val arbitraryMessageSender: Arbitrary[MessageSender] =
-    Arbitrary {
-      for {
-        movementId <- alphaNumeric(12)
-        messageId  <- alphaNumeric(12)
-      } yield MessageSender(s"$movementId-$messageId")
     }
 
   implicit lazy val arbitraryMovementId: Arbitrary[MovementId] =

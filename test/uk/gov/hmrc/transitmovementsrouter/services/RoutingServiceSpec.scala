@@ -280,7 +280,6 @@ class RoutingServiceSpec
     when(mockMessageConnectorProvider.xi) thenReturn mockMessageConnector
     when(
       mockMessageConnector.post(
-        ArgumentMatchers.any[String].asInstanceOf[MessageSender],
         ArgumentMatchers.any[Source[ByteString, _]],
         ArgumentMatchers.any[HeaderCarrier]
       )

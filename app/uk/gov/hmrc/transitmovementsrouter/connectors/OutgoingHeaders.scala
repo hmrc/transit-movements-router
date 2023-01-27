@@ -25,7 +25,6 @@ object OutgoingHeaders {
     HeaderNames.DATE,
     HeaderNames.CONTENT_TYPE,
     "X-Message-Type",
-    "X-Message-Sender",
     HMRCHeaderNames.xRequestId
   )
 }

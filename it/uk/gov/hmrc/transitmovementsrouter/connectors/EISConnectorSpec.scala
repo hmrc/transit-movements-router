@@ -47,7 +47,6 @@ import uk.gov.hmrc.transitmovementsrouter.config.CircuitBreakerConfig
 import uk.gov.hmrc.transitmovementsrouter.config.EISInstanceConfig
 import uk.gov.hmrc.transitmovementsrouter.config.Headers
 import uk.gov.hmrc.transitmovementsrouter.config.RetryConfig
-import uk.gov.hmrc.transitmovementsrouter.models.MessageSender
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
 
 import java.net.URL
@@ -83,8 +82,7 @@ class EISConnectorSpec
       RetryPolicies.limitRetries[Future](1)(cats.implicits.catsStdInstancesForFuture(ec))
   }
 
-  val messageSender: MessageSender = Gen.alphaNumStr.map(MessageSender(_)).sample.get
-  val uriStub                      = "/transit-movements-eis-stub/movements/messages"
+  val uriStub = "/transit-movements-eis-stub/movements/messages"
 
   val connectorConfig: EISInstanceConfig = EISInstanceConfig(
     "http",
@@ -138,7 +136,6 @@ class EISConnectorSpec
               .inScenario("Standard Call")
               .whenScenarioStateIs(currentState)
               .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
-              .withHeader("X-Message-Sender", equalTo(messageSender.value))
               .withHeader("CustomProcessHost", equalTo("Digital"))
               .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
               .willReturn(aResponse().withStatus(codeToReturn))
@@ -152,7 +149,7 @@ class EISConnectorSpec
 
         val hc = HeaderCarrier()
 
-        whenReady(connector().post(messageSender, source, hc)) {
+        whenReady(connector().post(source, hc)) {
           _.isRight mustBe true
         }
     }
@@ -167,7 +164,6 @@ class EISConnectorSpec
               urlEqualTo(uriStub)
             ).withHeader("Authorization", equalTo("Bearer bearertokenhereGB"))
               .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
-              .withHeader("X-Message-Sender", equalTo(messageSender.value))
               .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
               .inScenario("Standard Call")
               .whenScenarioStateIs(currentState)
@@ -182,7 +178,7 @@ class EISConnectorSpec
 
         val hc = HeaderCarrier()
 
-        whenReady(connector().post(messageSender, source, hc)) {
+        whenReady(connector().post(source, hc)) {
           _.isRight mustBe true
         }
     }
@@ -198,7 +194,6 @@ class EISConnectorSpec
             .willSetStateTo(targetState)
             .withHeader("Authorization", equalTo("Bearer bearertokenhereGB"))
             .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
-            .withHeader("X-Message-Sender", equalTo(messageSender.value))
             .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
             .willReturn(aResponse().withStatus(codeToReturn))
         )
@@ -210,7 +205,7 @@ class EISConnectorSpec
 
       val hc = HeaderCarrier()
 
-      whenReady(oneRetryConnector.post(messageSender, source, hc)) {
+      whenReady(oneRetryConnector.post(source, hc)) {
         _.isRight mustBe true
       }
     }
@@ -234,14 +229,13 @@ class EISConnectorSpec
             urlEqualTo(uriStub)
           ).withHeader("Authorization", equalTo("Bearer bearertokenhereGB"))
             .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
-            .withHeader("X-Message-Sender", equalTo(messageSender.value))
             .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
             .willReturn(aResponse().withStatus(statusCode))
         )
 
         val hc = HeaderCarrier()
 
-        whenReady(connector().post(messageSender, source, hc)) {
+        whenReady(connector().post(source, hc)) {
           case Left(x) if x.isInstanceOf[RoutingError.Upstream] =>
             x.asInstanceOf[RoutingError.Upstream].upstreamErrorResponse.statusCode mustBe statusCode
           case x =>
@@ -258,7 +252,7 @@ class EISConnectorSpec
 
     when(httpClientV2.post(ArgumentMatchers.any[URL])(ArgumentMatchers.any[HeaderCarrier])).thenReturn(new FakeRequestBuilder)
 
-    whenReady(connector.post(messageSender, source, hc)) {
+    whenReady(connector.post(source, hc)) {
       case Left(x) if x.isInstanceOf[RoutingError.Unexpected] => x.asInstanceOf[RoutingError.Unexpected].cause.get mustBe a[RuntimeException]
       case _                                                  => fail("Left was not a RoutingError.Unexpected")
     }

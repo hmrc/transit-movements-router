@@ -32,7 +32,6 @@ import uk.gov.hmrc.http.UpstreamErrorResponse
 import uk.gov.hmrc.http.{HeaderNames => HMRCHeaderNames}
 import uk.gov.hmrc.http.client.HttpClientV2
 import uk.gov.hmrc.transitmovementsrouter.config.EISInstanceConfig
-import uk.gov.hmrc.transitmovementsrouter.models.MessageSender
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
 import uk.gov.hmrc.http.HttpReads.Implicits._
 import java.util.UUID
@@ -43,7 +42,7 @@ import scala.util.control.NonFatal
 
 trait EISConnector {
 
-  def post(messageSender: MessageSender, body: Source[ByteString, _], hc: HeaderCarrier): Future[Either[RoutingError, Unit]]
+  def post(body: Source[ByteString, _], hc: HeaderCarrier): Future[Either[RoutingError, Unit]]
 
 }
 
@@ -83,7 +82,7 @@ class EISConnectorImpl(
         Future.failed(new IllegalStateException(s"An unexpected error occurred - got a ${x.getClass}"))
     }
 
-  override def post(messageSender: MessageSender, body: Source[ByteString, _], hc: HeaderCarrier): Future[Either[RoutingError, Unit]] =
+  override def post(body: Source[ByteString, _], hc: HeaderCarrier): Future[Either[RoutingError, Unit]] =
     retryingOnFailures(
       retries.createRetryPolicy(eisInstanceConfig.retryConfig),
       (t: Either[RoutingError, Unit]) => Future.successful(t.isRight),
@@ -92,7 +91,6 @@ class EISConnectorImpl(
       val requestHeaders = hc.headers(OutgoingHeaders.headers) ++ Seq(
         "X-Correlation-Id"        -> UUID.randomUUID().toString,
         "CustomProcessHost"       -> "Digital",
-        "X-Message-Sender"        -> messageSender.value,
         HeaderNames.ACCEPT        -> MimeTypes.XML, // TODO: is this still relevant? Can't use ContentTypes.XML because EIS will not accept "application/xml; charset=utf-8"
         HeaderNames.AUTHORIZATION -> s"Bearer ${eisInstanceConfig.headers.bearerToken}"
       )
