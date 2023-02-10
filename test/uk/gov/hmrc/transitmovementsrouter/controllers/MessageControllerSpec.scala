@@ -54,6 +54,7 @@ import uk.gov.hmrc.transitmovementsrouter.connectors.PersistenceConnector
 import uk.gov.hmrc.transitmovementsrouter.connectors.PushNotificationsConnector
 import uk.gov.hmrc.transitmovementsrouter.controllers.actions.AuthenticateEISToken
 import uk.gov.hmrc.transitmovementsrouter.fakes.actions.FakeXmlTransformer
+import uk.gov.hmrc.transitmovementsrouter.models.ConversationId
 import uk.gov.hmrc.transitmovementsrouter.models.CustomsOffice
 import uk.gov.hmrc.transitmovementsrouter.models.EoriNumber
 import uk.gov.hmrc.transitmovementsrouter.models.MessageId
@@ -80,8 +81,8 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
 
   val eori         = EoriNumber("eori")
   val movementType = MovementType("departures")
-  val movementId   = MovementId("ABC123")
-  val messageId    = MessageId("XYZ456")
+  val movementId   = MovementId("abcdef1234567890")
+  val messageId    = MessageId("0987654321fedcba")
 
   val cc015cOfficeOfDepartureGB: NodeSeq =
     <ncts:CC015C PhaseID="NCTS5.0" xmlns:ncts="http://ncts.dgtaxud.ec">
@@ -127,7 +128,7 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
   def source = createStream(cc015cOfficeOfDepartureGB)
 
   val outgoing = routes.MessagesController.outgoing(eori, movementType, movementId, messageId).url
-  val incoming = routes.MessagesController.incoming((movementId, messageId)).url
+  val incoming = routes.MessagesController.incoming(ConversationId(movementId, messageId)).url
 
   def fakeRequest[A](
     body: NodeSeq,
@@ -353,7 +354,7 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
       val request = fakeRequest(incomingXml, incoming)
         .withHeaders(FakeHeaders().add("X-Message-Type" -> RequestOfRelease.code))
 
-      val result = controller().incoming((movementId, messageId))(request)
+      val result = controller().incoming(ConversationId(movementId, messageId))(request)
 
       status(result) mustBe CREATED
       header("X-Message-Id", result) mustBe Some("1")
@@ -362,7 +363,7 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
     "must return BAD_REQUEST when the X-Message-Type header is missing or body seems to not contain an appropriate root tag" in {
 
       when(mockMessageTypeExtractor.extract(any(), any())).thenReturn(EitherT.leftT[Future, MessageType](MessageTypeExtractionError.UnableToExtractFromBody))
-      val result = controller().incoming((movementId, messageId))(fakeRequest(incomingXml, incoming))
+      val result = controller().incoming(ConversationId(movementId, messageId))(fakeRequest(incomingXml, incoming))
 
       status(result) mustBe BAD_REQUEST
 
@@ -375,7 +376,7 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
       when(mockMessageTypeExtractor.extract(any(), any()))
         .thenReturn(EitherT.leftT[Future, MessageType](MessageTypeExtractionError.InvalidMessageType("abcde")))
 
-      val result = controller().incoming((movementId, messageId))(request)
+      val result = controller().incoming(ConversationId(movementId, messageId))(request)
 
       status(result) mustBe BAD_REQUEST
     }
@@ -389,7 +390,7 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
       val request = fakeRequest(incomingXml, incoming)
         .withHeaders(FakeHeaders().add("X-Message-Type" -> RequestOfRelease.code))
 
-      val result = controller().incoming((movementId, messageId))(request)
+      val result = controller().incoming(ConversationId(movementId, messageId))(request)
 
       status(result) mustBe NOT_FOUND
     }
@@ -403,7 +404,7 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
       val request = fakeRequest(incomingXml, incoming)
         .withHeaders(FakeHeaders().add("X-Message-Type" -> RequestOfRelease.code))
 
-      val result = controller().incoming((movementId, messageId))(request)
+      val result = controller().incoming(ConversationId(movementId, messageId))(request)
 
       status(result) mustBe INTERNAL_SERVER_ERROR
     }

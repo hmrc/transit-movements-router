@@ -35,6 +35,7 @@ import uk.gov.hmrc.transitmovementsrouter.controllers.actions.AuthenticateEISTok
 import uk.gov.hmrc.transitmovementsrouter.controllers.errors.ConvertError
 import uk.gov.hmrc.transitmovementsrouter.controllers.errors.PresentationError
 import uk.gov.hmrc.transitmovementsrouter.controllers.stream.StreamingParsers
+import uk.gov.hmrc.transitmovementsrouter.models.ConversationId
 import uk.gov.hmrc.transitmovementsrouter.models.EoriNumber
 import uk.gov.hmrc.transitmovementsrouter.models.MessageId
 import uk.gov.hmrc.transitmovementsrouter.models.MessageType
@@ -77,16 +78,16 @@ class MessagesController @Inject() (
         )
     }
 
-  def incoming(ids: (MovementId, MessageId)): Action[Source[ByteString, _]] =
+  def incoming(ids: ConversationId): Action[Source[ByteString, _]] =
     authenticateEISToken.stream(transformer = eisMessageTransformers.unwrap) {
       implicit request =>
         implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
-        val (movementId, messageId)    = ids
+        val (movementId, messageId)    = ids.toMovementAndMessageId
 
         (for {
           messageType         <- messageTypeExtractor.extract(request.headers, request.body).asPresentation
           persistenceResponse <- persistenceConnector.post(movementId, messageId, messageType, request.body).asPresentation
-          _ = pushNotificationsConnector.post(movementId, messageId, request.body).asPresentation
+          _ = pushNotificationsConnector.post(movementId, persistenceResponse.messageId, request.body).asPresentation
         } yield persistenceResponse)
           .fold[Result](
             error => Status(error.code.statusCode)(Json.toJson(error)),

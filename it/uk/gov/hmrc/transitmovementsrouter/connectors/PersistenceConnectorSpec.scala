@@ -39,6 +39,7 @@ import play.api.libs.json.Json
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.test.HttpClientV2Support
 import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
+import uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuite
 import uk.gov.hmrc.transitmovementsrouter.models.MessageId
 import uk.gov.hmrc.transitmovementsrouter.models.MessageType.DeclarationAmendment
 import uk.gov.hmrc.transitmovementsrouter.models.MovementId
@@ -65,7 +66,7 @@ class PersistenceConnectorSpec
   val uriPersistence = Url(
     path = s"/transit-movements/traders/movements/${movementId.value}/messages",
     query = QueryString.fromPairs("triggerId" -> messageId.value)
-  ).path.toStringRaw
+  ).toStringRaw
 
   val appConfig = mock[AppConfig]
 
@@ -126,6 +127,7 @@ class PersistenceConnectorSpec
               case BAD_REQUEST           => x mustBe a[Left[Unexpected, _]]
               case NOT_FOUND             => x mustBe a[Left[MovementNotFound, _]]
               case INTERNAL_SERVER_ERROR => x mustBe a[Left[Unexpected, _]]
+              case _                     => fail()
             }
 
         }
