@@ -18,6 +18,7 @@ package uk.gov.hmrc.transitmovementsrouter.controllers.stream
 
 import akka.NotUsed
 import akka.stream.Materializer
+import akka.stream.scaladsl.Flow
 import akka.stream.scaladsl.Sink
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
@@ -46,7 +47,6 @@ import uk.gov.hmrc.transitmovementsrouter.base.TestSourceProvider
 
 import java.nio.charset.StandardCharsets
 import scala.annotation.tailrec
-import scala.collection.immutable
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 
@@ -89,6 +89,23 @@ class StreamingParsersSpec extends AnyFreeSpec with Matchers with TestActorSyste
             r => Ok(r)
           )
     }
+
+    def transformStream: Action[Source[ByteString, _]] = Action
+      .andThen(TestActionBuilder)
+      .stream(
+        Flow.fromFunction[ByteString, ByteString](
+          a => a ++ a
+        )
+      ) {
+        request =>
+          (for {
+            a <- request.body.runWith(Sink.last)
+            b <- request.body.runWith(Sink.last)
+          } yield (a ++ b).utf8String)
+            .map(
+              r => Ok(r)
+            )
+      }
   }
 
   @tailrec
@@ -122,6 +139,14 @@ class StreamingParsersSpec extends AnyFreeSpec with Matchers with TestActorSyste
       val result  = Harness.resultStream()(request)
       status(result) mustBe OK
       contentAsString(result) mustBe (string ++ string)
+    }
+
+    "via the stream extension method with a transformation" in {
+      val string  = Gen.stringOfN(20, Gen.alphaNumChar).sample.get
+      val request = FakeRequest("POST", "/", headers, singleUseStringSource(string))
+      val result  = Harness.transformStream()(request)
+      status(result) mustBe OK
+      contentAsString(result) mustBe (string ++ string ++ string ++ string)
     }
   }
 }

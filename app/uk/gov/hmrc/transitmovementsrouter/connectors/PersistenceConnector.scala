@@ -90,6 +90,7 @@ class PersistenceConnectorImpl @Inject() (httpClientV2: HttpClientV2, appConfig:
               case BAD_REQUEST           => Left(Unexpected())
               case NOT_FOUND             => Left(MovementNotFound(movementId))
               case INTERNAL_SERVER_ERROR => Left(Unexpected())
+              case _                     => Left(Unexpected())
             }
         }
         .recover {

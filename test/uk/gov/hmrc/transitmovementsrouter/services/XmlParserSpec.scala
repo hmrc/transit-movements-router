@@ -16,13 +16,10 @@
 
 package uk.gov.hmrc.transitmovementsrouter.services
 
-import akka.stream.alpakka.xml.scaladsl._
 import akka.stream.scaladsl.Sink
-import akka.util.ByteString
 import org.scalatest.concurrent.ScalaFutures.whenReady
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
-import org.scalatest.matchers.should.Matchers.convertToAnyShouldWrapper
 import uk.gov.hmrc.transitmovementsrouter.base.StreamTestHelpers._
 import uk.gov.hmrc.transitmovementsrouter.base.TestActorSystem
 import uk.gov.hmrc.transitmovementsrouter.generators.ModelGenerators

@@ -18,22 +18,27 @@ package uk.gov.hmrc.transitmovementsrouter.services
 
 import akka.stream.alpakka.xml.scaladsl.XmlParsing
 import akka.stream.alpakka.xml.scaladsl.XmlWriting
-import akka.stream.scaladsl.Source
+import akka.stream.scaladsl.Flow
 import akka.util.ByteString
 import com.google.inject.ImplementedBy
-import com.google.inject.Inject
+import com.google.inject.Singleton
 
-@ImplementedBy(classOf[StreamingMessageTrimmerImpl])
-trait StreamingMessageTrimmer {
+@ImplementedBy(classOf[EISMessageTransformersImpl])
+trait EISMessageTransformers {
 
-  def trim(source: Source[ByteString, _]): Source[ByteString, _]
+  def unwrap: Flow[ByteString, ByteString, _]
+
 }
 
-class StreamingMessageTrimmerImpl @Inject() extends StreamingMessageTrimmer {
+@Singleton
+class EISMessageTransformersImpl extends EISMessageTransformers {
 
-  override def trim(source: Source[ByteString, _]): Source[ByteString, _] =
-    source
+  // This is in line with the API 2 spec that we provided to EIS -- check that this is how they actually wrap it
+  // as API 1 is different.
+  lazy val unwrap: Flow[ByteString, ByteString, _] =
+    Flow[ByteString]
       .via(XmlParsing.parser)
       .via(XmlParsing.subslice("TraderChannelResponse" :: Nil))
       .via(XmlWriting.writer)
+
 }

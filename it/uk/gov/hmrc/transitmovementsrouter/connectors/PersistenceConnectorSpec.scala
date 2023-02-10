@@ -40,12 +40,12 @@ import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.test.HttpClientV2Support
 import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
 import uk.gov.hmrc.transitmovementsrouter.models.MessageId
+import uk.gov.hmrc.transitmovementsrouter.models.MessageType.DeclarationAmendment
 import uk.gov.hmrc.transitmovementsrouter.models.MovementId
 import uk.gov.hmrc.transitmovementsrouter.models.PersistenceResponse
-import uk.gov.hmrc.transitmovementsrouter.models.MessageType.DeclarationAmendment
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.MovementNotFound
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.Unexpected
-import uk.gov.hmrc.transitmovementsrouter.services.StreamingMessageTrimmerImpl
+import uk.gov.hmrc.transitmovementsrouter.services.EISMessageTransformersImpl
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -136,7 +136,7 @@ class PersistenceConnectorSpec
 
       stub(OK)
 
-      val failingSource = new StreamingMessageTrimmerImpl().trim(Source.single(ByteString.fromString("<abc>asdadsadads")))
+      val failingSource = Source.single(ByteString.fromString("<abc>asdadsadads")).via(new EISMessageTransformersImpl().unwrap)
 
       whenReady(connector.post(movementId, messageId, DeclarationAmendment, failingSource).value) {
         res =>

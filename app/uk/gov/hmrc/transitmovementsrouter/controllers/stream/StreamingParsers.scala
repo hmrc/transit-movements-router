@@ -17,9 +17,13 @@
 package uk.gov.hmrc.transitmovementsrouter.controllers.stream
 
 import akka.stream.Materializer
+import akka.stream.scaladsl.FileIO
+import akka.stream.scaladsl.Flow
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
+import cats.syntax.all._
 import play.api.libs.Files.TemporaryFileCreator
+import play.api.libs.json.Json
 import play.api.libs.streams.Accumulator
 import play.api.mvc.Action
 import play.api.mvc.ActionBuilder
@@ -27,23 +31,21 @@ import play.api.mvc.BaseControllerHelpers
 import play.api.mvc.BodyParser
 import play.api.mvc.Request
 import play.api.mvc.Result
-import uk.gov.hmrc.transitmovementsrouter.utils.FutureConversions
-import uk.gov.hmrc.transitmovementsrouter.utils.StreamWithFile
+import uk.gov.hmrc.transitmovementsrouter.controllers.errors.PresentationError
 
 import java.util.concurrent.Executors
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
+import scala.util.Failure
+import scala.util.Success
 
-trait StreamingParsers extends StreamWithFile with FutureConversions {
+trait StreamingParsers {
   self: BaseControllerHelpers =>
 
   implicit val materializer: Materializer
 
-  // TODO: do we choose a better thread pool, or make configurable?
-  //  We have to be careful to not use Play's EC because we could accidentally starve the thread pool
-  //  and cause errors for additional connections
   implicit val materializerExecutionContext: ExecutionContext =
-    ExecutionContext.fromExecutorService(Executors.newFixedThreadPool(4))
+    ExecutionContext.fromExecutorService(Executors.newCachedThreadPool())
 
   lazy val streamFromMemory: BodyParser[Source[ByteString, _]] = BodyParser {
     _ =>
@@ -52,16 +54,32 @@ trait StreamingParsers extends StreamWithFile with FutureConversions {
 
   implicit class ActionBuilderStreamHelpers(actionBuilder: ActionBuilder[Request, _]) {
 
-    def stream(
+    // This method allows for the transformation of a stream before it goes into a file,
+    // such that we only transform it once.
+    def stream(transformer: Flow[ByteString, ByteString, _])(
       block: Request[Source[ByteString, _]] => Future[Result]
     )(implicit temporaryFileCreator: TemporaryFileCreator): Action[Source[ByteString, _]] =
       actionBuilder.async(streamFromMemory) {
         request =>
-          withReusableSource(request.body) {
-            memoryOrFileSource =>
-              block(request.withBody(memoryOrFileSource))
-          }
+          val tempFile = temporaryFileCreator.create()
+          request.body
+            .via(transformer)
+            .runWith(FileIO.toPath(tempFile))
+            .transformWith {
+              case Success(_)   => block(request.withBody(FileIO.fromPath(tempFile)))
+              case Failure(thr) => Future.successful(Status(INTERNAL_SERVER_ERROR)(Json.toJson(PresentationError.internalServiceError(cause = Some(thr)))))
+            }
+            .attemptTap {
+              _ =>
+                temporaryFileCreator.delete(tempFile)
+                Future.unit
+            }
       }
+
+    def stream(
+      block: Request[Source[ByteString, _]] => Future[Result]
+    )(implicit temporaryFileCreator: TemporaryFileCreator): Action[Source[ByteString, _]] =
+      stream(Flow.apply[ByteString])(block)(temporaryFileCreator)
   }
 
 }

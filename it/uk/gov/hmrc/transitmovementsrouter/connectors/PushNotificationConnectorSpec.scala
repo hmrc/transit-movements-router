@@ -40,7 +40,7 @@ import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
 import uk.gov.hmrc.transitmovementsrouter.generators.ModelGenerators
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PushNotificationError.MovementNotFound
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PushNotificationError.Unexpected
-import uk.gov.hmrc.transitmovementsrouter.services.StreamingMessageTrimmerImpl
+import uk.gov.hmrc.transitmovementsrouter.services.EISMessageTransformersImpl
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -126,7 +126,7 @@ class PushNotificationConnectorSpec
 
       stub(OK)
 
-      val failingSource = new StreamingMessageTrimmerImpl().trim(Source.single(ByteString.fromString("{}")))
+      val failingSource = Source.single(ByteString.fromString("{}")).via(new EISMessageTransformersImpl().unwrap)
 
       whenReady(connector.post(movementId, messageId, failingSource).value) {
         res =>

@@ -28,16 +28,18 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.Failure
 import scala.util.Success
 
-class StreamingMessageTrimmerSpec extends AnyFreeSpec with Matchers with ScalaFutures with TestActorSystem {
-  "trim flow should" - {
+class EISMessageTransformerSpec extends AnyFreeSpec with Matchers with ScalaFutures with TestActorSystem {
 
-    val sut = new StreamingMessageTrimmerImpl
+  val sut = new EISMessageTransformersImpl
+
+  "trim flow should" - {
 
     "successfully trim with valid xml" in {
       val input = "<TraderChannelResponse><test>text</test></TraderChannelResponse>"
 
-      val result = sut
-        .trim(Source.single(ByteString.fromString(input)))
+      val result = Source
+        .single(ByteString.fromString(input))
+        .via(sut.unwrap)
         .runReduce(_ ++ _)
         .map {
           x => x.utf8String
@@ -52,8 +54,9 @@ class StreamingMessageTrimmerSpec extends AnyFreeSpec with Matchers with ScalaFu
       val input = "<Wrapper>text</Wrapper>"
 
       val result =
-        sut
-          .trim(Source.single(ByteString.fromString(input)))
+        Source
+          .single(ByteString.fromString(input))
+          .via(sut.unwrap)
           .runWith(Sink.head)
 
       whenReady(result.transform {
