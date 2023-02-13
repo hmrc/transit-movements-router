@@ -84,6 +84,12 @@ class MessageTypeExtractorSpec extends AnyFreeSpec with ScalaFutures with Matche
           _ mustBe Right(mt)
         }
     }
+
+    "return Left(UnableToExtract) when no body is returned (i.e., if the wrapping is incorrect)" in {
+      whenReady(sut.extractFromBody(Source.empty[ByteString]).value) {
+        _ mustBe Left(UnableToExtractFromBody)
+      }
+    }
   }
 
   "extract" - {

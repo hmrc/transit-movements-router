@@ -73,6 +73,9 @@ class MessageTypeExtractorImpl @Inject() (implicit ec: ExecutionContext, mat: Ma
       case _: WFCException => Left(UnableToExtractFromBody)
       case NonFatal(e)     => Left(MessageTypeExtractionError.Unexpected(Some(e)))
     }
+    .fold[MaybeMessageType](Left(UnableToExtractFromBody))(
+      (_, incoming) => incoming
+    )
     .toMat(Sink.head)(Keep.right)
 
   override def extract(headers: Headers, source: Source[ByteString, _]): EitherT[Future, MessageTypeExtractionError, MessageType] =

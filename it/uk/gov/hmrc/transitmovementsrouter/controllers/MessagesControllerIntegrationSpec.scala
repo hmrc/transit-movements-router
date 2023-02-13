@@ -27,6 +27,7 @@ import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
 import org.scalatestplus.play.guice.GuiceOneAppPerSuite
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
+import play.api.http.Status.BAD_REQUEST
 import play.api.http.Status.CREATED
 import play.api.http.Status.OK
 import play.api.http.Status.UNAUTHORIZED
@@ -64,6 +65,16 @@ class MessagesControllerIntegrationSpec
       </ncts:CC029C>
     </TraderChannelResponse>.mkString
 
+  val brokenXml: String =
+    <nope>
+      <ncts:CC029C PhaseID="NCTS5.0" xmlns:ncts="http://ncts.dgtaxud.ec">
+        <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
+        <CustomsOfficeOfDeparture>
+          <referenceNumber>GB1234567</referenceNumber>
+        </CustomsOfficeOfDeparture>
+      </ncts:CC029C>
+    </nope>.mkString
+
   override protected def appBuilder: GuiceApplicationBuilder =
     super.appBuilder.configure(
       "incomingRequestAuth.enabled"                                     -> true,
@@ -78,7 +89,7 @@ class MessagesControllerIntegrationSpec
   )
 
   "incoming" - {
-    "when EIS makes a valid call with a valid body" - Seq("ABC", "123").foreach {
+    "when EIS makes a valid call with a valid body, return 201" - Seq("ABC", "123").foreach {
       authCode =>
         s"with auth code $authCode" in {
           // We do this instead of using the standard "app" because we otherwise get the error
@@ -127,7 +138,31 @@ class MessagesControllerIntegrationSpec
         }
     }
 
-    "when EIS makes a call with an invalid authorization header with a valid body" in forAll(Gen.stringOfN(4, Gen.alphaNumChar)) {
+    "when EIS makes a call with an invalid authorization header with an invalid body, return 400" in {
+      val newApp         = appBuilder.build()
+      val conversationId = ConversationId(UUID.randomUUID())
+
+      val eisRequest = FakeRequest(
+        "POST",
+        s"/transit-movements-router/movement/${conversationId.value.toString}/messages",
+        FakeHeaders(
+          Seq(
+            "Authorization"    -> s"Bearer ABC",
+            "x-correlation-id" -> UUID.randomUUID().toString
+          )
+        ),
+        Source.single(ByteString(brokenXml))
+      )
+
+      running(newApp) {
+        val sut    = newApp.injector.instanceOf[MessagesController]
+        val result = sut.incoming(conversationId)(eisRequest)
+
+        Helpers.status(result) mustBe BAD_REQUEST
+      }
+    }
+
+    "when EIS makes a call with an invalid authorization header with a valid body, return 401" in forAll(Gen.stringOfN(4, Gen.alphaNumChar)) {
       authCode =>
         val conversationId = ConversationId(UUID.randomUUID())
 
