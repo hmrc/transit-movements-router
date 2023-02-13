@@ -56,24 +56,28 @@ class MessagesControllerIntegrationSpec
 
   // We don't care about the content in this XML fragment, only the root tag and its child.
   val sampleXml: String =
-    <TraderChannelResponse>
-      <ncts:CC029C PhaseID="NCTS5.0" xmlns:ncts="http://ncts.dgtaxud.ec">
+    <n1:TraderChannelResponse xmlns:txd="http://ncts.dgtaxud.ec"
+                                xmlns:n1="http://www.hmrc.gov.uk/eis/ncts5/v1"
+                                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                                xsi:schemaLocation="http://www.hmrc.gov.uk/eis/ncts5/v1
+    EIS_WrapperV10_TraderChannelSubmission-51.8.xsd">
+      <txd:CC029C PhaseID="NCTS5.0">
         <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
         <CustomsOfficeOfDeparture>
           <referenceNumber>GB1234567</referenceNumber>
         </CustomsOfficeOfDeparture>
-      </ncts:CC029C>
-    </TraderChannelResponse>.mkString
+      </txd:CC029C>
+    </n1:TraderChannelResponse>.mkString
 
   val brokenXml: String =
-    <nope>
-      <ncts:CC029C PhaseID="NCTS5.0" xmlns:ncts="http://ncts.dgtaxud.ec">
+    """<nope>
+      <ncts:CC029C xmlns:ncts="http://ncts.dgtaxud.ec" PhaseID="NCTS5.0">
         <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
         <CustomsOfficeOfDeparture>
           <referenceNumber>GB1234567</referenceNumber>
         </CustomsOfficeOfDeparture>
       </ncts:CC029C>
-    </nope>.mkString
+    </nope>"""
 
   override protected def appBuilder: GuiceApplicationBuilder =
     super.appBuilder.configure(

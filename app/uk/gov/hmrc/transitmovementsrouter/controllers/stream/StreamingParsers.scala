@@ -16,12 +16,14 @@
 
 package uk.gov.hmrc.transitmovementsrouter.controllers.stream
 
+import akka.stream.IOOperationIncompleteException
 import akka.stream.Materializer
 import akka.stream.scaladsl.FileIO
 import akka.stream.scaladsl.Flow
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import cats.syntax.all._
+import com.fasterxml.aalto.WFCException
 import play.api.libs.Files.TemporaryFileCreator
 import play.api.libs.json.Json
 import play.api.libs.streams.Accumulator
@@ -66,7 +68,10 @@ trait StreamingParsers {
             .via(transformer)
             .runWith(FileIO.toPath(tempFile))
             .transformWith {
-              case Success(_)   => block(request.withBody(FileIO.fromPath(tempFile)))
+              case Success(_) => block(request.withBody(FileIO.fromPath(tempFile)))
+              case Failure(error: IOOperationIncompleteException)
+                  if error.getCause.isInstanceOf[IllegalStateException] || error.getCause.isInstanceOf[WFCException] =>
+                Future.successful(Status(BAD_REQUEST)(Json.toJson(PresentationError.badRequestError(error.getCause.getMessage))))
               case Failure(thr) => Future.successful(Status(INTERNAL_SERVER_ERROR)(Json.toJson(PresentationError.internalServiceError(cause = Some(thr)))))
             }
             .attemptTap {

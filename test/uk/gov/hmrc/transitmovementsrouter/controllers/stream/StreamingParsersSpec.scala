@@ -26,6 +26,7 @@ import org.scalacheck.Gen
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
 import play.api.http.HeaderNames
+import play.api.http.Status.BAD_REQUEST
 import play.api.http.Status.INTERNAL_SERVER_ERROR
 import play.api.http.Status.OK
 import play.api.libs.Files.SingletonTemporaryFileCreator
@@ -115,7 +116,18 @@ class StreamingParsersSpec extends AnyFreeSpec with Matchers with TestActorSyste
       .andThen(TestActionBuilder)
       .stream(
         Flow.fromFunction[ByteString, ByteString](
-          _ => throw new IllegalStateException()
+          _ => throw new IllegalStateException("this happened")
+        )
+      ) {
+        _ =>
+          Future.successful(Ok("but should never happen"))
+      }
+
+    def internalErrorStream: Action[Source[ByteString, _]] = Action
+      .andThen(TestActionBuilder)
+      .stream(
+        Flow.fromFunction[ByteString, ByteString](
+          _ => throw new NumberFormatException() // doesn't matter - we're just not expecting it
         )
       ) {
         _ =>
@@ -164,10 +176,18 @@ class StreamingParsersSpec extends AnyFreeSpec with Matchers with TestActorSyste
       contentAsString(result) mustBe (string ++ string ++ string ++ string)
     }
 
-    "via the stream extension method with a transformation that fails" in {
+    "via the stream extension method with a transformation that fails in an expected way" in {
       val string  = Gen.stringOfN(20, Gen.alphaNumChar).sample.get
       val request = FakeRequest("POST", "/", headers, singleUseStringSource(string))
       val result  = Harness.errorStream()(request)
+      status(result) mustBe BAD_REQUEST
+      contentAsJson(result) mustBe Json.toJson(PresentationError.badRequestError("this happened"))
+    }
+
+    "via the stream extension method with a transformation that fails in an unexpected way" in {
+      val string  = Gen.stringOfN(20, Gen.alphaNumChar).sample.get
+      val request = FakeRequest("POST", "/", headers, singleUseStringSource(string))
+      val result  = Harness.internalErrorStream()(request)
       status(result) mustBe INTERNAL_SERVER_ERROR
       contentAsJson(result) mustBe Json.toJson(PresentationError.internalServiceError())
     }
