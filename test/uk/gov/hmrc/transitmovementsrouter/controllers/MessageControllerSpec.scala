@@ -33,6 +33,7 @@ import play.api.http.DefaultHttpErrorHandler
 import play.api.http.HttpErrorConfig
 import play.api.http.Status._
 import play.api.libs.Files.SingletonTemporaryFileCreator
+import play.api.libs.json.JsString
 import play.api.libs.json.Json
 import play.api.mvc.PlayBodyParsers
 import play.api.mvc.Request
@@ -369,6 +370,23 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
       val result = controller().incoming((movementId, messageId))(request)
 
       status(result) mustBe INTERNAL_SERVER_ERROR
+    }
+
+  }
+
+  "POST /movements/:movementId/messages/:messageId" - {
+
+    "should return ok" in {
+      val request = FakeRequest(
+        POST,
+        routes.MessagesController.incoming(movementId, messageId).url,
+        headers = FakeHeaders(),
+        JsString("upscan resonse") //TODO - this will either be response from upscan from a caseclass I create for a success vs failure
+      )
+
+      val result = controller().incomingLargeMessage(movementId, messageId)(request)
+
+      status(result) mustBe OK
     }
 
   }

@@ -17,6 +17,7 @@
 package uk.gov.hmrc.transitmovementsrouter.controllers
 
 import akka.stream.Materializer
+import akka.stream.scaladsl.Sink
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import cats.data.EitherT
@@ -93,6 +94,13 @@ class MessagesController @Inject() (
             response => Created.withHeaders("X-Message-Id" -> response.messageId.value)
           )
     }
+
+  def incomingLargeMessage(movementId: MovementId, messageId: MessageId) = Action.async(cc.parsers.json) {
+    implicit request =>
+      //validate the json, if it doesn't validate as a successful then it will as failure
+
+      Future.successful(Ok)
+  }
 
   private def filterRequestMessageType(messageType: MessageType): EitherT[Future, PresentationError, RequestMessageType] = messageType match {
     case t: RequestMessageType => EitherT.rightT(t)
