@@ -57,6 +57,11 @@ import uk.gov.hmrc.transitmovementsrouter.models.MovementId
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
 
 import java.net.URL
+import java.time.Instant
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -125,7 +130,7 @@ class EISConnectorSpec
 
   "post" should {
 
-    "add CustomProcessHost, X-Correlation-Id and X-Conversation-Id headers to messages for GB" in forAll(
+    "add CustomProcessHost, X-Correlation-Id and X-Conversation-Id and Date headers to messages for GB" in forAll(
       connectorGen,
       arbitrary[MovementId],
       arbitrary[MessageId]
@@ -167,6 +172,57 @@ class EISConnectorSpec
         stub(secondState, secondState, INTERNAL_SERVER_ERROR)
 
         val hc = HeaderCarrier()
+
+        whenReady(connector().post(movementId, messageId, source, hc)) {
+          _.isRight mustBe true
+        }
+    }
+
+    "add CustomProcessHost, X-Correlation-Id and X-Conversation-Id headers, but retain the Date header, to messages for GB" in forAll(
+      connectorGen,
+      arbitrary[MovementId],
+      arbitrary[MessageId]
+    ) {
+      (connector, movementId, messageId) =>
+        server.resetAll() // Need to reset due to the forAll - it's technically the same test
+
+        // Important note: while this test considers successes, as this connector has a retry function,
+        // we have to ensure that any success result is not retried. To do this, we make the stub return
+        // a 202 status the first time it is called, then we transition it into a state where it'll return
+        // an error. As the retry algorithm should not attempt a retry on a 202, the stub should only be
+        // called once - so a 500 should never be returned.
+        //
+        // If a 500 error is returned, this most likely means a retry happened, the first place to look
+        // should be the code the determines if a result is successful.
+
+        val expectedConversationId = ConversationId(movementId, messageId)
+
+        val time      = OffsetDateTime.of(2023, 2, 14, 15, 55, 28, 0, ZoneOffset.UTC)
+        val formatted = DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss z", Locale.ENGLISH).withZone(ZoneOffset.UTC).format(time)
+
+        def stub(currentState: String, targetState: String, codeToReturn: Int) =
+          server.stubFor(
+            post(
+              urlEqualTo(uriStub)
+            )
+              .inScenario("Standard Call")
+              .whenScenarioStateIs(currentState)
+              .withHeader("Date", equalTo(formatted))
+              .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
+              .withHeader("X-Conversation-Id", equalTo(expectedConversationId.value.toString))
+              .withHeader("CustomProcessHost", equalTo("Digital"))
+              .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
+              .withHeader(HeaderNames.CONTENT_TYPE, equalTo("application/xml"))
+              .willReturn(aResponse().withStatus(codeToReturn))
+              .willSetStateTo(targetState)
+          )
+
+        val secondState = "should now fail"
+
+        stub(Scenario.STARTED, secondState, ACCEPTED)
+        stub(secondState, secondState, INTERNAL_SERVER_ERROR)
+
+        val hc = HeaderCarrier().withExtraHeaders(HeaderNames.DATE -> formatted)
 
         whenReady(connector().post(movementId, messageId, source, hc)) {
           _.isRight mustBe true
