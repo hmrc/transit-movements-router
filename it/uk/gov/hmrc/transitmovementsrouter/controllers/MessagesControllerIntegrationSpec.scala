@@ -59,8 +59,7 @@ class MessagesControllerIntegrationSpec
     <n1:TraderChannelResponse xmlns:txd="http://ncts.dgtaxud.ec"
                                 xmlns:n1="http://www.hmrc.gov.uk/eis/ncts5/v1"
                                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                                xsi:schemaLocation="http://www.hmrc.gov.uk/eis/ncts5/v1
-    EIS_WrapperV10_TraderChannelSubmission-51.8.xsd">
+                                xsi:schemaLocation="http://www.hmrc.gov.uk/eis/ncts5/v1 EIS_WrapperV10_TraderChannelSubmission-51.8.xsd">
       <txd:CC029C PhaseID="NCTS5.0">
         <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
         <CustomsOfficeOfDeparture>
