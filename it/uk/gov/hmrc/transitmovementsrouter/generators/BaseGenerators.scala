@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package it.uk.gov.hmrc.transitmovementsrouter.generators
+package uk.gov.hmrc.transitmovementsrouter.generators
 
 import cats.data.NonEmptyList
 import org.scalacheck.Arbitrary.arbitrary

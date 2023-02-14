@@ -420,8 +420,7 @@ class MessageControllerSpec
           Json.toJson(submissionFailure)
         )
 
-        when(mockUpscanService.parseUpscanResponse(any[JsValue]))
-          .thenReturn(Some(submissionFailure))
+        when(mockUpscanService.parseUpscanResponse(any[JsValue])).thenReturn(None)
 
         val result = controller().incomingLargeMessage(movementId, messageId)(request)
 

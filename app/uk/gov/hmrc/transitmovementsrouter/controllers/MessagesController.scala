@@ -17,7 +17,6 @@
 package uk.gov.hmrc.transitmovementsrouter.controllers
 
 import akka.stream.Materializer
-import akka.stream.scaladsl.Sink
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import cats.data.EitherT
@@ -45,6 +44,7 @@ import uk.gov.hmrc.transitmovementsrouter.models.RequestMessageType
 import uk.gov.hmrc.transitmovementsrouter.services.MessageTypeHeaderExtractor
 import uk.gov.hmrc.transitmovementsrouter.services.RoutingService
 import uk.gov.hmrc.transitmovementsrouter.services.StreamingMessageTrimmer
+import uk.gov.hmrc.transitmovementsrouter.services.UpscanService
 
 import javax.inject.Inject
 import scala.concurrent.Future
@@ -54,6 +54,7 @@ class MessagesController @Inject() (
   routingService: RoutingService,
   persistenceConnector: PersistenceConnector,
   pushNotificationsConnector: PushNotificationsConnector,
+  upscanService: UpscanService,
   trimmer: StreamingMessageTrimmer,
   messageSize: MessageSizeActionProvider
 )(implicit
@@ -97,7 +98,7 @@ class MessagesController @Inject() (
 
   def incomingLargeMessage(movementId: MovementId, messageId: MessageId) = Action.async(cc.parsers.json) {
     implicit request =>
-      //validate the json, if it doesn't validate as a successful then it will as failure
+      upscanService.parseUpscanResponse(request.body)
 
       Future.successful(Ok)
   }

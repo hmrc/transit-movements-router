@@ -14,11 +14,10 @@
  * limitations under the License.
  */
 
-package it.uk.gov.hmrc.transitmovementsrouter.connectors
+package uk.gov.hmrc.transitmovementsrouter.connectors
 
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
-import cats.syntax.all._
 import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.stubbing.Scenario
 import org.mockito.ArgumentMatchers

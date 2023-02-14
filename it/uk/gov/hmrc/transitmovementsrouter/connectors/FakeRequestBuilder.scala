@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package it.uk.gov.hmrc.transitmovementsrouter.connectors
+package uk.gov.hmrc.transitmovementsrouter.connectors
 
 import play.api.libs.ws.BodyWritable
 import play.api.libs.ws.WSRequest
