@@ -23,6 +23,10 @@ import uk.gov.hmrc.transitmovementsrouter.models.MessageId
 import uk.gov.hmrc.transitmovementsrouter.models.MessageType
 import uk.gov.hmrc.transitmovementsrouter.models.MovementId
 import uk.gov.hmrc.transitmovementsrouter.models.RequestMessageType
+import uk.gov.hmrc.transitmovementsrouter.models.responses.FailureDetails
+import uk.gov.hmrc.transitmovementsrouter.models.responses.UploadDetails
+import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.SubmissionFailure
+import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.SuccessfulSubmission
 
 import java.time.Instant
 import java.time.OffsetDateTime
@@ -61,5 +65,38 @@ trait ModelGenerators extends BaseGenerators {
         millis <- Gen.chooseNum(0, Long.MaxValue / 1000L)
       } yield OffsetDateTime.ofInstant(Instant.ofEpochMilli(millis), ZoneOffset.UTC)
     }
+
+  implicit lazy val arbitraryUploadDetails: Arbitrary[UploadDetails] = Arbitrary {
+    for {
+      fileName     <- Gen.alphaNumStr
+      fileMimeType <- Gen.alphaNumStr
+      checksum     <- Gen.alphaNumStr
+      size         <- Gen.long
+    } yield UploadDetails(fileName, fileMimeType, Instant.now(), checksum, size)
+  }
+
+  implicit lazy val arbitrarySuccessfulSubmission: Arbitrary[SuccessfulSubmission] = Arbitrary {
+    for {
+      reference   <- Gen.alphaNumStr
+      downloadUrl <- Gen.alphaNumStr
+      fileStatus  <- Gen.alphaNumStr
+      details     <- arbitraryUploadDetails.arbitrary
+    } yield SuccessfulSubmission(reference, downloadUrl, fileStatus, details)
+  }
+
+  implicit lazy val arbitraryFailureDetails: Arbitrary[FailureDetails] = Arbitrary {
+    for {
+      failureReason <- Gen.alphaNumStr
+      message       <- Gen.alphaNumStr
+    } yield FailureDetails(failureReason, message)
+  }
+
+  implicit lazy val arbitrarySubmissionFailure: Arbitrary[SubmissionFailure] = Arbitrary {
+    for {
+      reference  <- Gen.alphaNumStr
+      fileStatus <- Gen.alphaNumStr
+      reason     <- arbitraryFailureDetails.arbitrary
+    } yield SubmissionFailure(reference, fileStatus, reason)
+  }
 
 }

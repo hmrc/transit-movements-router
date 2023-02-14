@@ -68,21 +68,21 @@ object MessageType {
   // *******************
 
   /** E_DEC_AMD (IE013) */
-  case object DeclarationAmendment extends DepartureRequestMessageType("IE013", "CC013C")
+  final case object DeclarationAmendment extends DepartureRequestMessageType("IE013", "CC013C")
 
   /** E_DEC_INV (IE014) */
-  case object DeclarationInvalidation extends DepartureRequestMessageType("IE014", "CC014C")
+  final case object DeclarationInvalidation extends DepartureRequestMessageType("IE014", "CC014C")
 
   /** E_DEC_DAT (IE015) */
-  case object DeclarationData extends DepartureRequestMessageType("IE015", "CC015C")
+  final case object DeclarationData extends DepartureRequestMessageType("IE015", "CC015C")
 
   /** E_REQ_REL (IE054) */
-  case object RequestOfRelease extends DepartureRequestMessageType("IE054", "CC054C")
+  final case object RequestOfRelease extends DepartureRequestMessageType("IE054", "CC054C")
 
   /** E_PRE_NOT (IE170) */
-  case object PresentationNotification extends DepartureRequestMessageType("IE170", "CC170C")
+  final case object PresentationNotification extends DepartureRequestMessageType("IE170", "CC170C")
 
-  case object InformationAboutNonArrivedMovement extends DepartureRequestMessageType("IE141", "CC141C", "CustomsOfficeOfEnquiryAtDeparture")
+  final case object InformationAboutNonArrivedMovement extends DepartureRequestMessageType("IE141", "CC141C", "CustomsOfficeOfEnquiryAtDeparture")
 
   val departureRequestValues = Set(
     DeclarationAmendment,

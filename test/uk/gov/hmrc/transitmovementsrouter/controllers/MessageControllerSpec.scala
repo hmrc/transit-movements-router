@@ -34,6 +34,7 @@ import play.api.http.HttpErrorConfig
 import play.api.http.Status._
 import play.api.libs.Files.SingletonTemporaryFileCreator
 import play.api.libs.json.JsString
+import play.api.libs.json.JsValue
 import play.api.libs.json.Json
 import play.api.mvc.PlayBodyParsers
 import play.api.mvc.Request
@@ -53,6 +54,7 @@ import uk.gov.hmrc.transitmovementsrouter.connectors.PushNotificationsConnector
 import uk.gov.hmrc.transitmovementsrouter.controllers.actions.MessageSizeActionProvider
 import uk.gov.hmrc.transitmovementsrouter.fakes.actions.FakeMessageSizeAction
 import uk.gov.hmrc.transitmovementsrouter.fakes.actions.FakeXmlTrimmer
+import uk.gov.hmrc.transitmovementsrouter.generators.ModelGenerators
 import uk.gov.hmrc.transitmovementsrouter.models.MessageType.RequestOfRelease
 import uk.gov.hmrc.transitmovementsrouter.models.EoriNumber
 import uk.gov.hmrc.transitmovementsrouter.models.MessageId
@@ -65,6 +67,7 @@ import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.Movemen
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.Unexpected
 import uk.gov.hmrc.transitmovementsrouter.services.RoutingService
 import uk.gov.hmrc.transitmovementsrouter.services.StreamingMessageTrimmer
+import uk.gov.hmrc.transitmovementsrouter.services.UpscanService
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
 import uk.gov.hmrc.transitmovementsrouter.models.CustomsOffice
 
@@ -73,7 +76,13 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.xml.NodeSeq
 
-class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSystem with BeforeAndAfterEach with ScalaCheckDrivenPropertyChecks {
+class MessageControllerSpec
+    extends AnyFreeSpec
+    with Matchers
+    with TestActorSystem
+    with BeforeAndAfterEach
+    with ScalaCheckDrivenPropertyChecks
+    with ModelGenerators {
 
   val eori         = EoriNumber("eori")
   val movementType = MovementType("departures")
@@ -95,6 +104,7 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
   val mockRoutingService             = mock[RoutingService]
   val mockPersistenceConnector       = mock[PersistenceConnector]
   val mockPushNotificationsConnector = mock[PushNotificationsConnector]
+  val mockUpscanService              = mock[UpscanService]
   implicit val temporaryFileCreator  = SingletonTemporaryFileCreator
 
   val mockProvider = mock[MessageSizeActionProvider]
@@ -104,7 +114,15 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
   val controllerComponentWithTempFile = stubControllerComponents(playBodyParsers = PlayBodyParsers(SingletonTemporaryFileCreator, errorHandler)(materializer))
 
   def controller(trimmer: StreamingMessageTrimmer = new FakeXmlTrimmer(trimmedXml)) =
-    new MessagesController(controllerComponentWithTempFile, mockRoutingService, mockPersistenceConnector, mockPushNotificationsConnector, trimmer, mockProvider)
+    new MessagesController(
+      controllerComponentWithTempFile,
+      mockRoutingService,
+      mockPersistenceConnector,
+      mockPushNotificationsConnector,
+      mockUpscanService,
+      trimmer,
+      mockProvider
+    )
 
   def source = createStream(cc015cOfficeOfDepartureGB)
 
@@ -376,18 +394,38 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
 
   "POST /movements/:movementId/messages/:messageId" - {
 
-    "should return ok" in {
-      val request = FakeRequest(
-        POST,
-        routes.MessagesController.incoming(movementId, messageId).url,
-        headers = FakeHeaders(),
-        JsString("upscan resonse") //TODO - this will either be response from upscan from a caseclass I create for a success vs failure
-      )
+    "should return ok given a successful response from upscan" in forAll(arbitrarySuccessfulSubmission.arbitrary) {
+      successfulSubmission =>
+        val request = FakeRequest(
+          POST,
+          routes.MessagesController.incoming(movementId, messageId).url,
+          headers = FakeHeaders(),
+          Json.toJson(successfulSubmission)
+        )
 
-      val result = controller().incomingLargeMessage(movementId, messageId)(request)
+        when(mockUpscanService.parseUpscanResponse(any[JsValue]))
+          .thenReturn(Some(successfulSubmission))
 
-      status(result) mustBe OK
+        val result = controller().incomingLargeMessage(movementId, messageId)(request)
+
+        status(result) mustBe OK
     }
 
+    "should return ok given a failure response from upscan" in forAll(arbitrarySubmissionFailure.arbitrary) {
+      submissionFailure =>
+        val request = FakeRequest(
+          POST,
+          routes.MessagesController.incoming(movementId, messageId).url,
+          headers = FakeHeaders(),
+          Json.toJson(submissionFailure)
+        )
+
+        when(mockUpscanService.parseUpscanResponse(any[JsValue]))
+          .thenReturn(Some(submissionFailure))
+
+        val result = controller().incomingLargeMessage(movementId, messageId)(request)
+
+        status(result) mustBe OK
+    }
   }
 }

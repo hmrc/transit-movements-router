@@ -21,6 +21,6 @@ import uk.gov.hmrc.transitmovementsrouter.models.MovementId
 sealed trait PersistenceError
 
 object PersistenceError {
-  case class MovementNotFound(movementId: MovementId)  extends PersistenceError
-  case class Unexpected(thr: Option[Throwable] = None) extends PersistenceError
+  final case class MovementNotFound(movementId: MovementId)  extends PersistenceError
+  final case class Unexpected(thr: Option[Throwable] = None) extends PersistenceError
 }

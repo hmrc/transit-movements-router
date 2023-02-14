@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovementsrouter.base
+package it.uk.gov.hmrc.transitmovementsrouter.base
 
 import akka.actor.ActorSystem
 import akka.stream.Materializer

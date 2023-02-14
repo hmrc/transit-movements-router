@@ -49,6 +49,7 @@ trait RoutingService {
 
 }
 
+@Singleton
 class RoutingServiceImpl @Inject() (messageConnectorProvider: EISConnectorProvider)(implicit materializer: Materializer)
     extends RoutingService
     with XmlParsingServiceHelpers
