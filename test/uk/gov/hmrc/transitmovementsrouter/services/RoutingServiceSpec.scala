@@ -16,9 +16,12 @@
 
 package uk.gov.hmrc.transitmovementsrouter.services
 
+import akka.stream.scaladsl.Flow
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import org.mockito.ArgumentMatchers
+import org.mockito.Mockito.times
+import org.mockito.Mockito.verify
 import org.mockito.Mockito.when
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
@@ -67,7 +70,12 @@ class RoutingServiceSpec
           messageWithDepartureOfficeNode(messageType, "GB")
         ) {
           (messageId, movementId, officeOfDepartureXML) =>
-            val serviceUnderTest = new RoutingServiceImpl(mockMessageConnectorProvider)
+            val mockEISMessageTransformer = mock[EISMessageTransformers]
+            when(mockEISMessageTransformer.wrap).thenAnswer(
+              _ => Flow[ByteString]
+            )
+
+            val serviceUnderTest = new RoutingServiceImpl(mockEISMessageTransformer, mockMessageConnectorProvider)
             val payload          = createStream(officeOfDepartureXML._1)
             val response = serviceUnderTest.submitMessage(
               MovementType("departures"),
@@ -78,7 +86,9 @@ class RoutingServiceSpec
             )
 
             whenReady(response.value, Timeout(2.seconds)) {
-              _.mustBe(Right(()))
+              r =>
+                r.mustBe(Right(()))
+                verify(mockEISMessageTransformer, times(1)).wrap
             }
         }
 
@@ -88,7 +98,12 @@ class RoutingServiceSpec
           messageWithDepartureOfficeNode(messageType, "XI")
         ) {
           (messageId, movementId, officeOfDepartureXML) =>
-            val serviceUnderTest = new RoutingServiceImpl(mockMessageConnectorProvider)
+            val mockEISMessageTransformer = mock[EISMessageTransformers]
+            when(mockEISMessageTransformer.wrap).thenAnswer(
+              _ => Flow[ByteString]
+            )
+
+            val serviceUnderTest = new RoutingServiceImpl(mockEISMessageTransformer, mockMessageConnectorProvider)
             val payload          = createStream(officeOfDepartureXML._1)
             val response = serviceUnderTest.submitMessage(
               MovementType("departures"),
@@ -99,7 +114,9 @@ class RoutingServiceSpec
             )
 
             whenReady(response.value, Timeout(2.seconds)) {
-              _.mustBe(Right(()))
+              r =>
+                r.mustBe(Right(()))
+                verify(mockEISMessageTransformer, times(1)).wrap
             }
         }
 
@@ -109,7 +126,12 @@ class RoutingServiceSpec
           messageWithDepartureOfficeNode(messageType, "FR")
         ) {
           (messageId, movementId, officeOfDeparture) =>
-            val serviceUnderTest = new RoutingServiceImpl(mockMessageConnectorProvider)
+            val mockEISMessageTransformer = mock[EISMessageTransformers]
+            when(mockEISMessageTransformer.wrap).thenAnswer(
+              _ => Flow[ByteString]
+            )
+
+            val serviceUnderTest = new RoutingServiceImpl(mockEISMessageTransformer, mockMessageConnectorProvider)
             val referenceNumber  = officeOfDeparture._2
             val payload          = createStream(officeOfDeparture._1)
             val response = serviceUnderTest.submitMessage(
@@ -121,9 +143,11 @@ class RoutingServiceSpec
             )
 
             whenReady(response.value, Timeout(2.seconds)) {
-              _.mustBe(
-                Left(RoutingError.UnrecognisedOffice(s"Did not recognise office: $referenceNumber", CustomsOffice(referenceNumber), messageType.officeNode))
-              )
+              r =>
+                r.mustBe(
+                  Left(RoutingError.UnrecognisedOffice(s"Did not recognise office: $referenceNumber", CustomsOffice(referenceNumber), messageType.officeNode))
+                )
+                verify(mockEISMessageTransformer, times(0)).wrap
             }
         }
 
@@ -132,7 +156,12 @@ class RoutingServiceSpec
           arbitrary[MovementId]
         ) {
           (messageId, movementId) =>
-            val serviceUnderTest = new RoutingServiceImpl(mockMessageConnectorProvider)
+            val mockEISMessageTransformer = mock[EISMessageTransformers]
+            when(mockEISMessageTransformer.wrap).thenAnswer(
+              _ => Flow[ByteString]
+            )
+
+            val serviceUnderTest = new RoutingServiceImpl(mockEISMessageTransformer, mockMessageConnectorProvider)
             val payload          = createStream(emptyMessage(messageType.rootNode))
             val response = serviceUnderTest.submitMessage(
               MovementType("departures"),
@@ -143,7 +172,9 @@ class RoutingServiceSpec
             )
 
             whenReady(response.value, Timeout(2.seconds)) {
-              _.mustBe(Left(NoElementFound("referenceNumber")))
+              r =>
+                r.mustBe(Left(NoElementFound("referenceNumber")))
+                verify(mockEISMessageTransformer, times(0)).wrap
             }
         }
     }
@@ -156,7 +187,12 @@ class RoutingServiceSpec
           messageWithDestinationOfficeNode(messageType, "GB")
         ) {
           (messageId, movementId, officeOfDestinationXML) =>
-            val serviceUnderTest = new RoutingServiceImpl(mockMessageConnectorProvider)
+            val mockEISMessageTransformer = mock[EISMessageTransformers]
+            when(mockEISMessageTransformer.wrap).thenAnswer(
+              _ => Flow[ByteString]
+            )
+
+            val serviceUnderTest = new RoutingServiceImpl(mockEISMessageTransformer, mockMessageConnectorProvider)
             val payload          = createStream(officeOfDestinationXML._1)
             val response = serviceUnderTest.submitMessage(
               MovementType("arrivals"),
@@ -167,7 +203,9 @@ class RoutingServiceSpec
             )
 
             whenReady(response.value, Timeout(2.seconds)) {
-              _.mustBe(Right(()))
+              r =>
+                r.mustBe(Right(()))
+                verify(mockEISMessageTransformer, times(1)).wrap
             }
         }
 
@@ -177,7 +215,12 @@ class RoutingServiceSpec
           messageWithDestinationOfficeNode(messageType, "XI")
         ) {
           (messageId, movementId, officeOfDestinationXML) =>
-            val serviceUnderTest = new RoutingServiceImpl(mockMessageConnectorProvider)
+            val mockEISMessageTransformer = mock[EISMessageTransformers]
+            when(mockEISMessageTransformer.wrap).thenAnswer(
+              _ => Flow[ByteString]
+            )
+
+            val serviceUnderTest = new RoutingServiceImpl(mockEISMessageTransformer, mockMessageConnectorProvider)
             val payload          = createStream(officeOfDestinationXML._1)
             val response = serviceUnderTest.submitMessage(
               MovementType("arrivals"),
@@ -188,7 +231,9 @@ class RoutingServiceSpec
             )
 
             whenReady(response.value, Timeout(2.seconds)) {
-              _.mustBe(Right(()))
+              r =>
+                r.mustBe(Right(()))
+                verify(mockEISMessageTransformer, times(1)).wrap
             }
         }
 
@@ -199,7 +244,12 @@ class RoutingServiceSpec
           arbitrary[MovementId]
         ) {
           (messageId, movementId) =>
-            val serviceUnderTest = new RoutingServiceImpl(mockMessageConnectorProvider)
+            val mockEISMessageTransformer = mock[EISMessageTransformers]
+            when(mockEISMessageTransformer.wrap).thenAnswer(
+              _ => Flow[ByteString]
+            )
+
+            val serviceUnderTest = new RoutingServiceImpl(mockEISMessageTransformer, mockMessageConnectorProvider)
             val payload          = createStream(officeOfDestinationXML._1)
 
             val response = serviceUnderTest.submitMessage(
@@ -211,15 +261,17 @@ class RoutingServiceSpec
             )
 
             whenReady(response.value, Timeout(2.seconds)) {
-              _.mustBe(
-                Left(
-                  RoutingError.UnrecognisedOffice(
-                    s"Did not recognise office: ${officeOfDestinationXML._2}",
-                    CustomsOffice(officeOfDestinationXML._2),
-                    messageType.officeNode
+              r =>
+                r.mustBe(
+                  Left(
+                    RoutingError.UnrecognisedOffice(
+                      s"Did not recognise office: ${officeOfDestinationXML._2}",
+                      CustomsOffice(officeOfDestinationXML._2),
+                      messageType.officeNode
+                    )
                   )
                 )
-              )
+                verify(mockEISMessageTransformer, times(0)).wrap
             }
         }
 
@@ -228,6 +280,10 @@ class RoutingServiceSpec
 
   "selectConnector" - {
 
+    val mockEISMessageTransformer = mock[EISMessageTransformers]
+    when(mockEISMessageTransformer.wrap).thenAnswer(
+      _ => Flow[ByteString]
+    )
     val mockGbEISConnector = mock[EISConnector]
     when(mockGbEISConnector.toString).thenReturn("GB")
     val mockXiEISConnector = mock[EISConnector]
@@ -238,7 +294,7 @@ class RoutingServiceSpec
       override def xi: EISConnector = mockXiEISConnector
     }
 
-    val sut = new RoutingServiceImpl(provider)
+    val sut = new RoutingServiceImpl(mockEISMessageTransformer, provider)
 
     val requestMessageTypes = Gen.oneOf(MessageType.departureRequestValues ++ MessageType.arrivalRequestValues)
 

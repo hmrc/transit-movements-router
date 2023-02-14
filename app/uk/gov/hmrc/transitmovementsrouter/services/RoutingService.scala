@@ -49,7 +49,10 @@ trait RoutingService {
 
 }
 
-class RoutingServiceImpl @Inject() (messageConnectorProvider: EISConnectorProvider)(implicit materializer: Materializer)
+class RoutingServiceImpl @Inject() (
+  eisMessageTransformers: EISMessageTransformers,
+  messageConnectorProvider: EISConnectorProvider
+)(implicit materializer: Materializer)
     extends RoutingService
     with XmlParsingServiceHelpers
     with Logging {
@@ -81,7 +84,7 @@ class RoutingServiceImpl @Inject() (messageConnectorProvider: EISConnectorProvid
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): EitherT[Future, RoutingError, Unit] =
     for {
       connector <- EitherT[Future, RoutingError, EISConnector](payload.runWith(eisConnectorSelector(messageType)))
-      _         <- EitherT(connector.post(payload, hc))
+      _         <- EitherT(connector.post(payload.via(eisMessageTransformers.wrap), hc))
     } yield ()
 
   def selectConnector(maybeOffice: ParseResult[CustomsOffice], messageType: RequestMessageType): ParseResult[EISConnector] =
