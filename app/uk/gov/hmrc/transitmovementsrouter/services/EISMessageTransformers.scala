@@ -35,6 +35,8 @@ import uk.gov.hmrc.transitmovementsrouter.services.state.UnwrappingState.Looking
 @ImplementedBy(classOf[EISMessageTransformersImpl])
 trait EISMessageTransformers {
 
+  def wrap: Flow[ByteString, ByteString, _]
+
   def unwrap: Flow[ByteString, ByteString, _]
 
 }
@@ -96,5 +98,7 @@ class EISMessageTransformersImpl extends EISMessageTransformers {
       )
       .via(XmlParsing.subslice("TraderChannelResponse" :: Nil))
       .via(XmlWriting.writer)
+
+  lazy val wrap: Flow[ByteString, ByteString, _] = ???
 
 }
