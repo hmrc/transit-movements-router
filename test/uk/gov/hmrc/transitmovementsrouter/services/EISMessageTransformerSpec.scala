@@ -33,9 +33,9 @@ class EISMessageTransformerSpec extends AnyFreeSpec with Matchers with ScalaFutu
 
   val sut = new EISMessageTransformersImpl
 
-  "trim flow should" - {
+  "unwrap" - {
 
-    "successfully trim with valid xml" in {
+    "should successfully transform valid xml" in {
       val input =
         """<n1:TraderChannelResponse xmlns:txd="http://ncts.dgtaxud.ec" xmlns:n1="http://www.hmrc.gov.uk/eis/ncts5/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.hmrc.gov.uk/eis/ncts5/v1 EIS_WrapperV10_TraderChannelSubmission-51.8.xsd"><txd:CC029C PhaseID="NCTS5.0">text</txd:CC029C></n1:TraderChannelResponse>"""
 
@@ -52,7 +52,7 @@ class EISMessageTransformerSpec extends AnyFreeSpec with Matchers with ScalaFutu
       }
     }
 
-    "successfully trim with more complex valid xml, without specifying the PhaseID" in {
+    "should successfully transform with more complex valid xml, without specifying the PhaseID" in {
       val input =
         <n1:TraderChannelResponse xmlns:txd="http://ncts.dgtaxud.ec" xmlns:n1="http://www.hmrc.gov.uk/eis/ncts5/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.hmrc.gov.uk/eis/ncts5/v1 EIS_WrapperV10_TraderChannelSubmission-51.8.xsd">
           <txd:CC015C>
