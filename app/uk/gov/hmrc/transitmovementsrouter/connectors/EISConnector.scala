@@ -98,7 +98,7 @@ class EISConnectorImpl(
       case x     => x
     }
 
-    val requestHeaders: Seq[(String, String)] = hc.headers(OutgoingHeaders.headers) ++ dateHeader ++ Seq(
+    val requestHeaders: Seq[(String, String)] = hc.headers(Seq("X-Message-Type")) ++ dateHeader ++ Seq(
       "X-Correlation-Id"        -> UUID.randomUUID().toString,
       "CustomProcessHost"       -> "Digital",
       HeaderNames.CONTENT_TYPE  -> MimeTypes.XML,
@@ -134,7 +134,6 @@ class EISConnectorImpl(
                 |""".stripMargin
 
       withCircuitBreaker[Either[RoutingError, Unit]](shouldCauseCircuitBreakerStrike) {
-
         httpClientV2
           .post(url"${eisInstanceConfig.url}")
           .withBody(body)
