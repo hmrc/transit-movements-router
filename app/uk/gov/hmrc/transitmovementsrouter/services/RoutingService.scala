@@ -84,7 +84,7 @@ class RoutingServiceImpl @Inject() (
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): EitherT[Future, RoutingError, Unit] =
     for {
       connector <- EitherT[Future, RoutingError, EISConnector](payload.runWith(eisConnectorSelector(messageType)))
-      _         <- EitherT(connector.post(payload.via(eisMessageTransformers.wrap), hc))
+      _         <- EitherT(connector.post(movementId, messageId, payload.via(eisMessageTransformers.wrap), hc))
     } yield ()
 
   def selectConnector(maybeOffice: ParseResult[CustomsOffice], messageType: RequestMessageType): ParseResult[EISConnector] =

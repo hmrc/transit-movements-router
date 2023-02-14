@@ -19,7 +19,8 @@ package uk.gov.hmrc.transitmovementsrouter.services
 import akka.stream.scaladsl.Flow
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
-import org.mockito.ArgumentMatchers
+import org.mockito.ArgumentMatchers.any
+import org.mockito.ArgumentMatchers.anyString
 import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.when
@@ -336,8 +337,10 @@ class RoutingServiceSpec
     when(mockMessageConnectorProvider.xi) thenReturn mockMessageConnector
     when(
       mockMessageConnector.post(
-        ArgumentMatchers.any[Source[ByteString, _]],
-        ArgumentMatchers.any[HeaderCarrier]
+        MovementId(anyString()),
+        MessageId(anyString()),
+        any[Source[ByteString, _]],
+        any[HeaderCarrier]
       )
     )
       .thenReturn(Future.successful(Right(())))
