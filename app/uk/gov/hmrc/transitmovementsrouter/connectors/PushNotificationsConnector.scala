@@ -83,6 +83,7 @@ class PushNotificationsConnectorImpl @Inject() (httpClientV2: HttpClientV2, appC
               error.statusCode match {
                 case NOT_FOUND             => Left(MovementNotFound(movementId))
                 case INTERNAL_SERVER_ERROR => Left(Unexpected(Some(error.getCause)))
+                case _                     => Left(Unexpected(Some(error.getCause)))
               }
           }
           .recover {

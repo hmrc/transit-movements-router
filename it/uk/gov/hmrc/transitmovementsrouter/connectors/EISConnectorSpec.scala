@@ -40,13 +40,14 @@ import retry.RetryPolicy
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.client.HttpClientV2
 import uk.gov.hmrc.http.test.HttpClientV2Support
-import uk.gov.hmrc.transitmovementsrouter.base.RegexPatterns
-import uk.gov.hmrc.transitmovementsrouter.base.TestActorSystem
-import uk.gov.hmrc.transitmovementsrouter.base.TestHelpers
 import uk.gov.hmrc.transitmovementsrouter.config.CircuitBreakerConfig
 import uk.gov.hmrc.transitmovementsrouter.config.EISInstanceConfig
 import uk.gov.hmrc.transitmovementsrouter.config.Headers
 import uk.gov.hmrc.transitmovementsrouter.config.RetryConfig
+import uk.gov.hmrc.transitmovementsrouter.it.base.RegexPatterns
+import uk.gov.hmrc.transitmovementsrouter.it.base.TestActorSystem
+import uk.gov.hmrc.transitmovementsrouter.it.base.TestHelpers
+import uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuite
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
 
 import java.net.URL

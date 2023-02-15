@@ -41,4 +41,6 @@ class AppConfig @Inject() (config: Configuration, servicesConfig: CTCServicesCon
 
   lazy val messageSizeLimit: Int = config.get[Int]("messageSizeLimit")
 
+  lazy val incomingAuth: IncomingAuthConfig = config.get[IncomingAuthConfig]("incomingRequestAuth")
+
 }

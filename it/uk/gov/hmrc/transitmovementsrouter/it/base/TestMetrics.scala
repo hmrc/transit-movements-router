@@ -14,12 +14,13 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovementsrouter.models.errors
+package uk.gov.hmrc.transitmovementsrouter.it.base
 
-sealed trait HeaderExtractError
+import com.codahale.metrics.MetricRegistry
+import com.kenshoo.play.metrics.Metrics
 
-object HeaderExtractError {
-  case class NoHeaderFound(headerName: String) extends HeaderExtractError
+class TestMetrics extends Metrics {
+  override def defaultRegistry: MetricRegistry = new MetricRegistry
 
-  case class InvalidMessageType(message: String) extends HeaderExtractError
+  override def toJson: String = "{}"
 }

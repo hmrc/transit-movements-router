@@ -27,15 +27,15 @@ import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 import uk.gov.hmrc.http.UpstreamErrorResponse
 import uk.gov.hmrc.transitmovementsrouter.models.CustomsOffice
 import uk.gov.hmrc.transitmovementsrouter.models.MovementId
-import uk.gov.hmrc.transitmovementsrouter.models.errors.HeaderExtractError
+import uk.gov.hmrc.transitmovementsrouter.models.errors.MessageTypeExtractionError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PushNotificationError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.ErrorCode.BadRequest
 import uk.gov.hmrc.transitmovementsrouter.models.errors.ErrorCode.InternalServerError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.ErrorCode.InvalidOffice
 import uk.gov.hmrc.transitmovementsrouter.models.errors.ErrorCode.NotFound
-import uk.gov.hmrc.transitmovementsrouter.models.errors.HeaderExtractError.InvalidMessageType
-import uk.gov.hmrc.transitmovementsrouter.models.errors.HeaderExtractError.NoHeaderFound
+import uk.gov.hmrc.transitmovementsrouter.models.errors.MessageTypeExtractionError.InvalidMessageType
+import uk.gov.hmrc.transitmovementsrouter.models.errors.MessageTypeExtractionError.UnableToExtractFromBody
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError.BadDateTime
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError.NoElementFound
@@ -165,14 +165,14 @@ class ConvertErrorSpec extends AnyFreeSpec with Matchers with OptionValues with 
   }
 
   "HeaderExtractError error" - {
-    "for a failure - handle NoHeaderFound error" in {
-      val input = Left[HeaderExtractError, Unit](NoHeaderFound("headerName")).toEitherT[Future]
+    "for a failure - handle UnableToExtractFromBody error" in {
+      val input = Left[MessageTypeExtractionError, Unit](UnableToExtractFromBody).toEitherT[Future]
       whenReady(input.asPresentation.value) {
-        _ mustBe Left(StandardError("Missing header: headerName", BadRequest))
+        _ mustBe Left(StandardError("Message appears to be malformed -- message type was not detected", BadRequest))
       }
     }
     "for a failure - handle InvalidMessageType error" in {
-      val input = Left[HeaderExtractError, Unit](InvalidMessageType("code")).toEitherT[Future]
+      val input = Left[MessageTypeExtractionError, Unit](InvalidMessageType("code")).toEitherT[Future]
       whenReady(input.asPresentation.value) {
         _ mustBe Left(StandardError("Invalid message type: code", BadRequest))
       }

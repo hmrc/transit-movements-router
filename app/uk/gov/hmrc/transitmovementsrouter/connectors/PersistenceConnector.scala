@@ -65,15 +65,15 @@ class PersistenceConnectorImpl @Inject() (httpClientV2: HttpClientV2, appConfig:
   val baseUrl           = appConfig.persistenceServiceBaseUrl
   val baseRoute: String = "/transit-movements"
 
-  private def persistenceSendMessage(movementId: MovementId, messageId: MessageId): UrlPath =
-    Url(path = s"$baseRoute/traders/movements/${movementId.value}/messages", query = QueryString.fromPairs("triggerId" -> messageId.value)).path
+  private def persistenceSendMessage(movementId: MovementId): UrlPath =
+    Url(path = s"$baseRoute/traders/movements/${movementId.value}/messages").path
 
   override def post(movementId: MovementId, messageId: MessageId, messageType: MessageType, source: Source[ByteString, _])(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): EitherT[Future, PersistenceError, PersistenceResponse] =
     EitherT {
-      val url = baseUrl.withPath(persistenceSendMessage(movementId, messageId))
+      val url = baseUrl.withPath(persistenceSendMessage(movementId)).withQueryString(QueryString.fromPairs("triggerId" -> messageId.value))
       httpClientV2
         .post(url"$url")
         .transform(_.addHttpHeaders(HeaderNames.CONTENT_TYPE -> MimeTypes.XML, "X-Message-Type" -> messageType.code))
@@ -90,6 +90,7 @@ class PersistenceConnectorImpl @Inject() (httpClientV2: HttpClientV2, appConfig:
               case BAD_REQUEST           => Left(Unexpected())
               case NOT_FOUND             => Left(MovementNotFound(movementId))
               case INTERNAL_SERVER_ERROR => Left(Unexpected())
+              case _                     => Left(Unexpected())
             }
         }
         .recover {

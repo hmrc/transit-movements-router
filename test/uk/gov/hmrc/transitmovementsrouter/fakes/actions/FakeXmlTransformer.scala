@@ -14,17 +14,16 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovementsrouter.base
+package uk.gov.hmrc.transitmovementsrouter.fakes.actions
 
-import akka.actor.ActorSystem
-import akka.stream.Materializer
-import org.scalatest.Suite
+import akka.stream.scaladsl.Flow
+import akka.stream.scaladsl.Sink
+import akka.util.ByteString
+import uk.gov.hmrc.transitmovementsrouter.base.StreamTestHelpers
+import uk.gov.hmrc.transitmovementsrouter.services.EISMessageTransformers
 
-object TestActorSystem {
-  val system: ActorSystem = ActorSystem("test")
-}
+import scala.xml.NodeSeq
 
-trait TestActorSystem { self: Suite =>
-  implicit val system: ActorSystem        = TestActorSystem.system
-  implicit val materializer: Materializer = Materializer(TestActorSystem.system)
+class FakeXmlTransformer(xml: NodeSeq) extends EISMessageTransformers {
+  override def unwrap: Flow[ByteString, ByteString, _] = Flow.fromSinkAndSource[ByteString, ByteString](Sink.ignore, StreamTestHelpers.createStream(xml))
 }
