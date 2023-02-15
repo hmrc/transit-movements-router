@@ -31,9 +31,12 @@ import uk.gov.hmrc.transitmovementsrouter.services.state.UnwrappingState
 import uk.gov.hmrc.transitmovementsrouter.services.state.UnwrappingState.FoundMessageType
 import uk.gov.hmrc.transitmovementsrouter.services.state.UnwrappingState.LookingForMessageTypeElement
 import uk.gov.hmrc.transitmovementsrouter.services.state.UnwrappingState.LookingForWrappedElement
+import uk.gov.hmrc.transitmovementsrouter.services.state.WrappingState
 
 @ImplementedBy(classOf[EISMessageTransformersImpl])
 trait EISMessageTransformers {
+
+  def wrap: Flow[ByteString, ByteString, _]
 
   def unwrap: Flow[ByteString, ByteString, _]
 
@@ -42,16 +45,38 @@ trait EISMessageTransformers {
 @Singleton
 class EISMessageTransformersImpl extends EISMessageTransformers {
 
+  private val WRAPPED_MESSAGE_TYPE_PREFIX = "txd"
+  private val WRAPPED_MESSAGE_ROOT_PREFIX = "n1"
+  private val UNWRAPPED_PREFIX            = "ncts"
+  private val NCTS_NAMESPACE_URL          = "http://ncts.dgtaxud.ec"
+  private val XSI_NAMESPACE_URL           = "http://www.w3.org/2001/XMLSchema-instance"
+  private val EIS_NAMESPACE_URL           = "http://www.hmrc.gov.uk/eis/ncts5/v1"
+  private val TRADER_CHANNEL_RESPONSE     = "TraderChannelResponse"
+  private val TRADER_CHANNEL_SUBMISSION   = "TraderChannelSubmission"
+
+  private val WRAPPED_ATTRIBUTES: List[Attribute] = List(
+    Attribute("schemaLocation", "http://www.hmrc.gov.uk/eis/ncts5/v1 EIS_WrapperV10_TraderChannelSubmission-51.8.xsd", Some("xsi"), Some(XSI_NAMESPACE_URL))
+  )
+
+  private val WRAPPED_NAMESPACES: List[Namespace] = List(
+    Namespace(NCTS_NAMESPACE_URL, Some(WRAPPED_MESSAGE_TYPE_PREFIX)),
+    Namespace(EIS_NAMESPACE_URL, Some(WRAPPED_MESSAGE_ROOT_PREFIX)),
+    Namespace(XSI_NAMESPACE_URL, Some("xsi"))
+  )
+
   private val messageType = """CC\d{3}[A-Z]""".r
 
+  // Unwrapping
+
   private def lookingForWrappedElement(parseEvent: ParseEvent): (UnwrappingState, ParseEvent) = parseEvent match {
-    case StartElement("TraderChannelResponse", _, Some("n1"), _, _) => (LookingForMessageTypeElement, parseEvent)
-    case x: StartElement                                            => throw new IllegalStateException(s"First element should be a n1:TraderChannelResponse, not ${x.localName}")
-    case element                                                    => (LookingForWrappedElement, element)
+    case StartElement(TRADER_CHANNEL_RESPONSE, _, Some(WRAPPED_MESSAGE_ROOT_PREFIX), _, _) =>
+      (LookingForMessageTypeElement, parseEvent)
+    case x: StartElement => throw new IllegalStateException(s"First element should be a n1:TraderChannelResponse, not ${x.localName}")
+    case element         => (LookingForWrappedElement, element)
   }
 
   private def lookingForMessageTypeElement(parseEvent: ParseEvent): (UnwrappingState, ParseEvent) = parseEvent match {
-    case StartElement(name @ messageType(), attributes, Some("txd"), _, _) =>
+    case StartElement(name @ messageType(), attributes, Some(WRAPPED_MESSAGE_TYPE_PREFIX), _, _) =>
       val phaseId = attributes
         .find(
           a => a.name == "PhaseID"
@@ -66,9 +91,9 @@ class EISMessageTransformersImpl extends EISMessageTransformers {
         StartElement(
           name,
           List(Attribute("PhaseID", phaseId)),
-          Some("ncts"),
-          Some("http://ncts.dgtaxud.ec"),
-          List(Namespace("http://ncts.dgtaxud.ec", Some("ncts")))
+          Some(UNWRAPPED_PREFIX),
+          Some(NCTS_NAMESPACE_URL),
+          List(Namespace(NCTS_NAMESPACE_URL, Some(UNWRAPPED_PREFIX)))
         )
       )
     case element: StartElement => throw new IllegalStateException(s"Expecting a message type root (got ${element.localName}")
@@ -76,7 +101,7 @@ class EISMessageTransformersImpl extends EISMessageTransformers {
   }
 
   private def completingTransformation(state: FoundMessageType, parseEvent: ParseEvent): (UnwrappingState, ParseEvent) = parseEvent match {
-    case EndElement(state.root) => (state, EndElement(s"ncts:${state.root}"))
+    case EndElement(state.root) => (state, EndElement(s"$UNWRAPPED_PREFIX:${state.root}"))
     case element                => (state, element)
   }
 
@@ -94,7 +119,46 @@ class EISMessageTransformersImpl extends EISMessageTransformers {
           },
         _ => None
       )
-      .via(XmlParsing.subslice("TraderChannelResponse" :: Nil))
+      .via(XmlParsing.subslice(TRADER_CHANNEL_RESPONSE :: Nil))
+      .via(XmlWriting.writer)
+
+  // Wrapping
+
+  private lazy val wrappingHead: ParseEvent =
+    StartElement(TRADER_CHANNEL_SUBMISSION, WRAPPED_ATTRIBUTES, Some(WRAPPED_MESSAGE_ROOT_PREFIX), Some(EIS_NAMESPACE_URL), WRAPPED_NAMESPACES)
+
+  private lazy val wrappingTail: ParseEvent = EndElement(s"$WRAPPED_MESSAGE_ROOT_PREFIX:$TRADER_CHANNEL_SUBMISSION")
+
+  private def lookingForMessageType(event: ParseEvent): (WrappingState, Seq[ParseEvent]) = event match {
+    case StartElement(localName @ messageType(), attributesList, Some(UNWRAPPED_PREFIX), _, _) =>
+      (
+        WrappingState.FoundMessageType(localName),
+        Seq(wrappingHead, StartElement(localName, attributesList, Some(WRAPPED_MESSAGE_TYPE_PREFIX), Some(NCTS_NAMESPACE_URL), List.empty))
+      )
+    case x: StartElement => throw new IllegalStateException(s"Root tag was not the message type (found ${x.localName})")
+    case x               => (WrappingState.LookingForMessageType, Seq(x))
+  }
+
+  private def foundMessageType(state: WrappingState.FoundMessageType, event: ParseEvent): (WrappingState, Seq[ParseEvent]) = event match {
+    case element @ EndElement(messageType()) =>
+      (state, Seq(EndElement(s"$WRAPPED_MESSAGE_TYPE_PREFIX:${element.localName}"), wrappingTail))
+    case x => (state, Seq(x))
+  }
+
+  lazy val wrap: Flow[ByteString, ByteString, _] =
+    Flow[ByteString]
+      .via(XmlParsing.parser)
+      .statefulMap[WrappingState, Seq[ParseEvent]](
+        () => WrappingState.LookingForMessageType
+      )(
+        (state, event) =>
+          state match {
+            case WrappingState.LookingForMessageType => lookingForMessageType(event)
+            case s: WrappingState.FoundMessageType   => foundMessageType(s, event)
+          },
+        _ => None
+      )
+      .mapConcat(identity)
       .via(XmlWriting.writer)
 
 }

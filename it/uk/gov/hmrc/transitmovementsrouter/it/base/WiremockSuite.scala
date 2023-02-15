@@ -60,7 +60,8 @@ trait WiremockSuiteWithGuice extends WiremockSuite {
   protected def appBuilder: GuiceApplicationBuilder =
     new GuiceApplicationBuilder()
       .configure(
-        "microservice.services.eis.port"             -> server.port().toString,
+        "microservice.services.eis.gb.port"          -> server.port().toString,
+        "microservice.services.eis.xi.port"          -> server.port().toString,
         "microservice.services.ncts-monitoring.port" -> server.port().toString
       )
       .overrides(bindings: _*)

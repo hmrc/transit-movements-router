@@ -27,8 +27,12 @@ import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
 import org.scalatestplus.play.guice.GuiceOneAppPerSuite
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
+import play.api.http.HeaderNames
+import play.api.http.Status.ACCEPTED
 import play.api.http.Status.BAD_REQUEST
 import play.api.http.Status.CREATED
+import play.api.http.Status.FORBIDDEN
+import play.api.http.Status.INTERNAL_SERVER_ERROR
 import play.api.http.Status.OK
 import play.api.http.Status.UNAUTHORIZED
 import play.api.inject.bind
@@ -40,11 +44,18 @@ import play.api.test.FakeRequest
 import play.api.test.Helpers
 import play.api.test.Helpers.defaultAwaitTimeout
 import play.api.test.Helpers.running
+import uk.gov.hmrc.transitmovementsrouter.it.base.RegexPatterns
 import uk.gov.hmrc.transitmovementsrouter.it.base.TestMetrics
 import uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuiteWithGuice
 import uk.gov.hmrc.transitmovementsrouter.models.ConversationId
+import uk.gov.hmrc.transitmovementsrouter.models.EoriNumber
 import uk.gov.hmrc.transitmovementsrouter.models.MessageId
+import uk.gov.hmrc.transitmovementsrouter.models.MovementType
 
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 import java.util.UUID
 
 class MessagesControllerIntegrationSpec
@@ -55,7 +66,7 @@ class MessagesControllerIntegrationSpec
     with ScalaCheckDrivenPropertyChecks {
 
   // We don't care about the content in this XML fragment, only the root tag and its child.
-  val sampleXml: String =
+  val sampleIncomingXml: String =
     <n1:TraderChannelResponse xmlns:txd="http://ncts.dgtaxud.ec"
                                 xmlns:n1="http://www.hmrc.gov.uk/eis/ncts5/v1"
                                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -67,6 +78,23 @@ class MessagesControllerIntegrationSpec
         </CustomsOfficeOfDeparture>
       </txd:CC029C>
     </n1:TraderChannelResponse>.mkString
+
+  // We don't care about the content in this XML fragment, only the root tag and its child.
+  val sampleOutgoingXml: String =
+    <ncts:CC015C PhaseID="NCTS5.0" xmlns:ncts="http://ncts.dgtaxud.ec">
+        <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
+        <CustomsOfficeOfDeparture>
+          <referenceNumber>GB1234567</referenceNumber>
+        </CustomsOfficeOfDeparture>
+      </ncts:CC015C>.mkString
+
+  val sampleOutgoingXIXml: String =
+    <ncts:CC015C PhaseID="NCTS5.0" xmlns:ncts="http://ncts.dgtaxud.ec">
+      <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
+      <CustomsOfficeOfDeparture>
+        <referenceNumber>XI1234567</referenceNumber>
+      </CustomsOfficeOfDeparture>
+    </ncts:CC015C>.mkString
 
   val brokenXml: String =
     """<nope>
@@ -84,12 +112,219 @@ class MessagesControllerIntegrationSpec
       "incomingRequestAuth.acceptedTokens.0"                            -> "ABC",
       "incomingRequestAuth.acceptedTokens.1"                            -> "123",
       "microservice.services.transit-movements.port"                    -> server.port().toString,
-      "microservice.services.transit-movements-push-notifications.port" -> server.port().toString
+      "microservice.services.transit-movements-push-notifications.port" -> server.port().toString,
+      "microservice.services.eis.gb.uri"                                -> "/gb",
+      "microservice.services.eis.xi.uri"                                -> "/xi",
+      "microservice.services.eis.gb.retry.max-retries"                  -> 0
     )
 
   override protected lazy val bindings: Seq[GuiceableModule] = Seq(
     bind[Metrics].to[TestMetrics]
   )
+
+  "outgoing" - {
+    "with a valid body routing to GB, return 202" in {
+      // We do this instead of using the standard "app" because we otherwise get the error
+      // "Trying to materialize stream after materializer has been shutdown".
+      // We suspect it's due to nested tests.
+      val newApp                  = appBuilder.build()
+      val conversationId          = ConversationId(UUID.randomUUID())
+      val (movementId, messageId) = conversationId.toMovementAndMessageId
+
+      val time      = OffsetDateTime.of(2023, 2, 14, 15, 55, 28, 0, ZoneOffset.UTC)
+      val formatted = DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss z", Locale.ENGLISH).withZone(ZoneOffset.UTC).format(time)
+
+      server.stubFor(
+        post(
+          urlEqualTo("/gb")
+        )
+          .withHeader(HeaderNames.AUTHORIZATION, equalTo(s"Bearer bearertoken"))
+          .withHeader("Date", equalTo(formatted))
+          .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
+          .withHeader("X-Conversation-Id", equalTo(conversationId.value.toString))
+          .withHeader("CustomProcessHost", equalTo("Digital"))
+          .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
+          .withHeader(HeaderNames.CONTENT_TYPE, equalTo("application/xml"))
+          .willReturn(aResponse().withStatus(OK))
+      )
+
+      val apiRequest = FakeRequest(
+        "POST",
+        s"/traders/GB0123456789/movements/departures/${movementId.value}/messages/${messageId.value}",
+        FakeHeaders(
+          Seq(
+            "Date"           -> formatted,
+            "x-message-type" -> "IE015",
+            "x-request-id"   -> UUID.randomUUID().toString
+          )
+        ),
+        Source.single(ByteString(sampleOutgoingXml))
+      )
+
+      running(newApp) {
+        val sut    = newApp.injector.instanceOf[MessagesController]
+        val result = sut.outgoing(EoriNumber("GB0123456789"), MovementType("departures"), movementId, messageId)(apiRequest)
+
+        Helpers.status(result) mustBe ACCEPTED
+      }
+    }
+
+    "with a valid body routing to XI, return 202" in {
+      // We do this instead of using the standard "app" because we otherwise get the error
+      // "Trying to materialize stream after materializer has been shutdown".
+      // We suspect it's due to nested tests.
+      val newApp                  = appBuilder.build()
+      val conversationId          = ConversationId(UUID.randomUUID())
+      val (movementId, messageId) = conversationId.toMovementAndMessageId
+
+      val time      = OffsetDateTime.of(2023, 2, 14, 15, 55, 28, 0, ZoneOffset.UTC)
+      val formatted = DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss z", Locale.ENGLISH).withZone(ZoneOffset.UTC).format(time)
+
+      server.stubFor(
+        post(
+          urlEqualTo("/xi")
+        )
+          .withHeader(HeaderNames.AUTHORIZATION, equalTo(s"Bearer bearertoken"))
+          .withHeader("Date", equalTo(formatted))
+          .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
+          .withHeader("X-Conversation-Id", equalTo(conversationId.value.toString))
+          .withHeader("CustomProcessHost", equalTo("Digital"))
+          .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
+          .withHeader(HeaderNames.CONTENT_TYPE, equalTo("application/xml"))
+          .willReturn(aResponse().withStatus(OK))
+      )
+
+      val apiRequest = FakeRequest(
+        "POST",
+        s"/traders/GB0123456789/movements/departures/${movementId.value}/messages/${messageId.value}",
+        FakeHeaders(
+          Seq(
+            "Date"           -> formatted,
+            "x-message-type" -> "IE015",
+            "x-request-id"   -> UUID.randomUUID().toString
+          )
+        ),
+        Source.single(ByteString(sampleOutgoingXIXml))
+      )
+
+      running(newApp) {
+        val sut    = newApp.injector.instanceOf[MessagesController]
+        val result = sut.outgoing(EoriNumber("GB0123456789"), MovementType("departures"), movementId, messageId)(apiRequest)
+
+        Helpers.status(result) mustBe ACCEPTED
+      }
+    }
+
+    "with an incorrectly set bearer token routing to GB, return 500" in {
+      // We do this instead of using the standard "app" because we otherwise get the error
+      // "Trying to materialize stream after materializer has been shutdown".
+      // We suspect it's due to nested tests.
+      val newApp                  = appBuilder.build()
+      val conversationId          = ConversationId(UUID.randomUUID())
+      val (movementId, messageId) = conversationId.toMovementAndMessageId
+
+      val time      = OffsetDateTime.of(2023, 2, 14, 15, 55, 28, 0, ZoneOffset.UTC)
+      val formatted = DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss z", Locale.ENGLISH).withZone(ZoneOffset.UTC).format(time)
+
+      server.stubFor(
+        post(
+          urlEqualTo("/gb")
+        )
+          .withHeader(HeaderNames.AUTHORIZATION, equalTo(s"Bearer bearertoken"))
+          .withHeader("Date", equalTo(formatted))
+          .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
+          .withHeader("X-Conversation-Id", equalTo(conversationId.value.toString))
+          .withHeader("CustomProcessHost", equalTo("Digital"))
+          .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
+          .withHeader(HeaderNames.CONTENT_TYPE, equalTo("application/xml"))
+          .willReturn(aResponse().withStatus(FORBIDDEN))
+      )
+
+      val apiRequest = FakeRequest(
+        "POST",
+        s"/traders/GB0123456789/movements/departures/${movementId.value}/messages/${messageId.value}",
+        FakeHeaders(
+          Seq(
+            "Date"           -> formatted,
+            "x-message-type" -> "IE015",
+            "x-request-id"   -> UUID.randomUUID().toString
+          )
+        ),
+        Source.single(ByteString(sampleOutgoingXml))
+      )
+
+      running(newApp) {
+        val sut    = newApp.injector.instanceOf[MessagesController]
+        val result = sut.outgoing(EoriNumber("GB0123456789"), MovementType("departures"), movementId, messageId)(apiRequest)
+
+        Helpers.status(result) mustBe INTERNAL_SERVER_ERROR
+      }
+    }
+
+    "with XML containing the incorrect message type (no reference number in the expected place), return 400" in {
+      // We do this instead of using the standard "app" because we otherwise get the error
+      // "Trying to materialize stream after materializer has been shutdown".
+      // We suspect it's due to nested tests.
+      val newApp                  = appBuilder.build()
+      val conversationId          = ConversationId(UUID.randomUUID())
+      val (movementId, messageId) = conversationId.toMovementAndMessageId
+
+      val time      = OffsetDateTime.of(2023, 2, 14, 15, 55, 28, 0, ZoneOffset.UTC)
+      val formatted = DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss z", Locale.ENGLISH).withZone(ZoneOffset.UTC).format(time)
+
+      val apiRequest = FakeRequest(
+        "POST",
+        s"/traders/GB0123456789/movements/departures/${movementId.value}/messages/${messageId.value}",
+        FakeHeaders(
+          Seq(
+            "Date"           -> formatted,
+            "x-message-type" -> "IE015",
+            "x-request-id"   -> UUID.randomUUID().toString
+          )
+        ),
+        Source.single(ByteString(sampleIncomingXml)) // note this is the IE029, not the IE015
+      )
+
+      running(newApp) {
+        val sut    = newApp.injector.instanceOf[MessagesController]
+        val result = sut.outgoing(EoriNumber("GB0123456789"), MovementType("departures"), movementId, messageId)(apiRequest)
+
+        Helpers.status(result) mustBe BAD_REQUEST
+      }
+    }
+
+    "with broken XML, return 400" in {
+      // We do this instead of using the standard "app" because we otherwise get the error
+      // "Trying to materialize stream after materializer has been shutdown".
+      // We suspect it's due to nested tests.
+      val newApp                  = appBuilder.build()
+      val conversationId          = ConversationId(UUID.randomUUID())
+      val (movementId, messageId) = conversationId.toMovementAndMessageId
+
+      val time      = OffsetDateTime.of(2023, 2, 14, 15, 55, 28, 0, ZoneOffset.UTC)
+      val formatted = DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss z", Locale.ENGLISH).withZone(ZoneOffset.UTC).format(time)
+
+      val apiRequest = FakeRequest(
+        "POST",
+        s"/traders/GB0123456789/movements/departures/${movementId.value}/messages/${messageId.value}",
+        FakeHeaders(
+          Seq(
+            "Date"           -> formatted,
+            "x-message-type" -> "IE015",
+            "x-request-id"   -> UUID.randomUUID().toString
+          )
+        ),
+        Source.single(ByteString(brokenXml))
+      )
+
+      running(newApp) {
+        val sut    = newApp.injector.instanceOf[MessagesController]
+        val result = sut.outgoing(EoriNumber("GB0123456789"), MovementType("departures"), movementId, messageId)(apiRequest)
+
+        Helpers.status(result) mustBe BAD_REQUEST
+      }
+    }
+  }
 
   "incoming" - {
     "when EIS makes a valid call with a valid body, return 201" - Seq("ABC", "123").foreach {
@@ -129,7 +364,7 @@ class MessagesControllerIntegrationSpec
                 "x-correlation-id" -> UUID.randomUUID().toString
               )
             ),
-            Source.single(ByteString(sampleXml))
+            Source.single(ByteString(sampleIncomingXml))
           )
 
           running(newApp) {
@@ -178,7 +413,7 @@ class MessagesControllerIntegrationSpec
               "x-correlation-id" -> UUID.randomUUID().toString
             )
           ),
-          Source.single(ByteString(sampleXml))
+          Source.single(ByteString(sampleIncomingXml))
         )
 
         running(app) {

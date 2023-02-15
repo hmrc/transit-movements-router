@@ -35,6 +35,7 @@ import uk.gov.hmrc.transitmovementsrouter.models.errors.MessageTypeExtractionErr
 import uk.gov.hmrc.transitmovementsrouter.models.errors.MessageTypeExtractionError.InvalidMessageType
 import uk.gov.hmrc.transitmovementsrouter.models.errors.MessageTypeExtractionError.UnableToExtractFromBody
 import uk.gov.hmrc.transitmovementsrouter.models.errors.MessageTypeExtractionError.UnableToExtractFromHeader
+import uk.gov.hmrc.transitmovementsrouter.utils.RouterHeaderNames
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
@@ -85,7 +86,7 @@ class MessageTypeExtractorImpl @Inject() (implicit ec: ExecutionContext, mat: Ma
 
   override def extractFromHeaders(headers: Headers): EitherT[Future, MessageTypeExtractionError, MessageType] =
     EitherT {
-      headers.get("X-Message-Type") match {
+      headers.get(RouterHeaderNames.MESSAGE_TYPE) match {
         case None => Future.successful(Left(UnableToExtractFromHeader))
         case Some(headerValue) =>
           MessageType.withCode(headerValue) match {

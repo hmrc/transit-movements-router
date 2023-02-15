@@ -26,14 +26,23 @@ import retry.RetryDetails
 import retry.alleycats.instances._
 import retry.retryingOnFailures
 import uk.gov.hmrc.http.HeaderCarrier
+import uk.gov.hmrc.http.HttpReads.Implicits._
 import uk.gov.hmrc.http.HttpResponse
 import uk.gov.hmrc.http.StringContextOps
 import uk.gov.hmrc.http.UpstreamErrorResponse
-import uk.gov.hmrc.http.{HeaderNames => HMRCHeaderNames}
 import uk.gov.hmrc.http.client.HttpClientV2
+import uk.gov.hmrc.http.{HeaderNames => HMRCHeaderNames}
 import uk.gov.hmrc.transitmovementsrouter.config.EISInstanceConfig
+import uk.gov.hmrc.transitmovementsrouter.models.ConversationId
+import uk.gov.hmrc.transitmovementsrouter.models.MessageId
+import uk.gov.hmrc.transitmovementsrouter.models.MovementId
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
-import uk.gov.hmrc.http.HttpReads.Implicits._
+import uk.gov.hmrc.transitmovementsrouter.utils.RouterHeaderNames
+
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 import java.util.UUID
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
@@ -42,7 +51,7 @@ import scala.util.control.NonFatal
 
 trait EISConnector {
 
-  def post(body: Source[ByteString, _], hc: HeaderCarrier): Future[Either[RoutingError, Unit]]
+  def post(movementId: MovementId, messageId: MessageId, body: Source[ByteString, _], hc: HeaderCarrier): Future[Either[RoutingError, Unit]]
 
 }
 
@@ -58,6 +67,8 @@ class EISConnectorImpl(
 ) extends EISConnector
     with Logging
     with CircuitBreakers {
+
+  private val HTTP_DATE_FORMATTER = DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss z", Locale.ENGLISH).withZone(ZoneOffset.UTC)
 
   def getHeader(header: String, url: String)(implicit hc: HeaderCarrier): String =
     hc
@@ -82,36 +93,48 @@ class EISConnectorImpl(
         Future.failed(new IllegalStateException(s"An unexpected error occurred - got a ${x.getClass}"))
     }
 
-  override def post(body: Source[ByteString, _], hc: HeaderCarrier): Future[Either[RoutingError, Unit]] =
+  private def extractHeaders(movementId: MovementId, messageId: MessageId, hc: HeaderCarrier): Seq[(String, String)] = {
+    val dateHeader: Seq[(String, String)] = hc.headers(Seq(HeaderNames.DATE)) match {
+      case Seq() => Seq(HeaderNames.DATE -> HTTP_DATE_FORMATTER.format(OffsetDateTime.now()))
+      case x     => x
+    }
+
+    val requestHeaders: Seq[(String, String)] = hc.headers(Seq(RouterHeaderNames.MESSAGE_TYPE)) ++ dateHeader ++ Seq(
+      RouterHeaderNames.CORRELATION_ID      -> UUID.randomUUID().toString,
+      RouterHeaderNames.CUSTOM_PROCESS_HOST -> "Digital",
+      HeaderNames.CONTENT_TYPE              -> MimeTypes.XML,
+      HeaderNames.ACCEPT                    -> MimeTypes.XML,
+      HeaderNames.AUTHORIZATION             -> s"Bearer ${eisInstanceConfig.headers.bearerToken}",
+      RouterHeaderNames.CONVERSATION_ID     -> ConversationId(movementId, messageId).value.toString
+    )
+
+    hc.headersForUrl(headerCarrierConfig)(eisInstanceConfig.url) ++ requestHeaders
+
+  }
+
+  override def post(movementId: MovementId, messageId: MessageId, body: Source[ByteString, _], hc: HeaderCarrier): Future[Either[RoutingError, Unit]] =
     retryingOnFailures(
       retries.createRetryPolicy(eisInstanceConfig.retryConfig),
       (t: Either[RoutingError, Unit]) => Future.successful(t.isRight),
       onFailure
     ) {
-      val requestHeaders = hc.headers(OutgoingHeaders.headers) ++ Seq(
-        "X-Correlation-Id"        -> UUID.randomUUID().toString,
-        "CustomProcessHost"       -> "Digital",
-        HeaderNames.ACCEPT        -> MimeTypes.XML, // TODO: is this still relevant? Can't use ContentTypes.XML because EIS will not accept "application/xml; charset=utf-8"
-        HeaderNames.AUTHORIZATION -> s"Bearer ${eisInstanceConfig.headers.bearerToken}"
-      )
-
       implicit val headerCarrier: HeaderCarrier = hc
         .copy(authorization = None, otherHeaders = Seq.empty)
-        .withExtraHeaders(requestHeaders: _*)
+        .withExtraHeaders(extractHeaders(movementId, messageId, hc): _*)
 
       val requestId = getHeader(HMRCHeaderNames.xRequestId, eisInstanceConfig.url)(headerCarrier)
       lazy val logMessage =
         s"""|Posting NCTS message, routing to $code
-                |X-Correlation-Id: ${getHeader("X-Correlation-Id", eisInstanceConfig.url)(headerCarrier)}
+                |${RouterHeaderNames.CORRELATION_ID}: ${getHeader(RouterHeaderNames.CORRELATION_ID, eisInstanceConfig.url)(headerCarrier)}
                 |${HMRCHeaderNames.xRequestId}: $requestId
-                |X-Message-Type: ${getHeader("X-Message-Type", eisInstanceConfig.url)(headerCarrier)} // TODO - might need this from the service too
-                |X-Message-Sender: ${getHeader("X-Message-Sender", eisInstanceConfig.url)(headerCarrier)}
-                |Accept: ${getHeader("Accept", eisInstanceConfig.url)(headerCarrier)}
-                |CustomProcessHost: ${getHeader("CustomProcessHost", eisInstanceConfig.url)(headerCarrier)}
+                |${RouterHeaderNames.MESSAGE_TYPE}: ${getHeader(RouterHeaderNames.MESSAGE_TYPE, eisInstanceConfig.url)(headerCarrier)}
+                |${RouterHeaderNames.CONVERSATION_ID}: ${getHeader(RouterHeaderNames.CONVERSATION_ID, eisInstanceConfig.url)(headerCarrier)}
+                |${HeaderNames.ACCEPT}: ${getHeader(HeaderNames.ACCEPT, eisInstanceConfig.url)(headerCarrier)}
+                |${HeaderNames.CONTENT_TYPE}: ${getHeader(HeaderNames.CONTENT_TYPE, eisInstanceConfig.url)(headerCarrier)}
+                |${RouterHeaderNames.CUSTOM_PROCESS_HOST}: ${getHeader(RouterHeaderNames.CUSTOM_PROCESS_HOST, eisInstanceConfig.url)(headerCarrier)}
                 |""".stripMargin
 
       withCircuitBreaker[Either[RoutingError, Unit]](shouldCauseCircuitBreakerStrike) {
-
         httpClientV2
           .post(url"${eisInstanceConfig.url}")
           .withBody(body)

@@ -14,17 +14,11 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovementsrouter.connectors
+package uk.gov.hmrc.transitmovementsrouter.services.state
 
-import play.api.http.HeaderNames
-import uk.gov.hmrc.http.{HeaderNames => HMRCHeaderNames}
+sealed trait WrappingState
 
-object OutgoingHeaders {
-
-  val headers = Seq(
-    HeaderNames.DATE,
-    HeaderNames.CONTENT_TYPE,
-    "X-Message-Type",
-    HMRCHeaderNames.xRequestId
-  )
+object WrappingState {
+  case object LookingForMessageType        extends WrappingState
+  case class FoundMessageType(tag: String) extends WrappingState
 }
