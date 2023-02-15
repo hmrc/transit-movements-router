@@ -145,7 +145,7 @@ class MessagesControllerIntegrationSpec
           .withHeader("CustomProcessHost", equalTo("Digital"))
           .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
           .withHeader(HeaderNames.CONTENT_TYPE, equalTo("application/xml"))
-          .willReturn(aResponse().withStatus(ACCEPTED))
+          .willReturn(aResponse().withStatus(OK))
       )
 
       val apiRequest = FakeRequest(
@@ -191,7 +191,7 @@ class MessagesControllerIntegrationSpec
           .withHeader("CustomProcessHost", equalTo("Digital"))
           .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
           .withHeader(HeaderNames.CONTENT_TYPE, equalTo("application/xml"))
-          .willReturn(aResponse().withStatus(ACCEPTED))
+          .willReturn(aResponse().withStatus(OK))
       )
 
       val apiRequest = FakeRequest(

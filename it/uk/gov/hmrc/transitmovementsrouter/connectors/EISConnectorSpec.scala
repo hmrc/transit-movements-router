@@ -167,7 +167,7 @@ class EISConnectorSpec
 
         val secondState = "should now fail"
 
-        stub(Scenario.STARTED, secondState, ACCEPTED)
+        stub(Scenario.STARTED, secondState, OK)
         stub(secondState, secondState, INTERNAL_SERVER_ERROR)
 
         val hc = HeaderCarrier()
@@ -218,7 +218,7 @@ class EISConnectorSpec
 
         val secondState = "should now fail"
 
-        stub(Scenario.STARTED, secondState, ACCEPTED)
+        stub(Scenario.STARTED, secondState, OK)
         stub(secondState, secondState, INTERNAL_SERVER_ERROR)
 
         val hc = HeaderCarrier().withExtraHeaders(HeaderNames.DATE -> formatted)
@@ -252,7 +252,7 @@ class EISConnectorSpec
 
         val secondState = "should now fail"
 
-        stub(Scenario.STARTED, secondState, ACCEPTED)
+        stub(Scenario.STARTED, secondState, OK)
         stub(secondState, secondState, INTERNAL_SERVER_ERROR)
 
         val hc = HeaderCarrier()
@@ -286,7 +286,7 @@ class EISConnectorSpec
         val secondState = "should now succeed"
 
         stub(Scenario.STARTED, secondState, INTERNAL_SERVER_ERROR)
-        stub(secondState, secondState, ACCEPTED)
+        stub(secondState, secondState, OK)
 
         val hc = HeaderCarrier()
 
