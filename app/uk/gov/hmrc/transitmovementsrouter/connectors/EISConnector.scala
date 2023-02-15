@@ -37,6 +37,7 @@ import uk.gov.hmrc.transitmovementsrouter.models.ConversationId
 import uk.gov.hmrc.transitmovementsrouter.models.MessageId
 import uk.gov.hmrc.transitmovementsrouter.models.MovementId
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
+import uk.gov.hmrc.transitmovementsrouter.utils.RouterHeaderNames
 
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -98,13 +99,13 @@ class EISConnectorImpl(
       case x     => x
     }
 
-    val requestHeaders: Seq[(String, String)] = hc.headers(Seq("X-Message-Type")) ++ dateHeader ++ Seq(
-      "X-Correlation-Id"        -> UUID.randomUUID().toString,
-      "CustomProcessHost"       -> "Digital",
-      HeaderNames.CONTENT_TYPE  -> MimeTypes.XML,
-      HeaderNames.ACCEPT        -> MimeTypes.XML,
-      HeaderNames.AUTHORIZATION -> s"Bearer ${eisInstanceConfig.headers.bearerToken}",
-      "X-Conversation-Id"       -> ConversationId(movementId, messageId).value.toString
+    val requestHeaders: Seq[(String, String)] = hc.headers(Seq(RouterHeaderNames.MESSAGE_TYPE)) ++ dateHeader ++ Seq(
+      RouterHeaderNames.CORRELATION_ID      -> UUID.randomUUID().toString,
+      RouterHeaderNames.CUSTOM_PROCESS_HOST -> "Digital",
+      HeaderNames.CONTENT_TYPE              -> MimeTypes.XML,
+      HeaderNames.ACCEPT                    -> MimeTypes.XML,
+      HeaderNames.AUTHORIZATION             -> s"Bearer ${eisInstanceConfig.headers.bearerToken}",
+      RouterHeaderNames.CONVERSATION_ID     -> ConversationId(movementId, messageId).value.toString
     )
 
     hc.headersForUrl(headerCarrierConfig)(eisInstanceConfig.url) ++ requestHeaders
@@ -124,13 +125,13 @@ class EISConnectorImpl(
       val requestId = getHeader(HMRCHeaderNames.xRequestId, eisInstanceConfig.url)(headerCarrier)
       lazy val logMessage =
         s"""|Posting NCTS message, routing to $code
-                |X-Correlation-Id: ${getHeader("X-Correlation-Id", eisInstanceConfig.url)(headerCarrier)}
+                |${RouterHeaderNames.CORRELATION_ID}: ${getHeader(RouterHeaderNames.CORRELATION_ID, eisInstanceConfig.url)(headerCarrier)}
                 |${HMRCHeaderNames.xRequestId}: $requestId
-                |X-Message-Type: ${getHeader("X-Message-Type", eisInstanceConfig.url)(headerCarrier)}
-                |X-Conversation-Id: ${getHeader("X-Conversation-Id", eisInstanceConfig.url)(headerCarrier)}
-                |Accept: ${getHeader("Accept", eisInstanceConfig.url)(headerCarrier)}
-                |Content-Type: ${getHeader("Content-Type", eisInstanceConfig.url)(headerCarrier)}
-                |CustomProcessHost: ${getHeader("CustomProcessHost", eisInstanceConfig.url)(headerCarrier)}
+                |${RouterHeaderNames.MESSAGE_TYPE}: ${getHeader(RouterHeaderNames.MESSAGE_TYPE, eisInstanceConfig.url)(headerCarrier)}
+                |${RouterHeaderNames.CONVERSATION_ID}: ${getHeader(RouterHeaderNames.CONVERSATION_ID, eisInstanceConfig.url)(headerCarrier)}
+                |${HeaderNames.ACCEPT}: ${getHeader(HeaderNames.ACCEPT, eisInstanceConfig.url)(headerCarrier)}
+                |${HeaderNames.CONTENT_TYPE}: ${getHeader(HeaderNames.CONTENT_TYPE, eisInstanceConfig.url)(headerCarrier)}
+                |${RouterHeaderNames.CUSTOM_PROCESS_HOST}: ${getHeader(RouterHeaderNames.CUSTOM_PROCESS_HOST, eisInstanceConfig.url)(headerCarrier)}
                 |""".stripMargin
 
       withCircuitBreaker[Either[RoutingError, Unit]](shouldCauseCircuitBreakerStrike) {

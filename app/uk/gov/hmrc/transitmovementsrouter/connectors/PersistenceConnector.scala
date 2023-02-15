@@ -45,6 +45,7 @@ import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.MovementNotFound
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.Unexpected
 import uk.gov.hmrc.http.HttpReads.Implicits._
+import uk.gov.hmrc.transitmovementsrouter.utils.RouterHeaderNames
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
@@ -76,7 +77,7 @@ class PersistenceConnectorImpl @Inject() (httpClientV2: HttpClientV2, appConfig:
       val url = baseUrl.withPath(persistenceSendMessage(movementId)).withQueryString(QueryString.fromPairs("triggerId" -> messageId.value))
       httpClientV2
         .post(url"$url")
-        .transform(_.addHttpHeaders(HeaderNames.CONTENT_TYPE -> MimeTypes.XML, "X-Message-Type" -> messageType.code))
+        .transform(_.addHttpHeaders(HeaderNames.CONTENT_TYPE -> MimeTypes.XML, RouterHeaderNames.MESSAGE_TYPE -> messageType.code))
         .withBody(source)
         .execute[Either[UpstreamErrorResponse, HttpResponse]]
         .map {
