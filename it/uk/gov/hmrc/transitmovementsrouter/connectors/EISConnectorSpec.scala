@@ -57,10 +57,6 @@ import uk.gov.hmrc.transitmovementsrouter.models.MovementId
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
 
 import java.net.URL
-import java.time.OffsetDateTime
-import java.time.ZoneOffset
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -196,9 +192,6 @@ class EISConnectorSpec
 
         val expectedConversationId = ConversationId(movementId, messageId)
 
-        val time      = OffsetDateTime.of(2023, 2, 14, 15, 55, 28, 0, ZoneOffset.UTC)
-        val formatted = DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss z", Locale.ENGLISH).withZone(ZoneOffset.UTC).format(time)
-
         def stub(currentState: String, targetState: String, codeToReturn: Int) =
           server.stubFor(
             post(
@@ -206,7 +199,7 @@ class EISConnectorSpec
             )
               .inScenario("Standard Call")
               .whenScenarioStateIs(currentState)
-              .withHeader("Date", equalTo(formatted))
+              .withHeader("Date", anything)
               .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
               .withHeader("X-Conversation-Id", equalTo(expectedConversationId.value.toString))
               .withHeader("CustomProcessHost", equalTo("Digital"))
@@ -221,7 +214,7 @@ class EISConnectorSpec
         stub(Scenario.STARTED, secondState, OK)
         stub(secondState, secondState, INTERNAL_SERVER_ERROR)
 
-        val hc = HeaderCarrier().withExtraHeaders(HeaderNames.DATE -> formatted)
+        val hc = HeaderCarrier()
 
         whenReady(connector().post(movementId, messageId, source, hc)) {
           _.isRight mustBe true

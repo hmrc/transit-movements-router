@@ -125,7 +125,7 @@ class EISConnectorImpl(
       onFailure
     ) {
 
-      val updatedHeader = hc.copy(authorization = None)
+      val updatedHeader = hc.copy(authorization = None, extraHeaders = Seq.empty)
 
       implicit val headerCarrier: HeaderCarrier = updatedHeader
         .withExtraHeaders(extractHeaders(movementId, messageId, updatedHeader): _*)
