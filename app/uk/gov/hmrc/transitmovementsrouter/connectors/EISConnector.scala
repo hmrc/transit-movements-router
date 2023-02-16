@@ -108,8 +108,14 @@ class EISConnectorImpl(
       RouterHeaderNames.CONVERSATION_ID     -> ConversationId(movementId, messageId).value.toString
     )
 
-    hc.headersForUrl(headerCarrierConfig)(eisInstanceConfig.url) ++ requestHeaders
-
+    (hc
+      .headersForUrl(headerCarrierConfig)(eisInstanceConfig.url))
+      .filterNot(
+        x =>
+          requestHeaders.exists(
+            y => y._1 equalsIgnoreCase x._1
+          )
+      ) ++ requestHeaders
   }
 
   override def post(movementId: MovementId, messageId: MessageId, body: Source[ByteString, _], hc: HeaderCarrier): Future[Either[RoutingError, Unit]] =
@@ -118,9 +124,11 @@ class EISConnectorImpl(
       (t: Either[RoutingError, Unit]) => Future.successful(t.isRight),
       onFailure
     ) {
-      implicit val headerCarrier: HeaderCarrier = hc
-        .copy(authorization = None, otherHeaders = Seq.empty)
-        .withExtraHeaders(extractHeaders(movementId, messageId, hc): _*)
+
+      val updatedHeader = hc.copy(authorization = None, extraHeaders = Seq.empty)
+
+      implicit val headerCarrier: HeaderCarrier = updatedHeader
+        .withExtraHeaders(extractHeaders(movementId, messageId, updatedHeader): _*)
 
       val requestId = getHeader(HMRCHeaderNames.xRequestId, eisInstanceConfig.url)(headerCarrier)
       lazy val logMessage =
@@ -138,7 +146,6 @@ class EISConnectorImpl(
         httpClientV2
           .post(url"${eisInstanceConfig.url}")
           .withBody(body)
-          .transform(_.addHttpHeaders(headerCarrier.headersForUrl(headerCarrierConfig)(eisInstanceConfig.url): _*))
           .execute[Either[UpstreamErrorResponse, HttpResponse]]
           .map {
             case Right(result) =>

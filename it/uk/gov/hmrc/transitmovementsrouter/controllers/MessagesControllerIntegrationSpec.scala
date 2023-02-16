@@ -19,7 +19,9 @@ package uk.gov.hmrc.transitmovementsrouter.controllers
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import com.github.tomakehurst.wiremock.client.WireMock._
+import com.github.tomakehurst.wiremock.matching.AnythingPattern
 import com.github.tomakehurst.wiremock.matching.EqualToPattern
+import com.github.tomakehurst.wiremock.matching.StringValuePattern
 import com.github.tomakehurst.wiremock.matching.UrlPathPattern
 import com.kenshoo.play.metrics.Metrics
 import org.scalacheck.Gen
@@ -118,6 +120,8 @@ class MessagesControllerIntegrationSpec
       "microservice.services.eis.gb.retry.max-retries"                  -> 0
     )
 
+  lazy val anything: StringValuePattern = new AnythingPattern()
+
   override protected lazy val bindings: Seq[GuiceableModule] = Seq(
     bind[Metrics].to[TestMetrics]
   )
@@ -131,15 +135,12 @@ class MessagesControllerIntegrationSpec
       val conversationId          = ConversationId(UUID.randomUUID())
       val (movementId, messageId) = conversationId.toMovementAndMessageId
 
-      val time      = OffsetDateTime.of(2023, 2, 14, 15, 55, 28, 0, ZoneOffset.UTC)
-      val formatted = DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss z", Locale.ENGLISH).withZone(ZoneOffset.UTC).format(time)
-
       server.stubFor(
         post(
           urlEqualTo("/gb")
         )
           .withHeader(HeaderNames.AUTHORIZATION, equalTo(s"Bearer bearertoken"))
-          .withHeader("Date", equalTo(formatted))
+          .withHeader("Date", anything)
           .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
           .withHeader("X-Conversation-Id", equalTo(conversationId.value.toString))
           .withHeader("CustomProcessHost", equalTo("Digital"))
@@ -153,7 +154,6 @@ class MessagesControllerIntegrationSpec
         s"/traders/GB0123456789/movements/departures/${movementId.value}/messages/${messageId.value}",
         FakeHeaders(
           Seq(
-            "Date"           -> formatted,
             "x-message-type" -> "IE015",
             "x-request-id"   -> UUID.randomUUID().toString
           )
@@ -185,7 +185,7 @@ class MessagesControllerIntegrationSpec
           urlEqualTo("/xi")
         )
           .withHeader(HeaderNames.AUTHORIZATION, equalTo(s"Bearer bearertoken"))
-          .withHeader("Date", equalTo(formatted))
+          .withHeader("Date", anything)
           .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
           .withHeader("X-Conversation-Id", equalTo(conversationId.value.toString))
           .withHeader("CustomProcessHost", equalTo("Digital"))
@@ -223,15 +223,12 @@ class MessagesControllerIntegrationSpec
       val conversationId          = ConversationId(UUID.randomUUID())
       val (movementId, messageId) = conversationId.toMovementAndMessageId
 
-      val time      = OffsetDateTime.of(2023, 2, 14, 15, 55, 28, 0, ZoneOffset.UTC)
-      val formatted = DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss z", Locale.ENGLISH).withZone(ZoneOffset.UTC).format(time)
-
       server.stubFor(
         post(
           urlEqualTo("/gb")
         )
           .withHeader(HeaderNames.AUTHORIZATION, equalTo(s"Bearer bearertoken"))
-          .withHeader("Date", equalTo(formatted))
+          .withHeader("Date", anything)
           .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
           .withHeader("X-Conversation-Id", equalTo(conversationId.value.toString))
           .withHeader("CustomProcessHost", equalTo("Digital"))
@@ -245,7 +242,6 @@ class MessagesControllerIntegrationSpec
         s"/traders/GB0123456789/movements/departures/${movementId.value}/messages/${messageId.value}",
         FakeHeaders(
           Seq(
-            "Date"           -> formatted,
             "x-message-type" -> "IE015",
             "x-request-id"   -> UUID.randomUUID().toString
           )
