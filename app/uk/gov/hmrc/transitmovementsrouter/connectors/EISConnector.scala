@@ -125,7 +125,7 @@ class EISConnectorImpl(
       onFailure
     ) {
 
-      val updatedHeader = hc.copy(authorization = None, extraHeaders = Seq.empty)
+      val updatedHeader = hc.copy(authorization = None)
 
       implicit val headerCarrier: HeaderCarrier = updatedHeader
         .withExtraHeaders(extractHeaders(movementId, messageId, updatedHeader): _*)
@@ -146,7 +146,6 @@ class EISConnectorImpl(
         httpClientV2
           .post(url"${eisInstanceConfig.url}")
           .withBody(body)
-          .transform(_.addHttpHeaders(headerCarrier.headersForUrl(headerCarrierConfig)(eisInstanceConfig.url): _*))
           .execute[Either[UpstreamErrorResponse, HttpResponse]]
           .map {
             case Right(result) =>
