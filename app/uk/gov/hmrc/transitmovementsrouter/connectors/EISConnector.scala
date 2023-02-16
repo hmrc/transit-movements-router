@@ -110,10 +110,10 @@ class EISConnectorImpl(
 
     (hc
       .headersForUrl(headerCarrierConfig)(eisInstanceConfig.url))
-      .filter(
+      .filterNot(
         x =>
-          !requestHeaders.exists(
-            y => y._1 == x
+          requestHeaders.exists(
+            y => y._1 equalsIgnoreCase x._1
           )
       ) ++ requestHeaders
   }
@@ -125,7 +125,7 @@ class EISConnectorImpl(
       onFailure
     ) {
 
-      val updatedHeader = hc.copy(authorization = None, extraHeaders = Seq.empty, otherHeaders = Seq.empty)
+      val updatedHeader = hc.copy(authorization = None, extraHeaders = Seq.empty)
 
       implicit val headerCarrier: HeaderCarrier = updatedHeader
         .withExtraHeaders(extractHeaders(movementId, messageId, updatedHeader): _*)

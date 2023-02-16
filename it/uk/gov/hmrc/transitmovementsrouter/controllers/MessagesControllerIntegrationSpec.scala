@@ -19,9 +19,7 @@ package uk.gov.hmrc.transitmovementsrouter.controllers
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import com.github.tomakehurst.wiremock.client.WireMock._
-import com.github.tomakehurst.wiremock.matching.AnythingPattern
 import com.github.tomakehurst.wiremock.matching.EqualToPattern
-import com.github.tomakehurst.wiremock.matching.StringValuePattern
 import com.github.tomakehurst.wiremock.matching.UrlPathPattern
 import com.kenshoo.play.metrics.Metrics
 import org.scalacheck.Gen
@@ -66,8 +64,6 @@ class MessagesControllerIntegrationSpec
     with Matchers
     with WiremockSuiteWithGuice
     with ScalaCheckDrivenPropertyChecks {
-
-  lazy val anything: StringValuePattern = new AnythingPattern()
 
   // We don't care about the content in this XML fragment, only the root tag and its child.
   val sampleIncomingXml: String =
@@ -143,7 +139,7 @@ class MessagesControllerIntegrationSpec
           urlEqualTo("/gb")
         )
           .withHeader(HeaderNames.AUTHORIZATION, equalTo(s"Bearer bearertoken"))
-          .withHeader("Date", anything)
+          .withHeader("Date", equalTo(formatted))
           .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
           .withHeader("X-Conversation-Id", equalTo(conversationId.value.toString))
           .withHeader("CustomProcessHost", equalTo("Digital"))
@@ -189,7 +185,7 @@ class MessagesControllerIntegrationSpec
           urlEqualTo("/xi")
         )
           .withHeader(HeaderNames.AUTHORIZATION, equalTo(s"Bearer bearertoken"))
-          .withHeader("Date", anything)
+          .withHeader("Date", equalTo(formatted))
           .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
           .withHeader("X-Conversation-Id", equalTo(conversationId.value.toString))
           .withHeader("CustomProcessHost", equalTo("Digital"))
