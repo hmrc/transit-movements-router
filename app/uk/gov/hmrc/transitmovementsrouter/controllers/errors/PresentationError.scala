@@ -34,6 +34,9 @@ object PresentationError extends CommonFormats {
   def forbiddenError(message: String): PresentationError =
     StandardError(message, ErrorCode.Forbidden)
 
+  def unauthorisedError(message: String): PresentationError =
+    StandardError(message, ErrorCode.Unauthorized)
+
   def badRequestError(message: String): PresentationError =
     StandardError(message, ErrorCode.BadRequest)
 

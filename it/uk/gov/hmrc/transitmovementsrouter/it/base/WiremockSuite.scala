@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovementsrouter.connectors
+package uk.gov.hmrc.transitmovementsrouter.it.base
 
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.common.ConsoleNotifier
@@ -22,6 +22,8 @@ import com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.Suite
+import org.scalatestplus.play.guice.GuiceFakeApplicationFactory
+import play.api.Application
 import play.api.inject.guice.GuiceApplicationBuilder
 import play.api.inject.guice.GuiceableModule
 
@@ -51,12 +53,15 @@ trait WiremockSuite extends BeforeAndAfterAll with BeforeAndAfterEach {
 }
 
 trait WiremockSuiteWithGuice extends WiremockSuite {
-  this: Suite =>
+  this: Suite with GuiceFakeApplicationFactory =>
+
+  override def fakeApplication(): Application = appBuilder.build()
 
   protected def appBuilder: GuiceApplicationBuilder =
     new GuiceApplicationBuilder()
       .configure(
-        "microservice.services.eis.port"             -> server.port().toString,
+        "microservice.services.eis.gb.port"          -> server.port().toString,
+        "microservice.services.eis.xi.port"          -> server.port().toString,
         "microservice.services.ncts-monitoring.port" -> server.port().toString
       )
       .overrides(bindings: _*)

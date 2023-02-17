@@ -16,23 +16,11 @@
 
 package uk.gov.hmrc.transitmovementsrouter.utils
 
-import cats.data.EitherT
+object RouterHeaderNames {
 
-import scala.concurrent.Future
+  val CORRELATION_ID      = "X-Correlation-Id"
+  val CONVERSATION_ID     = "X-Conversation-Id"
+  val CUSTOM_PROCESS_HOST = "CustomProcessHost"
+  val MESSAGE_TYPE        = "X-Message-Type"
 
-sealed trait FutureConversion[A] {
-  def toFuture(a: A): Future[_]
-}
-
-object FutureConversions extends FutureConversions
-
-trait FutureConversions {
-
-  implicit def eitherTInstance[L, R]: FutureConversion[EitherT[Future, L, R]] = new FutureConversion[EitherT[Future, L, R]] {
-    override def toFuture(a: EitherT[Future, L, R]): Future[_] = a.value
-  }
-
-  implicit def futureResultInstance[A]: FutureConversion[Future[A]] = new FutureConversion[Future[A]] {
-    override def toFuture(a: Future[A]): Future[_] = a
-  }
 }

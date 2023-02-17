@@ -32,7 +32,7 @@ import java.time.Instant
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 
-trait ModelGenerators extends BaseGenerators {
+trait TestModelGenerators extends BaseGenerators {
 
   implicit lazy val arbitraryCustomsOffice: Arbitrary[CustomsOffice] =
     Arbitrary {

@@ -17,7 +17,7 @@
 package uk.gov.hmrc.transitmovementsrouter.controllers.errors
 
 import cats.data.EitherT
-import uk.gov.hmrc.transitmovementsrouter.models.errors.HeaderExtractError
+import uk.gov.hmrc.transitmovementsrouter.models.errors.MessageTypeExtractionError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PushNotificationError
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
@@ -69,12 +69,14 @@ trait ConvertError {
     }
   }
 
-  implicit val headerExtractErrorConverter = new Converter[HeaderExtractError] {
-    import uk.gov.hmrc.transitmovementsrouter.models.errors.HeaderExtractError._
+  implicit val headerExtractErrorConverter = new Converter[MessageTypeExtractionError] {
+    import uk.gov.hmrc.transitmovementsrouter.models.errors.MessageTypeExtractionError._
 
-    def convert(error: HeaderExtractError): PresentationError = error match {
-      case NoHeaderFound(headerValue)       => PresentationError.badRequestError(s"Missing header: $headerValue")
-      case InvalidMessageType(code: String) => PresentationError.badRequestError(s"Invalid message type: $code")
+    def convert(error: MessageTypeExtractionError): PresentationError = error match {
+      case UnableToExtractFromHeader          => PresentationError.badRequestError(s"Missing header: X-Message-Type")
+      case UnableToExtractFromBody            => PresentationError.badRequestError(s"Message appears to be malformed -- message type was not detected")
+      case InvalidMessageType(code: String)   => PresentationError.badRequestError(s"Invalid message type: $code")
+      case Unexpected(thr: Option[Throwable]) => PresentationError.internalServiceError(cause = thr)
     }
   }
 

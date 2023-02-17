@@ -14,17 +14,13 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovementsrouter.connectors
+package uk.gov.hmrc.transitmovementsrouter.it.base
 
-import play.api.http.HeaderNames
-import uk.gov.hmrc.http.{HeaderNames => HMRCHeaderNames}
+import com.codahale.metrics.MetricRegistry
+import com.kenshoo.play.metrics.Metrics
 
-object OutgoingHeaders {
+class TestMetrics extends Metrics {
+  override def defaultRegistry: MetricRegistry = new MetricRegistry
 
-  val headers = Seq(
-    HeaderNames.DATE,
-    HeaderNames.CONTENT_TYPE,
-    "X-Message-Type",
-    HMRCHeaderNames.xRequestId
-  )
+  override def toJson: String = "{}"
 }

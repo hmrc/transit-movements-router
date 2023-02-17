@@ -14,17 +14,21 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovementsrouter.fakes.actions
+package uk.gov.hmrc.transitmovementsrouter.config
 
-import play.api.mvc.Request
-import play.api.mvc.Result
-import uk.gov.hmrc.transitmovementsrouter.controllers.actions.MessageSizeAction
+import play.api.ConfigLoader
 
-import scala.concurrent.ExecutionContext
-import scala.concurrent.Future
+import scala.jdk.CollectionConverters._
 
-class FakeMessageSizeAction[R[_] <: Request[_]] extends MessageSizeAction[R] {
-  override protected def filter[A](request: R[A]): Future[Option[Result]] = Future.successful(None)
+object IncomingAuthConfig {
 
-  override protected def executionContext: ExecutionContext = scala.concurrent.ExecutionContext.Implicits.global
+  implicit lazy val configLoader: ConfigLoader[IncomingAuthConfig] = ConfigLoader {
+    rootConfig => rootPath =>
+      IncomingAuthConfig(
+        rootConfig.getConfig(rootPath).getBoolean("enabled"),
+        rootConfig.getConfig(rootPath).getStringList("acceptedTokens").asScala.toSeq
+      )
+  }
 }
+
+case class IncomingAuthConfig(enabled: Boolean, acceptedTokens: Seq[String])

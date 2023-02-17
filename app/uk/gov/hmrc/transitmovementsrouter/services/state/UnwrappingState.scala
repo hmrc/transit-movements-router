@@ -14,15 +14,14 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovementsrouter.fakes.actions
+package uk.gov.hmrc.transitmovementsrouter.services.state
 
-import akka.stream.scaladsl.Source
-import akka.util.ByteString
-import uk.gov.hmrc.transitmovementsrouter.base.StreamTestHelpers
-import uk.gov.hmrc.transitmovementsrouter.services.StreamingMessageTrimmer
+sealed trait UnwrappingState
 
-import scala.xml.NodeSeq
+object UnwrappingState {
+  case object LookingForWrappedElement extends UnwrappingState
 
-class FakeXmlTrimmer(xml: NodeSeq) extends StreamingMessageTrimmer {
-  override def trim(source: Source[ByteString, _]): Source[ByteString, _] = StreamTestHelpers.createStream(xml)
+  case object LookingForMessageTypeElement extends UnwrappingState
+
+  case class FoundMessageType(root: String) extends UnwrappingState
 }

@@ -21,9 +21,9 @@ import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import play.api.libs.json.Json
-import uk.gov.hmrc.transitmovementsrouter.generators.ModelGenerators
+import uk.gov.hmrc.transitmovementsrouter.generators.TestModelGenerators
 
-class UpscanServiceSpec extends AnyFreeSpec with ScalaFutures with Matchers with ScalaCheckPropertyChecks with ModelGenerators {
+class UpscanServiceSpec extends AnyFreeSpec with ScalaFutures with Matchers with ScalaCheckPropertyChecks with TestModelGenerators {
 
   val UpscanService = new UpscanServiceImpl
 

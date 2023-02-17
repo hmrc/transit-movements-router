@@ -19,10 +19,13 @@ package uk.gov.hmrc.transitmovementsrouter.connectors
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import com.github.tomakehurst.wiremock.client.WireMock._
+import com.github.tomakehurst.wiremock.matching.AnythingPattern
+import com.github.tomakehurst.wiremock.matching.StringValuePattern
 import com.github.tomakehurst.wiremock.stubbing.Scenario
 import org.mockito.ArgumentMatchers
 import org.mockito.Mockito.when
 import org.scalacheck.Gen
+import org.scalacheck.Arbitrary.arbitrary
 import org.scalatest.concurrent.IntegrationPatience
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.matchers.must.Matchers
@@ -39,13 +42,18 @@ import retry.RetryPolicy
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.client.HttpClientV2
 import uk.gov.hmrc.http.test.HttpClientV2Support
-import uk.gov.hmrc.transitmovementsrouter.base.RegexPatterns
-import uk.gov.hmrc.transitmovementsrouter.base.TestActorSystem
-import uk.gov.hmrc.transitmovementsrouter.base.TestHelpers
 import uk.gov.hmrc.transitmovementsrouter.config.CircuitBreakerConfig
 import uk.gov.hmrc.transitmovementsrouter.config.EISInstanceConfig
 import uk.gov.hmrc.transitmovementsrouter.config.Headers
 import uk.gov.hmrc.transitmovementsrouter.config.RetryConfig
+import uk.gov.hmrc.transitmovementsrouter.generators.ModelGenerators
+import uk.gov.hmrc.transitmovementsrouter.it.base.RegexPatterns
+import uk.gov.hmrc.transitmovementsrouter.it.base.TestActorSystem
+import uk.gov.hmrc.transitmovementsrouter.it.base.TestHelpers
+import uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuite
+import uk.gov.hmrc.transitmovementsrouter.models.ConversationId
+import uk.gov.hmrc.transitmovementsrouter.models.MessageId
+import uk.gov.hmrc.transitmovementsrouter.models.MovementId
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
 
 import java.net.URL
@@ -63,7 +71,10 @@ class EISConnectorSpec
     with IntegrationPatience
     with ScalaCheckPropertyChecks
     with TableDrivenPropertyChecks
-    with TestActorSystem {
+    with TestActorSystem
+    with ModelGenerators {
+
+  lazy val anything: StringValuePattern = new AnythingPattern()
 
   private object NoRetries extends Retries {
 
@@ -114,8 +125,12 @@ class EISConnectorSpec
 
   "post" should {
 
-    "add CustomProcessHost and X-Correlation-Id headers to messages for GB" in forAll(connectorGen) {
-      connector =>
+    "add CustomProcessHost, X-Correlation-Id and X-Conversation-Id and Date headers to messages for GB" in forAll(
+      connectorGen,
+      arbitrary[MovementId],
+      arbitrary[MessageId]
+    ) {
+      (connector, movementId, messageId) =>
         server.resetAll() // Need to reset due to the forAll - it's technically the same test
 
         // Important note: while this test considers successes, as this connector has a retry function,
@@ -127,6 +142,8 @@ class EISConnectorSpec
         // If a 500 error is returned, this most likely means a retry happened, the first place to look
         // should be the code the determines if a result is successful.
 
+        val expectedConversationId = ConversationId(movementId, messageId)
+
         def stub(currentState: String, targetState: String, codeToReturn: Int) =
           server.stubFor(
             post(
@@ -134,36 +151,92 @@ class EISConnectorSpec
             )
               .inScenario("Standard Call")
               .whenScenarioStateIs(currentState)
+              .withHeader("Date", anything)
               .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
+              .withHeader("X-Conversation-Id", equalTo(expectedConversationId.value.toString))
               .withHeader("CustomProcessHost", equalTo("Digital"))
               .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
+              .withHeader(HeaderNames.CONTENT_TYPE, equalTo("application/xml"))
               .willReturn(aResponse().withStatus(codeToReturn))
               .willSetStateTo(targetState)
           )
 
         val secondState = "should now fail"
 
-        stub(Scenario.STARTED, secondState, ACCEPTED)
+        stub(Scenario.STARTED, secondState, OK)
         stub(secondState, secondState, INTERNAL_SERVER_ERROR)
 
         val hc = HeaderCarrier()
 
-        whenReady(connector().post(source, hc)) {
+        whenReady(connector().post(movementId, messageId, source, hc)) {
           _.isRight mustBe true
         }
     }
 
-    "return a unit when post is successful" in forAll(connectorGen) {
-      connector =>
+    "add CustomProcessHost, X-Correlation-Id and X-Conversation-Id headers, but retain the Date header, to messages for GB" in forAll(
+      connectorGen,
+      arbitrary[MovementId],
+      arbitrary[MessageId]
+    ) {
+      (connector, movementId, messageId) =>
         server.resetAll() // Need to reset due to the forAll - it's technically the same test
+
+        // Important note: while this test considers successes, as this connector has a retry function,
+        // we have to ensure that any success result is not retried. To do this, we make the stub return
+        // a 202 status the first time it is called, then we transition it into a state where it'll return
+        // an error. As the retry algorithm should not attempt a retry on a 202, the stub should only be
+        // called once - so a 500 should never be returned.
+        //
+        // If a 500 error is returned, this most likely means a retry happened, the first place to look
+        // should be the code the determines if a result is successful.
+
+        val expectedConversationId = ConversationId(movementId, messageId)
+
+        def stub(currentState: String, targetState: String, codeToReturn: Int) =
+          server.stubFor(
+            post(
+              urlEqualTo(uriStub)
+            )
+              .inScenario("Standard Call")
+              .whenScenarioStateIs(currentState)
+              .withHeader("Date", anything)
+              .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
+              .withHeader("X-Conversation-Id", equalTo(expectedConversationId.value.toString))
+              .withHeader("CustomProcessHost", equalTo("Digital"))
+              .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
+              .withHeader(HeaderNames.CONTENT_TYPE, equalTo("application/xml"))
+              .willReturn(aResponse().withStatus(codeToReturn))
+              .willSetStateTo(targetState)
+          )
+
+        val secondState = "should now fail"
+
+        stub(Scenario.STARTED, secondState, OK)
+        stub(secondState, secondState, INTERNAL_SERVER_ERROR)
+
+        val hc = HeaderCarrier()
+
+        whenReady(connector().post(movementId, messageId, source, hc)) {
+          _.isRight mustBe true
+        }
+    }
+
+    "return a unit when post is successful" in forAll(connectorGen, arbitrary[MovementId], arbitrary[MessageId]) {
+      (connector, movementId, messageId) =>
+        server.resetAll() // Need to reset due to the forAll - it's technically the same test
+
+        val expectedConversationId = ConversationId(movementId, messageId)
 
         def stub(currentState: String, targetState: String, codeToReturn: Int) =
           server.stubFor(
             post(
               urlEqualTo(uriStub)
             ).withHeader("Authorization", equalTo("Bearer bearertokenhereGB"))
+              .withHeader("Date", anything)
               .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
+              .withHeader(HeaderNames.CONTENT_TYPE, equalTo("application/xml"))
               .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
+              .withHeader("X-Conversation-Id", equalTo(expectedConversationId.value.toString))
               .inScenario("Standard Call")
               .whenScenarioStateIs(currentState)
               .willReturn(aResponse().withStatus(codeToReturn))
@@ -172,41 +245,47 @@ class EISConnectorSpec
 
         val secondState = "should now fail"
 
-        stub(Scenario.STARTED, secondState, ACCEPTED)
+        stub(Scenario.STARTED, secondState, OK)
         stub(secondState, secondState, INTERNAL_SERVER_ERROR)
 
         val hc = HeaderCarrier()
 
-        whenReady(connector().post(source, hc)) {
+        whenReady(connector().post(movementId, messageId, source, hc)) {
           _.isRight mustBe true
         }
     }
 
-    "return unit when post is successful on retry if there is an initial failure" in {
-      def stub(currentState: String, targetState: String, codeToReturn: Int) =
-        server.stubFor(
-          post(
-            urlEqualTo(uriStub)
+    "return unit when post is successful on retry if there is an initial failure" in forAll(arbitrary[MovementId], arbitrary[MessageId]) {
+      (movementId, messageId) =>
+        val expectedConversationId = ConversationId(movementId, messageId)
+
+        def stub(currentState: String, targetState: String, codeToReturn: Int) =
+          server.stubFor(
+            post(
+              urlEqualTo(uriStub)
+            )
+              .inScenario("Flaky Call")
+              .whenScenarioStateIs(currentState)
+              .willSetStateTo(targetState)
+              .withHeader("Date", anything)
+              .withHeader("Authorization", equalTo("Bearer bearertokenhereGB"))
+              .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
+              .withHeader(HeaderNames.CONTENT_TYPE, equalTo("application/xml"))
+              .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
+              .withHeader("X-Conversation-Id", equalTo(expectedConversationId.value.toString))
+              .willReturn(aResponse().withStatus(codeToReturn))
           )
-            .inScenario("Flaky Call")
-            .whenScenarioStateIs(currentState)
-            .willSetStateTo(targetState)
-            .withHeader("Authorization", equalTo("Bearer bearertokenhereGB"))
-            .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
-            .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
-            .willReturn(aResponse().withStatus(codeToReturn))
-        )
 
-      val secondState = "should now succeed"
+        val secondState = "should now succeed"
 
-      stub(Scenario.STARTED, secondState, INTERNAL_SERVER_ERROR)
-      stub(secondState, secondState, ACCEPTED)
+        stub(Scenario.STARTED, secondState, INTERNAL_SERVER_ERROR)
+        stub(secondState, secondState, OK)
 
-      val hc = HeaderCarrier()
+        val hc = HeaderCarrier()
 
-      whenReady(oneRetryConnector.post(source, hc)) {
-        _.isRight mustBe true
-      }
+        whenReady(oneRetryConnector.post(movementId, messageId, source, hc)) {
+          _.isRight mustBe true
+        }
     }
 
     val errorCodes = Gen.oneOf(
@@ -219,42 +298,48 @@ class EISConnectorSpec
       )
     )
 
-    "pass through error status codes" in forAll(errorCodes, connectorGen) {
-      (statusCode, connector) =>
+    "pass through error status codes" in forAll(errorCodes, connectorGen, arbitrary[MovementId], arbitrary[MessageId]) {
+      (statusCode, connector, movementId, messageId) =>
         server.resetAll() // Need to reset due to the forAll - it's technically the same test
+
+        val expectedConversationId = ConversationId(movementId, messageId)
 
         server.stubFor(
           post(
             urlEqualTo(uriStub)
           ).withHeader("Authorization", equalTo("Bearer bearertokenhereGB"))
             .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
+            .withHeader("Date", anything)
+            .withHeader(HeaderNames.CONTENT_TYPE, equalTo("application/xml"))
             .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
+            .withHeader("X-Conversation-Id", equalTo(expectedConversationId.value.toString))
             .willReturn(aResponse().withStatus(statusCode))
         )
 
         val hc = HeaderCarrier()
 
-        whenReady(connector().post(source, hc)) {
+        whenReady(connector().post(movementId, messageId, source, hc)) {
           case Left(x) if x.isInstanceOf[RoutingError.Upstream] =>
             x.asInstanceOf[RoutingError.Upstream].upstreamErrorResponse.statusCode mustBe statusCode
-          case x =>
+          case _ =>
             fail("Left was not a RoutingError.Upstream")
         }
     }
   }
 
-  "handle exceptions by returning an HttpResponse with status code 500" in {
-    val httpClientV2 = mock[HttpClientV2]
+  "handle exceptions by returning an HttpResponse with status code 500" in forAll(arbitrary[MovementId], arbitrary[MessageId]) {
+    (movementId, messageId) =>
+      val httpClientV2 = mock[HttpClientV2]
 
-    val hc        = HeaderCarrier()
-    val connector = new EISConnectorImpl("Failure", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, NoRetries)
+      val hc        = HeaderCarrier()
+      val connector = new EISConnectorImpl("Failure", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, NoRetries)
 
-    when(httpClientV2.post(ArgumentMatchers.any[URL])(ArgumentMatchers.any[HeaderCarrier])).thenReturn(new FakeRequestBuilder)
+      when(httpClientV2.post(ArgumentMatchers.any[URL])(ArgumentMatchers.any[HeaderCarrier])).thenReturn(new FakeRequestBuilder)
 
-    whenReady(connector.post(source, hc)) {
-      case Left(x) if x.isInstanceOf[RoutingError.Unexpected] => x.asInstanceOf[RoutingError.Unexpected].cause.get mustBe a[RuntimeException]
-      case _                                                  => fail("Left was not a RoutingError.Unexpected")
-    }
+      whenReady(connector.post(movementId, messageId, source, hc)) {
+        case Left(x) if x.isInstanceOf[RoutingError.Unexpected] => x.asInstanceOf[RoutingError.Unexpected].cause.get mustBe a[RuntimeException]
+        case _                                                  => fail("Left was not a RoutingError.Unexpected")
+      }
   }
 
   "when retrying with an error that should occur, fail the future with an IllegalStateException" in {
@@ -272,7 +357,7 @@ class EISConnectorSpec
       }
 
     whenReady(result) {
-      r => // we can only get here if it was successful and a unit
+      _ => // we can only get here if it was successful and a unit
     }
   }
 

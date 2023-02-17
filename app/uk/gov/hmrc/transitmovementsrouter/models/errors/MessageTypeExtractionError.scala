@@ -16,10 +16,11 @@
 
 package uk.gov.hmrc.transitmovementsrouter.models.errors
 
-sealed trait HeaderExtractError
+sealed trait MessageTypeExtractionError
 
-object HeaderExtractError {
-  case class NoHeaderFound(headerName: String) extends HeaderExtractError
-
-  case class InvalidMessageType(message: String) extends HeaderExtractError
+object MessageTypeExtractionError {
+  case object UnableToExtractFromHeader           extends MessageTypeExtractionError
+  case object UnableToExtractFromBody             extends MessageTypeExtractionError
+  case class InvalidMessageType(message: String)  extends MessageTypeExtractionError
+  case class Unexpected(cause: Option[Throwable]) extends MessageTypeExtractionError
 }

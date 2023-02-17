@@ -33,11 +33,13 @@ import play.api.http.DefaultHttpErrorHandler
 import play.api.http.HttpErrorConfig
 import play.api.http.Status._
 import play.api.libs.Files.SingletonTemporaryFileCreator
-import play.api.libs.json.JsString
 import play.api.libs.json.JsValue
 import play.api.libs.json.Json
+import play.api.mvc.AnyContent
+import play.api.mvc.BodyParser
 import play.api.mvc.PlayBodyParsers
 import play.api.mvc.Request
+import play.api.mvc.Result
 import play.api.test.FakeHeaders
 import play.api.test.FakeRequest
 import play.api.test.Helpers.contentAsJson
@@ -51,11 +53,12 @@ import uk.gov.hmrc.transitmovementsrouter.base.StreamTestHelpers.createStream
 import uk.gov.hmrc.transitmovementsrouter.base.TestActorSystem
 import uk.gov.hmrc.transitmovementsrouter.connectors.PersistenceConnector
 import uk.gov.hmrc.transitmovementsrouter.connectors.PushNotificationsConnector
-import uk.gov.hmrc.transitmovementsrouter.controllers.actions.MessageSizeActionProvider
-import uk.gov.hmrc.transitmovementsrouter.fakes.actions.FakeMessageSizeAction
-import uk.gov.hmrc.transitmovementsrouter.fakes.actions.FakeXmlTrimmer
-import uk.gov.hmrc.transitmovementsrouter.generators.ModelGenerators
+import uk.gov.hmrc.transitmovementsrouter.generators.TestModelGenerators
 import uk.gov.hmrc.transitmovementsrouter.models.MessageType.RequestOfRelease
+import uk.gov.hmrc.transitmovementsrouter.controllers.actions.AuthenticateEISToken
+import uk.gov.hmrc.transitmovementsrouter.fakes.actions.FakeXmlTransformer
+import uk.gov.hmrc.transitmovementsrouter.models.ConversationId
+import uk.gov.hmrc.transitmovementsrouter.models.CustomsOffice
 import uk.gov.hmrc.transitmovementsrouter.models.EoriNumber
 import uk.gov.hmrc.transitmovementsrouter.models.MessageId
 import uk.gov.hmrc.transitmovementsrouter.models.MessageType
@@ -63,16 +66,17 @@ import uk.gov.hmrc.transitmovementsrouter.models.MovementId
 import uk.gov.hmrc.transitmovementsrouter.models.MovementType
 import uk.gov.hmrc.transitmovementsrouter.models.PersistenceResponse
 import uk.gov.hmrc.transitmovementsrouter.models.RequestMessageType
+import uk.gov.hmrc.transitmovementsrouter.models.errors.MessageTypeExtractionError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.MovementNotFound
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.Unexpected
+import uk.gov.hmrc.transitmovementsrouter.services.EISMessageTransformers
+import uk.gov.hmrc.transitmovementsrouter.services.MessageTypeExtractor
 import uk.gov.hmrc.transitmovementsrouter.services.RoutingService
-import uk.gov.hmrc.transitmovementsrouter.services.StreamingMessageTrimmer
 import uk.gov.hmrc.transitmovementsrouter.services.UpscanService
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
-import uk.gov.hmrc.transitmovementsrouter.models.CustomsOffice
 
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.ExecutionContext
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.xml.NodeSeq
 
@@ -82,12 +86,12 @@ class MessageControllerSpec
     with TestActorSystem
     with BeforeAndAfterEach
     with ScalaCheckDrivenPropertyChecks
-    with ModelGenerators {
+    with TestModelGenerators {
 
   val eori         = EoriNumber("eori")
   val movementType = MovementType("departures")
-  val movementId   = MovementId("ABC123")
-  val messageId    = MessageId("XYZ456")
+  val movementId   = MovementId("abcdef1234567890")
+  val messageId    = MessageId("0987654321fedcba")
 
   val cc015cOfficeOfDepartureGB: NodeSeq =
     <ncts:CC015C PhaseID="NCTS5.0" xmlns:ncts="http://ncts.dgtaxud.ec">
@@ -107,27 +111,35 @@ class MessageControllerSpec
   val mockUpscanService              = mock[UpscanService]
   implicit val temporaryFileCreator  = SingletonTemporaryFileCreator
 
-  val mockProvider = mock[MessageSizeActionProvider]
-  when(mockProvider.apply()).thenReturn(new FakeMessageSizeAction[Nothing])
-
   val errorHandler                    = new DefaultHttpErrorHandler(HttpErrorConfig(showDevErrors = false, None), None, None)
   val controllerComponentWithTempFile = stubControllerComponents(playBodyParsers = PlayBodyParsers(SingletonTemporaryFileCreator, errorHandler)(materializer))
 
-  def controller(trimmer: StreamingMessageTrimmer = new FakeXmlTrimmer(trimmedXml)) =
+  object FakeAuthenticateEISToken extends AuthenticateEISToken {
+    override protected def filter[A](request: Request[A]): Future[Option[Result]] = Future.successful(None)
+
+    override def parser: BodyParser[AnyContent] = stubControllerComponents().parsers.defaultBodyParser
+
+    override protected def executionContext: ExecutionContext = scala.concurrent.ExecutionContext.global
+  }
+
+  val mockMessageTypeExtractor: MessageTypeExtractor = mock[MessageTypeExtractor]
+
+  def controller(eisMessageTransformer: EISMessageTransformers = new FakeXmlTransformer(trimmedXml)) =
     new MessagesController(
       controllerComponentWithTempFile,
       mockRoutingService,
       mockPersistenceConnector,
       mockPushNotificationsConnector,
       mockUpscanService,
-      trimmer,
-      mockProvider
+      mockMessageTypeExtractor,
+      FakeAuthenticateEISToken,
+      eisMessageTransformer
     )
 
   def source = createStream(cc015cOfficeOfDepartureGB)
 
   val outgoing = routes.MessagesController.outgoing(eori, movementType, movementId, messageId).url
-  val incoming = routes.MessagesController.incoming((movementId, messageId)).url
+  val incoming = routes.MessagesController.incoming(ConversationId(movementId, messageId)).url
 
   def fakeRequest[A](
     body: NodeSeq,
@@ -143,6 +155,7 @@ class MessageControllerSpec
 
   override def afterEach(): Unit = {
     reset(mockRoutingService)
+    reset(mockMessageTypeExtractor)
     super.afterEach()
   }
 
@@ -172,6 +185,8 @@ class MessageControllerSpec
           )
       ).thenReturn(EitherT.rightT(()))
 
+      when(mockMessageTypeExtractor.extractFromHeaders(any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](MessageType.DeclarationData))
+
       val result = controller().outgoing(eori, movementType, movementId, messageId)(fakeRequest(cc015cOfficeOfDepartureGB, outgoing, messageTypeHeader))
 
       status(result) mustBe ACCEPTED
@@ -190,6 +205,7 @@ class MessageControllerSpec
               any[Source[ByteString, _]]
             )(any[HeaderCarrier], any[ExecutionContext])
           ).thenReturn(EitherT[Future, RoutingError, Unit](Future.successful(Left(RoutingError.UnrecognisedOffice("office", CustomsOffice(office), field)))))
+          when(mockMessageTypeExtractor.extractFromHeaders(any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](MessageType.DeclarationData))
 
           val result = controller().outgoing(eori, movementType, movementId, messageId)(fakeRequest(cc015cOfficeOfDepartureGB, outgoing, messageTypeHeader))
 
@@ -217,6 +233,7 @@ class MessageControllerSpec
             any[Source[ByteString, _]]
           )(any[HeaderCarrier], any[ExecutionContext])
         ).thenReturn(EitherT[Future, RoutingError, Unit](Future.successful(Left(RoutingError.NoElementFound("messageSender")))))
+        when(mockMessageTypeExtractor.extractFromHeaders(any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](MessageType.DeclarationData))
 
         val result = controller().outgoing(eori, movementType, movementId, messageId)(fakeRequest(cc015cOfficeOfDepartureGB, outgoing, messageTypeHeader))
 
@@ -238,6 +255,7 @@ class MessageControllerSpec
             any[Source[ByteString, _]]
           )(any[HeaderCarrier], any[ExecutionContext])
         ).thenReturn(EitherT[Future, RoutingError, Unit](Future.successful(Left(RoutingError.TooManyElementsFound("eori")))))
+        when(mockMessageTypeExtractor.extractFromHeaders(any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](MessageType.DeclarationData))
 
         val result = controller().outgoing(eori, movementType, movementId, messageId)(fakeRequest(cc015cOfficeOfDepartureGB, outgoing, messageTypeHeader))
 
@@ -259,6 +277,8 @@ class MessageControllerSpec
             any[Source[ByteString, _]]
           )(any[HeaderCarrier], any[ExecutionContext])
         ).thenReturn(EitherT[Future, RoutingError, Unit](Future.successful(Left(RoutingError.NoElementFound("messageSender")))))
+        when(mockMessageTypeExtractor.extractFromHeaders(any()))
+          .thenReturn(EitherT.leftT[Future, MessageType](MessageTypeExtractionError.UnableToExtractFromHeader))
 
         val result = controller().outgoing(eori, movementType, movementId, messageId)(fakeRequest(cc015cOfficeOfDepartureGB, outgoing))
 
@@ -280,6 +300,8 @@ class MessageControllerSpec
             any[Source[ByteString, _]]
           )(any[HeaderCarrier], any[ExecutionContext])
         ).thenReturn(EitherT[Future, RoutingError, Unit](Future.successful(Left(RoutingError.NoElementFound("messageSender")))))
+        when(mockMessageTypeExtractor.extractFromHeaders(any()))
+          .thenReturn(EitherT.leftT[Future, MessageType](MessageTypeExtractionError.InvalidMessageType("EEinvalid")))
 
         val result = controller().outgoing(eori, movementType, movementId, messageId)(
           fakeRequest(cc015cOfficeOfDepartureGB, outgoing, FakeHeaders(Seq(("X-Message-Type", "EEinvalid"))))
@@ -288,7 +310,7 @@ class MessageControllerSpec
         status(result) mustBe BAD_REQUEST
         contentAsJson(result) mustBe Json.obj(
           "code"    -> "BAD_REQUEST",
-          "message" -> "Invalid message type: Invalid X-Message-Type header value: EEinvalid"
+          "message" -> "Invalid message type: EEinvalid"
         )
       }
     }
@@ -308,6 +330,7 @@ class MessageControllerSpec
           Future.successful(Left(RoutingError.Unexpected("unexpected error", Some(new Exception("An unexpected error occurred")))))
         )
       )
+      when(mockMessageTypeExtractor.extractFromHeaders(any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](MessageType.DeclarationData))
 
       val result = controller().outgoing(eori, movementType, movementId, messageId)(fakeRequest(cc015cOfficeOfDepartureGB, outgoing, messageTypeHeader))
 
@@ -320,6 +343,7 @@ class MessageControllerSpec
 
     "must return BAD_REQUEST when a message is not a request message" in {
 
+      when(mockMessageTypeExtractor.extractFromHeaders(any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](MessageType.Discrepancies))
       lazy val messageTypeHeader = FakeHeaders(Seq(("X-Message-Type", MessageType.Discrepancies.code)))
       val result                 = controller().outgoing(eori, movementType, movementId, messageId)(fakeRequest(cc015cOfficeOfDepartureGB, outgoing, messageTypeHeader))
 
@@ -336,19 +360,21 @@ class MessageControllerSpec
     "must return CREATED when message is successfully forwarded" in {
       when(mockPersistenceConnector.post(any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId], any(), any())(any(), any()))
         .thenReturn(EitherT.fromEither(Right(PersistenceResponse(MessageId("1")))))
+      when(mockMessageTypeExtractor.extract(any(), any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](MessageType.RequestOfRelease))
 
       val request = fakeRequest(incomingXml, incoming)
         .withHeaders(FakeHeaders().add("X-Message-Type" -> RequestOfRelease.code))
 
-      val result = controller().incoming((movementId, messageId))(request)
+      val result = controller().incoming(ConversationId(movementId, messageId))(request)
 
       status(result) mustBe CREATED
       header("X-Message-Id", result) mustBe Some("1")
     }
 
-    "must return BAD_REQUEST when the X-Message-Type header is missing" in {
+    "must return BAD_REQUEST when the X-Message-Type header is missing or body seems to not contain an appropriate root tag" in {
 
-      val result = controller().incoming((movementId, messageId))(fakeRequest(incomingXml, incoming))
+      when(mockMessageTypeExtractor.extract(any(), any())).thenReturn(EitherT.leftT[Future, MessageType](MessageTypeExtractionError.UnableToExtractFromBody))
+      val result = controller().incoming(ConversationId(movementId, messageId))(fakeRequest(incomingXml, incoming))
 
       status(result) mustBe BAD_REQUEST
 
@@ -358,8 +384,10 @@ class MessageControllerSpec
 
       val request = fakeRequest(incomingXml, incoming)
         .withHeaders(FakeHeaders().add("X-Message-Type" -> "abcdef"))
+      when(mockMessageTypeExtractor.extract(any(), any()))
+        .thenReturn(EitherT.leftT[Future, MessageType](MessageTypeExtractionError.InvalidMessageType("abcde")))
 
-      val result = controller().incoming((movementId, messageId))(request)
+      val result = controller().incoming(ConversationId(movementId, messageId))(request)
 
       status(result) mustBe BAD_REQUEST
     }
@@ -368,11 +396,12 @@ class MessageControllerSpec
 
       when(mockPersistenceConnector.post(any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId], any(), any())(any(), any()))
         .thenReturn(EitherT.fromEither(Left(MovementNotFound(MovementId("ABC")))))
+      when(mockMessageTypeExtractor.extract(any(), any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](MessageType.RequestOfRelease))
 
       val request = fakeRequest(incomingXml, incoming)
         .withHeaders(FakeHeaders().add("X-Message-Type" -> RequestOfRelease.code))
 
-      val result = controller().incoming((movementId, messageId))(request)
+      val result = controller().incoming(ConversationId(movementId, messageId))(request)
 
       status(result) mustBe NOT_FOUND
     }
@@ -381,11 +410,12 @@ class MessageControllerSpec
 
       when(mockPersistenceConnector.post(any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId], any(), any())(any(), any()))
         .thenReturn(EitherT.fromEither(Left(Unexpected(None))))
+      when(mockMessageTypeExtractor.extract(any(), any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](MessageType.RequestOfRelease))
 
       val request = fakeRequest(incomingXml, incoming)
         .withHeaders(FakeHeaders().add("X-Message-Type" -> RequestOfRelease.code))
 
-      val result = controller().incoming((movementId, messageId))(request)
+      val result = controller().incoming(ConversationId(movementId, messageId))(request)
 
       status(result) mustBe INTERNAL_SERVER_ERROR
     }
@@ -398,7 +428,7 @@ class MessageControllerSpec
       successfulSubmission =>
         val request = FakeRequest(
           POST,
-          routes.MessagesController.incoming(movementId, messageId).url,
+          routes.MessagesController.incomingLargeMessage(movementId, messageId).url,
           headers = FakeHeaders(),
           Json.toJson(successfulSubmission)
         )
@@ -415,7 +445,7 @@ class MessageControllerSpec
       submissionFailure =>
         val request = FakeRequest(
           POST,
-          routes.MessagesController.incoming(movementId, messageId).url,
+          routes.MessagesController.incomingLargeMessage(movementId, messageId).url,
           headers = FakeHeaders(),
           Json.toJson(submissionFailure)
         )
@@ -427,4 +457,5 @@ class MessageControllerSpec
         status(result) mustBe OK
     }
   }
+
 }

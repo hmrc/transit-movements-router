@@ -14,17 +14,11 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovementsrouter.base
+package uk.gov.hmrc.transitmovementsrouter.services.state
 
-import akka.actor.ActorSystem
-import akka.stream.Materializer
-import org.scalatest.Suite
+sealed trait WrappingState
 
-object TestActorSystem {
-  val system: ActorSystem = ActorSystem("test")
-}
-
-trait TestActorSystem { self: Suite =>
-  implicit val system: ActorSystem        = TestActorSystem.system
-  implicit val materializer: Materializer = Materializer(TestActorSystem.system)
+object WrappingState {
+  case object LookingForMessageType        extends WrappingState
+  case class FoundMessageType(tag: String) extends WrappingState
 }

@@ -18,6 +18,7 @@ package uk.gov.hmrc.transitmovementsrouter.controllers.stream
 
 import akka.NotUsed
 import akka.stream.Materializer
+import akka.stream.scaladsl.Flow
 import akka.stream.scaladsl.Sink
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
@@ -25,8 +26,11 @@ import org.scalacheck.Gen
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
 import play.api.http.HeaderNames
+import play.api.http.Status.BAD_REQUEST
+import play.api.http.Status.INTERNAL_SERVER_ERROR
 import play.api.http.Status.OK
 import play.api.libs.Files.SingletonTemporaryFileCreator
+import play.api.libs.json.Json
 import play.api.mvc.Action
 import play.api.mvc.ActionBuilder
 import play.api.mvc.ActionRefiner
@@ -37,16 +41,17 @@ import play.api.mvc.Request
 import play.api.mvc.Result
 import play.api.test.FakeHeaders
 import play.api.test.FakeRequest
+import play.api.test.Helpers.contentAsJson
 import play.api.test.Helpers.contentAsString
 import play.api.test.Helpers.defaultAwaitTimeout
 import play.api.test.Helpers.status
 import play.api.test.Helpers.stubControllerComponents
 import uk.gov.hmrc.transitmovementsrouter.base.TestActorSystem
 import uk.gov.hmrc.transitmovementsrouter.base.TestSourceProvider
+import uk.gov.hmrc.transitmovementsrouter.controllers.errors.PresentationError
 
 import java.nio.charset.StandardCharsets
 import scala.annotation.tailrec
-import scala.collection.immutable
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 
@@ -89,6 +94,45 @@ class StreamingParsersSpec extends AnyFreeSpec with Matchers with TestActorSyste
             r => Ok(r)
           )
     }
+
+    def transformStream: Action[Source[ByteString, _]] = Action
+      .andThen(TestActionBuilder)
+      .stream(
+        Flow.fromFunction[ByteString, ByteString](
+          a => a ++ a
+        )
+      ) {
+        request =>
+          (for {
+            a <- request.body.runWith(Sink.last)
+            b <- request.body.runWith(Sink.last)
+          } yield (a ++ b).utf8String)
+            .map(
+              r => Ok(r)
+            )
+      }
+
+    def errorStream: Action[Source[ByteString, _]] = Action
+      .andThen(TestActionBuilder)
+      .stream(
+        Flow.fromFunction[ByteString, ByteString](
+          _ => throw new IllegalStateException("this happened")
+        )
+      ) {
+        _ =>
+          Future.successful(Ok("but should never happen"))
+      }
+
+    def internalErrorStream: Action[Source[ByteString, _]] = Action
+      .andThen(TestActionBuilder)
+      .stream(
+        Flow.fromFunction[ByteString, ByteString](
+          _ => throw new NumberFormatException() // doesn't matter - we're just not expecting it
+        )
+      ) {
+        _ =>
+          Future.successful(Ok("but should never happen"))
+      }
   }
 
   @tailrec
@@ -122,6 +166,30 @@ class StreamingParsersSpec extends AnyFreeSpec with Matchers with TestActorSyste
       val result  = Harness.resultStream()(request)
       status(result) mustBe OK
       contentAsString(result) mustBe (string ++ string)
+    }
+
+    "via the stream extension method with a transformation" in {
+      val string  = Gen.stringOfN(20, Gen.alphaNumChar).sample.get
+      val request = FakeRequest("POST", "/", headers, singleUseStringSource(string))
+      val result  = Harness.transformStream()(request)
+      status(result) mustBe OK
+      contentAsString(result) mustBe (string ++ string ++ string ++ string)
+    }
+
+    "via the stream extension method with a transformation that fails in an expected way" in {
+      val string  = Gen.stringOfN(20, Gen.alphaNumChar).sample.get
+      val request = FakeRequest("POST", "/", headers, singleUseStringSource(string))
+      val result  = Harness.errorStream()(request)
+      status(result) mustBe BAD_REQUEST
+      contentAsJson(result) mustBe Json.toJson(PresentationError.badRequestError("this happened"))
+    }
+
+    "via the stream extension method with a transformation that fails in an unexpected way" in {
+      val string  = Gen.stringOfN(20, Gen.alphaNumChar).sample.get
+      val request = FakeRequest("POST", "/", headers, singleUseStringSource(string))
+      val result  = Harness.internalErrorStream()(request)
+      status(result) mustBe INTERNAL_SERVER_ERROR
+      contentAsJson(result) mustBe Json.toJson(PresentationError.internalServiceError())
     }
   }
 }
