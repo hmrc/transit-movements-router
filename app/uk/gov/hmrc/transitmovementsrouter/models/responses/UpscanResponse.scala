@@ -16,7 +16,13 @@
 
 package uk.gov.hmrc.transitmovementsrouter.models.responses
 
+import play.api.libs.json.Format
+import play.api.libs.json.JsString
 import play.api.libs.json.Json
+import play.api.libs.json.Reads
+import play.api.libs.json.Writes
+import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.DownloadUrl
+import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.Reference
 
 import java.time.Instant
 
@@ -32,11 +38,43 @@ object FailureDetails {
   implicit val format = Json.format[FailureDetails]
 }
 
-final case class UpscanResponse(reference: String, fileStatus: String, uploadDetails: Option[UploadDetails], failureDetails: Option[FailureDetails]) {
-  val isSuccess = uploadDetails.isDefined
-}
-
 object UpscanResponse {
 
+  case class Reference(value: String) extends AnyVal
+
+  object Reference {
+
+    implicit val format: Format[Reference] =
+      Format(
+        Reads.of[String].map(Reference(_)),
+        Writes(
+          ref => JsString(ref.value)
+        )
+      )
+  }
+
+  case class DownloadUrl(value: String) extends AnyVal
+
+  object DownloadUrl {
+
+    implicit val format: Format[DownloadUrl] =
+      Format(
+        Reads.of[String].map(DownloadUrl(_)),
+        Writes(
+          ref => JsString(ref.value)
+        )
+      )
+  }
+
   implicit val upscanResponseFormat = Json.format[UpscanResponse]
+}
+
+final case class UpscanResponse(
+  reference: Reference,
+  fileStatus: String,
+  downloadUrl: Option[DownloadUrl],
+  uploadDetails: Option[UploadDetails],
+  failureDetails: Option[FailureDetails]
+) {
+  val isSuccess = uploadDetails.isDefined
 }

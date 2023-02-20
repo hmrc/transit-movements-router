@@ -26,6 +26,8 @@ import uk.gov.hmrc.transitmovementsrouter.models.RequestMessageType
 import uk.gov.hmrc.transitmovementsrouter.models.responses.FailureDetails
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UploadDetails
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse
+import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.DownloadUrl
+import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.Reference
 
 import java.time.Instant
 import java.time.OffsetDateTime
@@ -85,9 +87,10 @@ trait TestModelGenerators extends BaseGenerators {
     for {
       reference  <- Gen.alphaNumStr
       fileStatus <- Gen.alphaNumStr
+      downloadUrl    = if (isSuccess) Gen.alphaNumStr.sample.map(DownloadUrl(_)) else None
       uploadDetails  = if (isSuccess) arbitraryUploadDetails.arbitrary.sample else None
       failureDetails = if (!isSuccess) arbitraryFailureDetails.arbitrary.sample else None
-    } yield UpscanResponse(reference, fileStatus, uploadDetails, failureDetails)
+    } yield UpscanResponse(Reference(reference), fileStatus, downloadUrl, uploadDetails, failureDetails)
   }
 
 }
