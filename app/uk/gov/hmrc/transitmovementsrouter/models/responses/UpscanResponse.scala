@@ -22,6 +22,7 @@ import play.api.libs.json.Json
 import play.api.libs.json.Reads
 import play.api.libs.json.Writes
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.DownloadUrl
+import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.FileStatus
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.Reference
 
 import java.time.Instant
@@ -66,12 +67,25 @@ object UpscanResponse {
       )
   }
 
+  case class FileStatus(value: String) extends AnyVal
+
+  object FileStatus {
+
+    implicit val format: Format[FileStatus] =
+      Format(
+        Reads.of[String].map(FileStatus(_)),
+        Writes(
+          ref => JsString(ref.value)
+        )
+      )
+  }
+
   implicit val upscanResponseFormat = Json.format[UpscanResponse]
 }
 
 final case class UpscanResponse(
   reference: Reference,
-  fileStatus: String,
+  fileStatus: FileStatus,
   downloadUrl: Option[DownloadUrl],
   uploadDetails: Option[UploadDetails],
   failureDetails: Option[FailureDetails]
