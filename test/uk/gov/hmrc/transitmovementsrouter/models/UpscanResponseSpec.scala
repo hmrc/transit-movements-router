@@ -21,8 +21,7 @@ import org.scalatest.matchers.must.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 import play.api.libs.json.JsSuccess
 import play.api.libs.json.Json
-import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.SubmissionFailure
-import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.SuccessfulSubmission
+import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse
 
 class UpscanResponseSpec extends AnyFreeSpec with Matchers with ScalaCheckDrivenPropertyChecks {
 
@@ -41,7 +40,10 @@ class UpscanResponseSpec extends AnyFreeSpec with Matchers with ScalaCheckDriven
         )
       )
 
-      jsonSuccessResponse.validate[SuccessfulSubmission] mustBe a[JsSuccess[SuccessfulSubmission]]
+      jsonSuccessResponse.validate[UpscanResponse] match {
+        case JsSuccess(response, _) => response.isSuccess mustBe true
+        case _                      => fail("Expected to be a success response from upscan")
+      }
     }
   }
 
@@ -55,7 +57,10 @@ class UpscanResponseSpec extends AnyFreeSpec with Matchers with ScalaCheckDriven
       )
     )
     "deserializes correctly" in {
-      jsonFailureResponse.validate[SubmissionFailure] mustBe a[JsSuccess[SubmissionFailure]]
+      jsonFailureResponse.validate[UpscanResponse] match {
+        case JsSuccess(response, _) => response.isSuccess mustBe false
+        case _                      => fail("Expected to be a failure response from upscan")
+      }
     }
   }
 

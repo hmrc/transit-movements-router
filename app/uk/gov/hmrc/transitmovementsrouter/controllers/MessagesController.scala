@@ -20,6 +20,7 @@ import akka.stream.Materializer
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import cats.data.EitherT
+import play.api.Logging
 import play.api.libs.Files.TemporaryFileCreator
 import play.api.libs.json.Json
 import play.api.mvc.Action
@@ -44,7 +45,6 @@ import uk.gov.hmrc.transitmovementsrouter.models.MovementType
 import uk.gov.hmrc.transitmovementsrouter.models.RequestMessageType
 import uk.gov.hmrc.transitmovementsrouter.services.EISMessageTransformers
 import uk.gov.hmrc.transitmovementsrouter.services.RoutingService
-import uk.gov.hmrc.transitmovementsrouter.services.UpscanService
 import uk.gov.hmrc.transitmovementsrouter.services.MessageTypeExtractor
 
 import javax.inject.Inject
@@ -55,7 +55,6 @@ class MessagesController @Inject() (
   routingService: RoutingService,
   persistenceConnector: PersistenceConnector,
   pushNotificationsConnector: PushNotificationsConnector,
-  upscanService: UpscanService,
   messageTypeExtractor: MessageTypeExtractor,
   authenticateEISToken: AuthenticateEISToken,
   eisMessageTransformers: EISMessageTransformers
@@ -64,7 +63,9 @@ class MessagesController @Inject() (
   val temporaryFileCreator: TemporaryFileCreator
 ) extends BackendController(cc)
     with StreamingParsers
-    with ConvertError {
+    with ConvertError
+    with UpscanResponseParser
+    with Logging {
 
   def outgoing(eori: EoriNumber, movementType: MovementType, movementId: MovementId, messageId: MessageId): Action[Source[ByteString, _]] =
     DefaultActionBuilder.apply(cc.parsers.anyContent).stream {
@@ -99,7 +100,7 @@ class MessagesController @Inject() (
 
   def incomingLargeMessage(movementId: MovementId, messageId: MessageId) = Action.async(cc.parsers.json) {
     implicit request =>
-      upscanService.parseUpscanResponse(request.body)
+      parseAndLogUpscanResponse(request.body)
 
       Future.successful(Ok)
   }

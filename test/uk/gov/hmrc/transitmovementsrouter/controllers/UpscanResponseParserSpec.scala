@@ -14,38 +14,53 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovementsrouter.services
+package uk.gov.hmrc.transitmovementsrouter.controllers
 
+import akka.stream.Materializer
+import com.google.inject.Inject
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+import play.api.Logging
 import play.api.libs.json.Json
+import play.api.mvc.BaseController
+import play.api.test.Helpers.stubControllerComponents
 import uk.gov.hmrc.transitmovementsrouter.generators.TestModelGenerators
 
-class UpscanServiceSpec extends AnyFreeSpec with ScalaFutures with Matchers with ScalaCheckPropertyChecks with TestModelGenerators {
+class UpscanResponseParserSpec @Inject() ()(implicit val materializer: Materializer)
+    extends AnyFreeSpec
+    with BaseController
+    with UpscanResponseParser
+    with Logging
+    with ScalaFutures
+    with Matchers
+    with ScalaCheckPropertyChecks
+    with TestModelGenerators {
 
-  val UpscanService = new UpscanServiceImpl
+  override val controllerComponents = stubControllerComponents()
 
   "parseUpscanResponse" - {
     "given a successful response in the callback, returns a defined option with value of SuccessfulSubmission" in forAll(
-      arbitrarySuccessfulSubmission.arbitrary
+      arbitraryUpscanResponse(true).arbitrary
     ) {
-      successfulSubmission =>
-        val json = Json.toJson(successfulSubmission)
-        UpscanService.parseUpscanResponse(json) mustBe Some(successfulSubmission)
+      successUpscanResponse =>
+        val json = Json.toJson(successUpscanResponse)
+        parseAndLogUpscanResponse(json) mustBe Some(successUpscanResponse)
+        successUpscanResponse.isSuccess mustBe true
     }
 
     "given a failure response in the callback, returns a None" in forAll(
-      arbitrarySubmissionFailure.arbitrary
+      arbitraryUpscanResponse(false).arbitrary
     ) {
-      submissionFailure =>
-        val json = Json.toJson(submissionFailure)
-        UpscanService.parseUpscanResponse(json) mustBe None
+      failureUpscanResponse =>
+        val json = Json.toJson(failureUpscanResponse)
+        parseAndLogUpscanResponse(json) mustBe None
+        failureUpscanResponse.isSuccess mustBe false
     }
 
     "given a response in the callback that we cannot deserialize, returns a None" in {
-      UpscanService.parseUpscanResponse(Json.obj("reference" -> "abc")) mustBe None
+      parseAndLogUpscanResponse(Json.obj("reference" -> "abc")) mustBe None
     }
   }
 

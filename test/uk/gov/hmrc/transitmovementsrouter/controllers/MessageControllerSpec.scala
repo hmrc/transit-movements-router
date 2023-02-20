@@ -33,7 +33,6 @@ import play.api.http.DefaultHttpErrorHandler
 import play.api.http.HttpErrorConfig
 import play.api.http.Status._
 import play.api.libs.Files.SingletonTemporaryFileCreator
-import play.api.libs.json.JsValue
 import play.api.libs.json.Json
 import play.api.mvc.AnyContent
 import play.api.mvc.BodyParser
@@ -72,7 +71,6 @@ import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.Unexpec
 import uk.gov.hmrc.transitmovementsrouter.services.EISMessageTransformers
 import uk.gov.hmrc.transitmovementsrouter.services.MessageTypeExtractor
 import uk.gov.hmrc.transitmovementsrouter.services.RoutingService
-import uk.gov.hmrc.transitmovementsrouter.services.UpscanService
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
 
 import scala.concurrent.ExecutionContext
@@ -108,7 +106,6 @@ class MessageControllerSpec
   val mockRoutingService             = mock[RoutingService]
   val mockPersistenceConnector       = mock[PersistenceConnector]
   val mockPushNotificationsConnector = mock[PushNotificationsConnector]
-  val mockUpscanService              = mock[UpscanService]
   implicit val temporaryFileCreator  = SingletonTemporaryFileCreator
 
   val errorHandler                    = new DefaultHttpErrorHandler(HttpErrorConfig(showDevErrors = false, None), None, None)
@@ -130,7 +127,6 @@ class MessageControllerSpec
       mockRoutingService,
       mockPersistenceConnector,
       mockPushNotificationsConnector,
-      mockUpscanService,
       mockMessageTypeExtractor,
       FakeAuthenticateEISToken,
       eisMessageTransformer
@@ -424,33 +420,28 @@ class MessageControllerSpec
 
   "POST /movements/:movementId/messages/:messageId" - {
 
-    "should return ok given a successful response from upscan" in forAll(arbitrarySuccessfulSubmission.arbitrary) {
-      successfulSubmission =>
+    "should return ok given a success response from upscan" in forAll(arbitraryUpscanResponse(true).arbitrary) {
+      successUpscanResponse =>
         val request = FakeRequest(
           POST,
           routes.MessagesController.incomingLargeMessage(movementId, messageId).url,
           headers = FakeHeaders(),
-          Json.toJson(successfulSubmission)
+          Json.toJson(successUpscanResponse)
         )
-
-        when(mockUpscanService.parseUpscanResponse(any[JsValue]))
-          .thenReturn(Some(successfulSubmission))
 
         val result = controller().incomingLargeMessage(movementId, messageId)(request)
 
         status(result) mustBe OK
     }
 
-    "should return ok given a failure response from upscan" in forAll(arbitrarySubmissionFailure.arbitrary) {
-      submissionFailure =>
+    "should return ok given a failure response from upscan" in forAll(arbitraryUpscanResponse(false).arbitrary) {
+      failureUpscanResponse =>
         val request = FakeRequest(
           POST,
           routes.MessagesController.incomingLargeMessage(movementId, messageId).url,
           headers = FakeHeaders(),
-          Json.toJson(submissionFailure)
+          Json.toJson(failureUpscanResponse)
         )
-
-        when(mockUpscanService.parseUpscanResponse(any[JsValue])).thenReturn(None)
 
         val result = controller().incomingLargeMessage(movementId, messageId)(request)
 

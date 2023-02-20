@@ -20,8 +20,6 @@ import play.api.libs.json.Json
 
 import java.time.Instant
 
-sealed trait UpscanResponse
-
 final case class UploadDetails(fileName: String, fileMimeType: String, uploadTimestamp: Instant, checksum: String, size: Long)
 
 object UploadDetails {
@@ -34,13 +32,11 @@ object FailureDetails {
   implicit val format = Json.format[FailureDetails]
 }
 
+final case class UpscanResponse(reference: String, fileStatus: String, uploadDetails: Option[UploadDetails], failureDetails: Option[FailureDetails]) {
+  val isSuccess = uploadDetails.isDefined
+}
+
 object UpscanResponse {
 
-  final case class SuccessfulSubmission(reference: String, downloadUrl: String, fileStatus: String, uploadDetails: UploadDetails) extends UpscanResponse
-
-  final case class SubmissionFailure(reference: String, fileStatus: String, failureDetails: FailureDetails) extends UpscanResponse
-
-  implicit val successFormat = Json.format[SuccessfulSubmission]
-
-  implicit val failureFormat = Json.format[SubmissionFailure]
+  implicit val upscanResponseFormat = Json.format[UpscanResponse]
 }

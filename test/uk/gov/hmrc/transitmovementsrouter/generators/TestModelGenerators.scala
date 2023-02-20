@@ -25,8 +25,7 @@ import uk.gov.hmrc.transitmovementsrouter.models.MovementId
 import uk.gov.hmrc.transitmovementsrouter.models.RequestMessageType
 import uk.gov.hmrc.transitmovementsrouter.models.responses.FailureDetails
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UploadDetails
-import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.SubmissionFailure
-import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.SuccessfulSubmission
+import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse
 
 import java.time.Instant
 import java.time.OffsetDateTime
@@ -75,15 +74,6 @@ trait TestModelGenerators extends BaseGenerators {
     } yield UploadDetails(fileName, fileMimeType, Instant.now(), checksum, size)
   }
 
-  implicit lazy val arbitrarySuccessfulSubmission: Arbitrary[SuccessfulSubmission] = Arbitrary {
-    for {
-      reference   <- Gen.alphaNumStr
-      downloadUrl <- Gen.alphaNumStr
-      fileStatus  <- Gen.alphaNumStr
-      details     <- arbitraryUploadDetails.arbitrary
-    } yield SuccessfulSubmission(reference, downloadUrl, fileStatus, details)
-  }
-
   implicit lazy val arbitraryFailureDetails: Arbitrary[FailureDetails] = Arbitrary {
     for {
       failureReason <- Gen.alphaNumStr
@@ -91,12 +81,13 @@ trait TestModelGenerators extends BaseGenerators {
     } yield FailureDetails(failureReason, message)
   }
 
-  implicit lazy val arbitrarySubmissionFailure: Arbitrary[SubmissionFailure] = Arbitrary {
+  implicit def arbitraryUpscanResponse(isSuccess: Boolean): Arbitrary[UpscanResponse] = Arbitrary {
     for {
       reference  <- Gen.alphaNumStr
       fileStatus <- Gen.alphaNumStr
-      reason     <- arbitraryFailureDetails.arbitrary
-    } yield SubmissionFailure(reference, fileStatus, reason)
+      uploadDetails  = if (isSuccess) arbitraryUploadDetails.arbitrary.sample else None
+      failureDetails = if (!isSuccess) arbitraryFailureDetails.arbitrary.sample else None
+    } yield UpscanResponse(reference, fileStatus, uploadDetails, failureDetails)
   }
 
 }
