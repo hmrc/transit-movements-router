@@ -46,27 +46,14 @@ object UpscanResponse {
   case class Reference(value: String) extends AnyVal
 
   object Reference {
-
-    implicit val format: Format[Reference] =
-      Format(
-        Reads.of[String].map(Reference(_)),
-        Writes(
-          ref => JsString(ref.value)
-        )
-      )
+    implicit val format: Format[Reference] = Json.valueFormat[Reference]
   }
 
   case class DownloadUrl(value: String) extends AnyVal
 
   object DownloadUrl {
 
-    implicit val format: Format[DownloadUrl] =
-      Format(
-        Reads.of[String].map(DownloadUrl(_)),
-        Writes(
-          ref => JsString(ref.value)
-        )
-      )
+    implicit val format: Format[DownloadUrl] = Json.valueFormat[DownloadUrl]
   }
 
   sealed trait FileStatus
