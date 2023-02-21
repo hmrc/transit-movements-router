@@ -79,5 +79,4 @@ trait ConvertError {
       case Unexpected(thr: Option[Throwable]) => PresentationError.internalServiceError(cause = thr)
     }
   }
-
 }

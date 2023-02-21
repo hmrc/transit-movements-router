@@ -22,14 +22,14 @@ import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
 import uk.gov.hmrc.transitmovementsrouter.base.StreamTestHelpers._
 import uk.gov.hmrc.transitmovementsrouter.base.TestActorSystem
-import uk.gov.hmrc.transitmovementsrouter.generators.ModelGenerators
+import uk.gov.hmrc.transitmovementsrouter.generators.TestModelGenerators
 import uk.gov.hmrc.transitmovementsrouter.models._
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError.NoElementFound
 
 import java.time.format.DateTimeFormatter
 import scala.xml._
 
-class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers with ModelGenerators {
+class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers with TestModelGenerators {
 
   MessageType.arrivalRequestValues.foreach {
     messageType =>

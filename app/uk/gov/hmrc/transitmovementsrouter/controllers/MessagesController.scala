@@ -20,6 +20,7 @@ import akka.stream.Materializer
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import cats.data.EitherT
+import play.api.Logging
 import play.api.libs.Files.TemporaryFileCreator
 import play.api.libs.json.Json
 import play.api.mvc.Action
@@ -62,7 +63,9 @@ class MessagesController @Inject() (
   val temporaryFileCreator: TemporaryFileCreator
 ) extends BackendController(cc)
     with StreamingParsers
-    with ConvertError {
+    with ConvertError
+    with UpscanResponseParser
+    with Logging {
 
   def outgoing(eori: EoriNumber, movementType: MovementType, movementId: MovementId, messageId: MessageId): Action[Source[ByteString, _]] =
     DefaultActionBuilder.apply(cc.parsers.anyContent).stream {
@@ -94,6 +97,13 @@ class MessagesController @Inject() (
             response => Created.withHeaders("X-Message-Id" -> response.messageId.value)
           )
     }
+
+  def incomingLargeMessage(movementId: MovementId, messageId: MessageId) = Action.async(cc.parsers.json) {
+    implicit request =>
+      parseAndLogUpscanResponse(request.body)
+
+      Future.successful(Ok)
+  }
 
   private def filterRequestMessageType(messageType: MessageType): EitherT[Future, PresentationError, RequestMessageType] = messageType match {
     case t: RequestMessageType => EitherT.rightT(t)

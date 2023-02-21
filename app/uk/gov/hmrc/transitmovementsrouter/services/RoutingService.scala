@@ -49,6 +49,7 @@ trait RoutingService {
 
 }
 
+@Singleton
 class RoutingServiceImpl @Inject() (
   eisMessageTransformers: EISMessageTransformers,
   messageConnectorProvider: EISConnectorProvider

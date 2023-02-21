@@ -52,6 +52,8 @@ import uk.gov.hmrc.transitmovementsrouter.base.StreamTestHelpers.createStream
 import uk.gov.hmrc.transitmovementsrouter.base.TestActorSystem
 import uk.gov.hmrc.transitmovementsrouter.connectors.PersistenceConnector
 import uk.gov.hmrc.transitmovementsrouter.connectors.PushNotificationsConnector
+import uk.gov.hmrc.transitmovementsrouter.generators.TestModelGenerators
+import uk.gov.hmrc.transitmovementsrouter.models.MessageType.RequestOfRelease
 import uk.gov.hmrc.transitmovementsrouter.controllers.actions.AuthenticateEISToken
 import uk.gov.hmrc.transitmovementsrouter.fakes.actions.FakeXmlTransformer
 import uk.gov.hmrc.transitmovementsrouter.models.ConversationId
@@ -59,7 +61,6 @@ import uk.gov.hmrc.transitmovementsrouter.models.CustomsOffice
 import uk.gov.hmrc.transitmovementsrouter.models.EoriNumber
 import uk.gov.hmrc.transitmovementsrouter.models.MessageId
 import uk.gov.hmrc.transitmovementsrouter.models.MessageType
-import uk.gov.hmrc.transitmovementsrouter.models.MessageType.RequestOfRelease
 import uk.gov.hmrc.transitmovementsrouter.models.MovementId
 import uk.gov.hmrc.transitmovementsrouter.models.MovementType
 import uk.gov.hmrc.transitmovementsrouter.models.PersistenceResponse
@@ -77,7 +78,13 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.xml.NodeSeq
 
-class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSystem with BeforeAndAfterEach with ScalaCheckDrivenPropertyChecks {
+class MessageControllerSpec
+    extends AnyFreeSpec
+    with Matchers
+    with TestActorSystem
+    with BeforeAndAfterEach
+    with ScalaCheckDrivenPropertyChecks
+    with TestModelGenerators {
 
   val eori         = EoriNumber("eori")
   val movementType = MovementType("departures")
@@ -410,4 +417,36 @@ class MessageControllerSpec extends AnyFreeSpec with Matchers with TestActorSyst
     }
 
   }
+
+  "POST /movements/:movementId/messages/:messageId" - {
+
+    "should return ok given a success response from upscan" in forAll(arbitraryUpscanResponse(true).arbitrary) {
+      successUpscanResponse =>
+        val request = FakeRequest(
+          POST,
+          routes.MessagesController.incomingLargeMessage(movementId, messageId).url,
+          headers = FakeHeaders(),
+          Json.toJson(successUpscanResponse)
+        )
+
+        val result = controller().incomingLargeMessage(movementId, messageId)(request)
+
+        status(result) mustBe OK
+    }
+
+    "should return ok given a failure response from upscan" in forAll(arbitraryUpscanResponse(false).arbitrary) {
+      failureUpscanResponse =>
+        val request = FakeRequest(
+          POST,
+          routes.MessagesController.incomingLargeMessage(movementId, messageId).url,
+          headers = FakeHeaders(),
+          Json.toJson(failureUpscanResponse)
+        )
+
+        val result = controller().incomingLargeMessage(movementId, messageId)(request)
+
+        status(result) mustBe OK
+    }
+  }
+
 }

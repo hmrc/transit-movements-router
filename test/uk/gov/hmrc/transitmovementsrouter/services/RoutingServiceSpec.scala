@@ -37,7 +37,7 @@ import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.transitmovementsrouter.base.StreamTestHelpers.createStream
 import uk.gov.hmrc.transitmovementsrouter.base._
 import uk.gov.hmrc.transitmovementsrouter.connectors._
-import uk.gov.hmrc.transitmovementsrouter.generators.ModelGenerators
+import uk.gov.hmrc.transitmovementsrouter.generators.TestModelGenerators
 import uk.gov.hmrc.transitmovementsrouter.models._
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError.NoElementFound
@@ -56,7 +56,7 @@ class RoutingServiceSpec
     with Matchers
     with MockitoSugar
     with ScalaCheckDrivenPropertyChecks
-    with ModelGenerators
+    with TestModelGenerators
     with OptionValues {
 
   implicit val hc: HeaderCarrier = HeaderCarrier()

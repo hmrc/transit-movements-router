@@ -23,12 +23,18 @@ import uk.gov.hmrc.transitmovementsrouter.models.MessageId
 import uk.gov.hmrc.transitmovementsrouter.models.MessageType
 import uk.gov.hmrc.transitmovementsrouter.models.MovementId
 import uk.gov.hmrc.transitmovementsrouter.models.RequestMessageType
+import uk.gov.hmrc.transitmovementsrouter.models.responses.FailureDetails
+import uk.gov.hmrc.transitmovementsrouter.models.responses.UploadDetails
+import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse
+import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.DownloadUrl
+import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.FileStatus
+import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.Reference
 
 import java.time.Instant
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 
-trait ModelGenerators extends BaseGenerators {
+trait TestModelGenerators extends BaseGenerators {
 
   implicit lazy val arbitraryCustomsOffice: Arbitrary[CustomsOffice] =
     Arbitrary {
@@ -61,5 +67,31 @@ trait ModelGenerators extends BaseGenerators {
         millis <- Gen.chooseNum(0, Long.MaxValue / 1000L)
       } yield OffsetDateTime.ofInstant(Instant.ofEpochMilli(millis), ZoneOffset.UTC)
     }
+
+  implicit lazy val arbitraryUploadDetails: Arbitrary[UploadDetails] = Arbitrary {
+    for {
+      fileName     <- Gen.alphaNumStr
+      fileMimeType <- Gen.alphaNumStr
+      checksum     <- Gen.alphaNumStr
+      size         <- Gen.long
+    } yield UploadDetails(fileName, fileMimeType, Instant.now(), checksum, size)
+  }
+
+  implicit lazy val arbitraryFailureDetails: Arbitrary[FailureDetails] = Arbitrary {
+    for {
+      failureReason <- Gen.alphaNumStr
+      message       <- Gen.alphaNumStr
+    } yield FailureDetails(failureReason, message)
+  }
+
+  implicit def arbitraryUpscanResponse(isSuccess: Boolean): Arbitrary[UpscanResponse] = Arbitrary {
+    for {
+      reference  <- Gen.alphaNumStr
+      fileStatus <- Gen.oneOf(FileStatus.values)
+      downloadUrl    = if (isSuccess) Gen.alphaNumStr.sample.map(DownloadUrl(_)) else None
+      uploadDetails  = if (isSuccess) arbitraryUploadDetails.arbitrary.sample else None
+      failureDetails = if (!isSuccess) arbitraryFailureDetails.arbitrary.sample else None
+    } yield UpscanResponse(Reference(reference), fileStatus, downloadUrl, uploadDetails, failureDetails)
+  }
 
 }
