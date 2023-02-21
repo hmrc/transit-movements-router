@@ -87,11 +87,11 @@ trait TestModelGenerators extends BaseGenerators {
   implicit def arbitraryUpscanResponse(isSuccess: Boolean): Arbitrary[UpscanResponse] = Arbitrary {
     for {
       reference  <- Gen.alphaNumStr
-      fileStatus <- Gen.alphaNumStr
+      fileStatus <- Gen.oneOf(FileStatus.values)
       downloadUrl    = if (isSuccess) Gen.alphaNumStr.sample.map(DownloadUrl(_)) else None
       uploadDetails  = if (isSuccess) arbitraryUploadDetails.arbitrary.sample else None
       failureDetails = if (!isSuccess) arbitraryFailureDetails.arbitrary.sample else None
-    } yield UpscanResponse(Reference(reference), FileStatus(fileStatus), downloadUrl, uploadDetails, failureDetails)
+    } yield UpscanResponse(Reference(reference), fileStatus, downloadUrl, uploadDetails, failureDetails)
   }
 
 }

@@ -16,8 +16,6 @@
 
 package uk.gov.hmrc.transitmovementsrouter.controllers
 
-import akka.stream.Materializer
-import com.google.inject.Inject
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
@@ -25,42 +23,51 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import play.api.Logging
 import play.api.libs.json.Json
 import play.api.mvc.BaseController
+import play.api.mvc.ControllerComponents
 import play.api.test.Helpers.stubControllerComponents
+import uk.gov.hmrc.transitmovementsrouter.controllers.errors.PresentationError
 import uk.gov.hmrc.transitmovementsrouter.generators.TestModelGenerators
 
-class UpscanResponseParserSpec @Inject() ()(implicit val materializer: Materializer)
-    extends AnyFreeSpec
-    with BaseController
-    with UpscanResponseParser
-    with Logging
-    with ScalaFutures
-    with Matchers
-    with ScalaCheckPropertyChecks
-    with TestModelGenerators {
+class UpscanResponseParserSpec extends AnyFreeSpec with ScalaFutures with Matchers with ScalaCheckPropertyChecks with TestModelGenerators {
 
-  override val controllerComponents = stubControllerComponents()
+  class TestUpscanResponseParserController extends BaseController with UpscanResponseParser with Logging {
+    override protected def controllerComponents: ControllerComponents = stubControllerComponents()
+  }
+
+  val testController = new TestUpscanResponseParserController()
 
   "parseUpscanResponse" - {
-    "given a successful response in the callback, returns a defined option with value of SuccessfulSubmission" in forAll(
+    "given a successful response in the callback, returns a defined option with value of UploadDetails" in forAll(
       arbitraryUpscanResponse(true).arbitrary
     ) {
       successUpscanResponse =>
         val json = Json.toJson(successUpscanResponse)
-        parseAndLogUpscanResponse(json) mustBe Some(successUpscanResponse)
-        successUpscanResponse.isSuccess mustBe true
+        whenReady(testController.parseAndLogUpscanResponse(json).value) {
+          either =>
+            either mustBe Right(successUpscanResponse)
+            either.toOption.get.isSuccess mustBe true
+            either.toOption.get.uploadDetails.isDefined mustBe true
+        }
     }
 
-    "given a failure response in the callback, returns a None" in forAll(
+    "given a failure response in the callback, returns a defined option with value of FailedDetails" in forAll(
       arbitraryUpscanResponse(false).arbitrary
     ) {
       failureUpscanResponse =>
         val json = Json.toJson(failureUpscanResponse)
-        parseAndLogUpscanResponse(json) mustBe None
-        failureUpscanResponse.isSuccess mustBe false
+        whenReady(testController.parseAndLogUpscanResponse(json).value) {
+          either =>
+            either mustBe Right(failureUpscanResponse)
+            either.toOption.get.isSuccess mustBe false
+            either.toOption.get.failureDetails.isDefined mustBe true
+        }
     }
 
-    "given a response in the callback that we cannot deserialize, returns a None" in {
-      parseAndLogUpscanResponse(Json.obj("reference" -> "abc")) mustBe None
+    "given a response in the callback that we cannot deserialize, returns a PresentationError" in {
+      whenReady(testController.parseAndLogUpscanResponse(Json.obj("reference" -> "abc")).value) {
+        either =>
+          either mustBe Left(PresentationError.badRequestError("Unexpected Upscan callback response"))
+      }
     }
   }
 

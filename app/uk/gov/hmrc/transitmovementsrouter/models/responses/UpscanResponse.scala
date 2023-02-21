@@ -17,7 +17,9 @@
 package uk.gov.hmrc.transitmovementsrouter.models.responses
 
 import play.api.libs.json.Format
+import play.api.libs.json.JsError
 import play.api.libs.json.JsString
+import play.api.libs.json.JsSuccess
 import play.api.libs.json.Json
 import play.api.libs.json.Reads
 import play.api.libs.json.Writes
@@ -67,17 +69,25 @@ object UpscanResponse {
       )
   }
 
-  case class FileStatus(value: String) extends AnyVal
+  sealed trait FileStatus
 
   object FileStatus {
+    case object Ready extends FileStatus
 
-    implicit val format: Format[FileStatus] =
-      Format(
-        Reads.of[String].map(FileStatus(_)),
-        Writes(
-          ref => JsString(ref.value)
-        )
-      )
+    case object Failed extends FileStatus
+
+    val values = Seq(Ready, Failed)
+
+    implicit val writes = new Writes[FileStatus] {
+
+      def writes(status: FileStatus) = Json.toJson(status.toString())
+    }
+
+    implicit val reads: Reads[FileStatus] = Reads {
+      case JsString(x) if x.toLowerCase == "ready"  => JsSuccess(Ready)
+      case JsString(x) if x.toLowerCase == "failed" => JsSuccess(Failed)
+      case _                                        => JsError("Invalid file status")
+    }
   }
 
   implicit val upscanResponseFormat = Json.format[UpscanResponse]
