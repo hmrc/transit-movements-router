@@ -46,7 +46,7 @@ trait UpscanResponseParser {
   private def logResponse(upscanResponse: Option[UpscanResponse]) =
     upscanResponse match {
       case None => logger.error("Unable to parse unexpected response from Upscan")
-      case Some(UpscanResponse(_, reference, _, uploadDetails, None)) =>
+      case Some(UpscanResponse(_, reference, _, _, None)) =>
         logger.info(s"Received a successful response from Upscan callback for the following reference: $reference")
       case Some(UpscanResponse(_, reference, _, None, failureDetails)) =>
         logger.warn(
