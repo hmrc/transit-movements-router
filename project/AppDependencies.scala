@@ -1,12 +1,30 @@
 import play.core.PlayVersion
 import play.core.PlayVersion.current
+import play.sbt.PlayImport
 import play.sbt.PlayImport._
 import sbt.Keys.libraryDependencies
 import sbt._
 
 object AppDependencies {
 
-  private val catsVersion         = "2.7.0"
+//  val bootstrapVersion = "7.12.0"
+//  val hmrcMongoVersion = "0.74.0"
+//  val catsVersion = "2.9.0"
+//
+//  val compile = Seq(
+//    "uk.gov.hmrc" %% "bootstrap-backend-play-28" % bootstrapVersion,
+//    "uk.gov.hmrc.mongo" %% "hmrc-mongo-play-28" % hmrcMongoVersion,
+//    "uk.gov.hmrc.objectstore" %% "object-store-client-play-28" % "1.0.0",
+//    "uk.gov.hmrc" %% "play-json-union-formatter" % "1.18.0-play-28",
+//    "org.typelevel" %% "cats-core" % catsVersion,
+//    "io.lemonlabs" %% "scala-uri" % "3.5.0",
+//    "com.lihaoyi" %% "pprint" % "0.8.1",
+//    "com.typesafe.akka" %% "akka-slf4j" % PlayVersion.akkaVersion,
+//    "com.lightbend.akka" %% "akka-stream-alpakka-xml" % "3.0.4",
+//    PlayImport.ws
+//  )
+
+    private val catsVersion         = "2.7.0"
   private val catsRetryVersion    = "3.1.0"
   private val boostrapPlayVersion = "7.12.0"
 
@@ -14,11 +32,13 @@ object AppDependencies {
     "uk.gov.hmrc"        %% "bootstrap-backend-play-28" % boostrapPlayVersion,
     "org.typelevel"      %% "cats-core"                 % catsVersion,
     "com.github.cb372"   %% "cats-retry"                % catsRetryVersion,
+    "uk.gov.hmrc.objectstore" %% "object-store-client-play-28" % "1.0.0",
     "com.github.cb372"   %% "alleycats-retry"           % catsRetryVersion,
     "com.typesafe.akka"  %% "akka-slf4j"                % PlayVersion.akkaVersion,
     "com.lightbend.akka" %% "akka-stream-alpakka-xml"   % "3.0.4",
     "io.lemonlabs"       %% "scala-uri"                 % "3.6.0",
     "org.typelevel"      %% "alleycats-core"            % catsVersion
+
   )
 
   val test = Seq(
@@ -36,5 +56,6 @@ object AppDependencies {
     "com.github.cb372"       %% "cats-retry"              % catsRetryVersion,
     "com.github.cb372"       %% "alleycats-retry"         % catsRetryVersion,
     "uk.gov.hmrc"            %% "bootstrap-test-play-28"  % boostrapPlayVersion
+
   ).map(_ % s"$Test, $IntegrationTest")
 }

@@ -43,4 +43,7 @@ class AppConfig @Inject() (config: Configuration, servicesConfig: CTCServicesCon
 
   lazy val incomingAuth: IncomingAuthConfig = config.get[IncomingAuthConfig]("incomingRequestAuth")
 
+  lazy val objectStoreUrl: String =
+    config.get[String]("microservice.services.object-store.sdes-host")
+
 }
