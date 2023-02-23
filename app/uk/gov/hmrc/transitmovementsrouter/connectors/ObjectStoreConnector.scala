@@ -1,3 +1,19 @@
+/*
+ * Copyright 2023 HM Revenue & Customs
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package uk.gov.hmrc.transitmovementsrouter.connectors
 
 import cats.data.EitherT
@@ -5,14 +21,10 @@ import cats.implicits._
 import play.api.mvc.Result
 import play.api.mvc.Results
 import uk.gov.hmrc.http.HeaderCarrier
-import uk.gov.hmrc.objectstore.client.Path.Directory
 import uk.gov.hmrc.objectstore.client.Md5Hash
 import uk.gov.hmrc.objectstore.client.ObjectMetadata
 import uk.gov.hmrc.objectstore.client.ObjectSummaryWithMd5
 import uk.gov.hmrc.objectstore.client.RetentionPeriod
-import uk.gov.hmrc.objectstore.client.http.ObjectStoreContentWrite
-import uk.gov.hmrc.objectstore.client.play.Implicits._
-import uk.gov.hmrc.objectstore.client.play.PlayObjectStoreClientEither
 import uk.gov.hmrc.transitmovementsrouter.models.MessageId
 import uk.gov.hmrc.transitmovementsrouter.models.MovementId
 
@@ -61,6 +73,8 @@ class ObjectStoreConnector @Inject() (
   def upload(movementId: MovementId, messageId: MessageId, path: java.nio.file.Path)(implicit
     hc: HeaderCarrier
   ): EitherT[Future, Result, ObjectSummaryWithMd5] = {
+    val objectMetadata = new ObjectMetadata("", 0, new Md5Hash("md5Hash"), Instant.now(), Map.empty)
+
     val directory = Path.Directory(s"movements/${movementId.value}/messages")
 
     val file = Path.File(directory, s"${messageId.value}.xml")
