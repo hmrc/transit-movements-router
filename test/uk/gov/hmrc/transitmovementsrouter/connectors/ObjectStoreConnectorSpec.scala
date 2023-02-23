@@ -2,18 +2,25 @@ package uk.gov.hmrc.transitmovementsrouter.connectors
 
 import cats.data.EitherT
 import org.mockito.ArgumentMatchers.any
-import org.mockito.ArgumentMatchersSugar.{any, eqTo}
+import org.mockito.ArgumentMatchersSugar.any
+import org.mockito.ArgumentMatchersSugar.eqTo
 import org.mockito.Mockito.when
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.mockito.MockitoSugar
-import play.api.mvc.{Result, Results}
-import uk.gov.hmrc.http.{HeaderCarrier, SessionId}
+import play.api.mvc.Result
+import play.api.mvc.Results
+import uk.gov.hmrc.http.HeaderCarrier
+import uk.gov.hmrc.http.SessionId
 import uk.gov.hmrc.objectstore.client.Path.File
-import uk.gov.hmrc.objectstore.client.{Md5Hash, ObjectMetadata, ObjectSummaryWithMd5, RetentionPeriod}
+import uk.gov.hmrc.objectstore.client.Md5Hash
+import uk.gov.hmrc.objectstore.client.ObjectMetadata
+import uk.gov.hmrc.objectstore.client.ObjectSummaryWithMd5
+import uk.gov.hmrc.objectstore.client.RetentionPeriod
 import uk.gov.hmrc.objectstore.client.http.ObjectStoreContentWrite
-import uk.gov.hmrc.transitmovementsrouter.models.{MessageId, MovementId}
+import uk.gov.hmrc.transitmovementsrouter.models.MessageId
+import uk.gov.hmrc.transitmovementsrouter.models.MovementId
 
 import java.nio.file.Paths
 import java.time.Instant
@@ -42,7 +49,8 @@ class ObjectStoreConnectorSpec extends AnyFreeSpec with Matchers with ScalaFutur
   implicit val hc: HeaderCarrier = HeaderCarrier(sessionId = Some(sessionId))
 
   private val objectStoreConnector = new ObjectStoreConnector(mockClient)
-  import uk.gov.hmrc.objectstore.client.Path.{Directory, File}
+  import uk.gov.hmrc.objectstore.client.Path.Directory
+  import uk.gov.hmrc.objectstore.client.Path.File
 
   private val movementId = MovementId("1")
   private val messageId  = MessageId("1")
