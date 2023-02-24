@@ -14,17 +14,11 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovementsrouter.config
+package uk.gov.hmrc.transitmovementsrouter.models.errors
 
-import com.google.inject.AbstractModule
-import java.time.Clock
+sealed trait ObjectStoreError
 
-class Module extends AbstractModule {
-
-  override def configure(): Unit = {
-    bind(classOf[AppConfig]).asEagerSingleton()
-    bind(classOf[CTCServicesConfig])
-    bind(classOf[Clock]).toInstance(Clock.systemUTC())
-  }
+object ObjectStoreError {
+  case class UnexpectedError(thr: Option[Throwable] = None) extends ObjectStoreError
 
 }

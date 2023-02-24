@@ -14,17 +14,12 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovementsrouter.config
+package uk.gov.hmrc.transitmovementsrouter.utils
 
-import com.google.inject.AbstractModule
-import java.time.Clock
+import com.codahale.metrics.MetricRegistry
+import com.kenshoo.play.metrics.Metrics
 
-class Module extends AbstractModule {
-
-  override def configure(): Unit = {
-    bind(classOf[AppConfig]).asEagerSingleton()
-    bind(classOf[CTCServicesConfig])
-    bind(classOf[Clock]).toInstance(Clock.systemUTC())
-  }
-
+class TestMetrics extends Metrics {
+  override def defaultRegistry: MetricRegistry = new MetricRegistry
+  override def toJson: String                  = ""
 }

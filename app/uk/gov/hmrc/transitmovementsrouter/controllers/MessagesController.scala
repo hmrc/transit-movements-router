@@ -28,6 +28,7 @@ import play.api.mvc.ControllerComponents
 import play.api.mvc.DefaultActionBuilder
 import play.api.mvc.Result
 import uk.gov.hmrc.http.HeaderCarrier
+import uk.gov.hmrc.objectstore.client.ObjectSummaryWithMd5
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
 import uk.gov.hmrc.play.http.HeaderCarrierConverter
 import uk.gov.hmrc.transitmovementsrouter.connectors.PersistenceConnector
@@ -36,17 +37,12 @@ import uk.gov.hmrc.transitmovementsrouter.controllers.actions.AuthenticateEISTok
 import uk.gov.hmrc.transitmovementsrouter.controllers.errors.ConvertError
 import uk.gov.hmrc.transitmovementsrouter.controllers.errors.PresentationError
 import uk.gov.hmrc.transitmovementsrouter.controllers.stream.StreamingParsers
-import uk.gov.hmrc.transitmovementsrouter.models.ConversationId
-import uk.gov.hmrc.transitmovementsrouter.models.EoriNumber
-import uk.gov.hmrc.transitmovementsrouter.models.MessageId
-import uk.gov.hmrc.transitmovementsrouter.models.MessageType
-import uk.gov.hmrc.transitmovementsrouter.models.MovementId
-import uk.gov.hmrc.transitmovementsrouter.models.MovementType
-import uk.gov.hmrc.transitmovementsrouter.models.ObjectStoreURI
-import uk.gov.hmrc.transitmovementsrouter.models.RequestMessageType
+import uk.gov.hmrc.transitmovementsrouter.models._
+import uk.gov.hmrc.transitmovementsrouter.models.errors.ObjectStoreError
 import uk.gov.hmrc.transitmovementsrouter.services.EISMessageTransformers
-import uk.gov.hmrc.transitmovementsrouter.services.RoutingService
 import uk.gov.hmrc.transitmovementsrouter.services.MessageTypeExtractor
+import uk.gov.hmrc.transitmovementsrouter.services.ObjectStoreService
+import uk.gov.hmrc.transitmovementsrouter.services.RoutingService
 
 import javax.inject.Inject
 import scala.concurrent.Future
@@ -58,7 +54,8 @@ class MessagesController @Inject() (
   pushNotificationsConnector: PushNotificationsConnector,
   messageTypeExtractor: MessageTypeExtractor,
   authenticateEISToken: AuthenticateEISToken,
-  eisMessageTransformers: EISMessageTransformers
+  eisMessageTransformers: EISMessageTransformers,
+  objectStoreService: ObjectStoreService
 )(implicit
   val materializer: Materializer,
   val temporaryFileCreator: TemporaryFileCreator
@@ -103,7 +100,14 @@ class MessagesController @Inject() (
     implicit request =>
       implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
       (for {
-        _ <- parseAndLogUpscanResponse(request.body)
+        upscanResponse <- parseAndLogUpscanResponse(request.body)
+        objectStoreResponse <- mapToOptionalResponse[
+          ObjectStoreError,
+          ObjectSummaryWithMd5
+        ](
+          objectStoreService.addMessage(upscanResponse.downloadUrl.get, movementId, messageId)
+        )
+
         //TODO: Get the object store uri location and extract the message type, remove below hardcoded value and then pass actual value with below method
         //TODO: Get the object store uri from object store remove below hardcoded value and then pass that too with below method
         persistenceResponse <- persistenceConnector
@@ -120,5 +124,15 @@ class MessagesController @Inject() (
     case t: RequestMessageType => EitherT.rightT(t)
     case _                     => EitherT.leftT(PresentationError.badRequestError(s"${messageType.code} is not valid for requests"))
   }
+
+  private def mapToOptionalResponse[E, R](
+    eitherT: EitherT[Future, E, R]
+  ): EitherT[Future, PresentationError, Option[R]] =
+    EitherT[Future, PresentationError, Option[R]] {
+      eitherT.fold(
+        _ => Right(None),
+        r => Right(Some(r))
+      )
+    }
 
 }

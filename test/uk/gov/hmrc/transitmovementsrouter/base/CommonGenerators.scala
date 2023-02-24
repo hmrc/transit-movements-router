@@ -14,51 +14,58 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovementsrouter.generators
+package uk.gov.hmrc.transitmovementsrouter.base
 
+import org.hamcrest.io.FileMatchers.FileStatus
+import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Arbitrary
 import org.scalacheck.Gen
 import uk.gov.hmrc.objectstore.client.Md5Hash
 import uk.gov.hmrc.objectstore.client.ObjectSummaryWithMd5
 import uk.gov.hmrc.objectstore.client.Path
-import uk.gov.hmrc.transitmovementsrouter.models._
+
 import uk.gov.hmrc.transitmovementsrouter.models.responses.FailureDetails
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UploadDetails
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse
-import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.DownloadUrl
-import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.FileStatus
-import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.Reference
+import uk.gov.hmrc.transitmovementsrouter.models.MessageId
+import uk.gov.hmrc.transitmovementsrouter.models.MessageType
+import uk.gov.hmrc.transitmovementsrouter.models.MovementId
+import uk.gov.hmrc.transitmovementsrouter.models.MovementType
 
 import java.time.Instant
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
+import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
+import org.scalacheck.Arbitrary
+import org.scalacheck.Arbitrary.arbitrary
+import org.scalacheck.Gen
+import uk.gov.hmrc.objectstore.client.Md5Hash
+import uk.gov.hmrc.objectstore.client.ObjectSummaryWithMd5
+import uk.gov.hmrc.objectstore.client.Path
+import uk.gov.hmrc.transitmovementsrouter.models._
+import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.Reference
 
-trait TestModelGenerators extends BaseGenerators {
+import scala.util.Random
 
-  implicit lazy val arbitraryCustomsOffice: Arbitrary[CustomsOffice] =
-    Arbitrary {
-      for {
-        destination <- Gen.oneOf(Seq("GB", "XI"))
-        id          <- intWithMaxLength(7, 7)
-      } yield CustomsOffice(s"$destination$id")
-    }
+trait CommonGenerators {
 
-  implicit lazy val arbitraryMovementId: Arbitrary[MovementId] =
-    Arbitrary {
-      Gen.listOfN(16, Gen.hexChar).map(_.mkString).map(MovementId)
-    }
+  lazy val genShortUUID: Gen[String] = Gen.long.map {
+    l: Long =>
+      f"${BigInt(l)}%016x"
+  }
 
-  implicit lazy val arbitraryMessageId: Arbitrary[MessageId] =
-    Arbitrary {
-      Gen.listOfN(16, Gen.hexChar).map(_.mkString).map(MessageId)
-    }
+  implicit lazy val arbitraryMessageId: Arbitrary[MessageId] = Arbitrary {
+    genShortUUID.map(MessageId(_))
+  }
 
-  implicit lazy val arbitraryMessageType: Arbitrary[MessageType] =
-    Arbitrary(Gen.oneOf(MessageType.values))
+  implicit lazy val arbitraryMessageType: Arbitrary[MessageType] = Arbitrary {
+    Gen.oneOf(MessageType.values)
+  }
 
-  implicit lazy val arbitraryRequestMessageType: Arbitrary[RequestMessageType] =
-    Arbitrary(Gen.oneOf(MessageType.requestValues))
+  implicit lazy val arbitraryMovementId: Arbitrary[MovementId] = Arbitrary {
+    genShortUUID.map(MovementId(_))
+  }
 
   // Restricts the date times to the range of positive long numbers to avoid overflows.
   implicit lazy val arbitraryOffsetDateTime: Arbitrary[OffsetDateTime] =
@@ -84,15 +91,13 @@ trait TestModelGenerators extends BaseGenerators {
     } yield FailureDetails(failureReason, message)
   }
 
-  implicit def arbitraryUpscanResponse(isSuccess: Boolean): Arbitrary[UpscanResponse] = Arbitrary {
-    for {
-      reference  <- Gen.alphaNumStr
-      fileStatus <- Gen.oneOf(FileStatus.values)
-      downloadUrl    = if (isSuccess) Gen.alphaNumStr.sample.map(DownloadUrl(_)) else None
-      uploadDetails  = if (isSuccess) arbitraryUploadDetails.arbitrary.sample else None
-      failureDetails = if (!isSuccess) arbitraryFailureDetails.arbitrary.sample else None
-    } yield UpscanResponse(Reference(reference), fileStatus, downloadUrl, uploadDetails, failureDetails)
-  }
+  val alpha = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
+  def randStr(n: Int) = (1 to n)
+    .map(
+      _ => alpha(Random.nextInt(alpha.length))
+    )
+    .mkString
 
   implicit val arbitraryObjectSummaryWithMd5: Arbitrary[ObjectSummaryWithMd5] = Arbitrary {
     for {
@@ -109,5 +114,4 @@ trait TestModelGenerators extends BaseGenerators {
       lastModified
     )
   }
-
 }

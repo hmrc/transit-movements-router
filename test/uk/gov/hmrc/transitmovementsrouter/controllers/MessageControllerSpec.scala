@@ -57,11 +57,15 @@ import uk.gov.hmrc.transitmovementsrouter.fakes.actions.FakeXmlTransformer
 import uk.gov.hmrc.transitmovementsrouter.generators.TestModelGenerators
 import uk.gov.hmrc.transitmovementsrouter.models.MessageType.RequestOfRelease
 import uk.gov.hmrc.transitmovementsrouter.models._
-import uk.gov.hmrc.transitmovementsrouter.models.errors.MessageTypeExtractionError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.MovementNotFound
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.Unexpected
+import uk.gov.hmrc.transitmovementsrouter.models.errors.MessageTypeExtractionError
+import uk.gov.hmrc.transitmovementsrouter.models.errors.ObjectStoreError
+import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse
+import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.DownloadUrl
 import uk.gov.hmrc.transitmovementsrouter.services.EISMessageTransformers
 import uk.gov.hmrc.transitmovementsrouter.services.MessageTypeExtractor
+import uk.gov.hmrc.transitmovementsrouter.services.ObjectStoreService
 import uk.gov.hmrc.transitmovementsrouter.services.RoutingService
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
 
@@ -99,6 +103,7 @@ class MessageControllerSpec
   val mockPersistenceConnector       = mock[PersistenceConnector]
   val mockPushNotificationsConnector = mock[PushNotificationsConnector]
   val mockUpscanResponseParser       = mock[UpscanResponseParser]
+  val mockObjectStoreService         = mock[ObjectStoreService]
   implicit val temporaryFileCreator  = SingletonTemporaryFileCreator
 
   val errorHandler                    = new DefaultHttpErrorHandler(HttpErrorConfig(showDevErrors = false, None), None, None)
@@ -122,7 +127,8 @@ class MessageControllerSpec
       mockPushNotificationsConnector,
       mockMessageTypeExtractor,
       FakeAuthenticateEISToken,
-      eisMessageTransformer
+      eisMessageTransformer,
+      mockObjectStoreService
     )
 
   def source = createStream(cc015cOfficeOfDepartureGB)
@@ -158,6 +164,7 @@ class MessageControllerSpec
     reset(mockRoutingService)
     reset(mockMessageTypeExtractor)
     reset(mockPersistenceConnector)
+    reset(mockObjectStoreService)
     super.afterEach()
   }
 
@@ -165,6 +172,19 @@ class MessageControllerSpec
     EitherT.rightT(())
 
   lazy val messageTypeHeader = FakeHeaders(Seq(("X-Message-Type", MessageType.DeclarationData.code)))
+
+  val jsonSuccessUpscanResponse = Json.obj(
+    "reference"   -> "11370e18-6e24-453e-b45a-76d3e32ea33d",
+    "downloadUrl" -> "https://bucketName.s3.eu-west-2.amazonaws.com?1235676",
+    "fileStatus"  -> "READY",
+    "uploadDetails" -> Json.obj(
+      "fileName"        -> "test.pdf",
+      "fileMimeType"    -> "application/pdf",
+      "uploadTimestamp" -> "2018-04-24T09:30:00Z",
+      "checksum"        -> "396f101dd52e8b2ace0dcf5ed09b1d1f030e608938510ce46e7a5c7a4e775100",
+      "size"            -> 987
+    )
+  )
 
   "POST outgoing" - {
     "must return ACCEPTED when declaration is submitted successfully" in {
@@ -426,8 +446,13 @@ class MessageControllerSpec
 
   "POST incoming for Large message" - {
 
-    "must return CREATED when message is successfully forwarded" in forAll(arbitraryUpscanResponse(true).arbitrary) {
-      successUpscanResponse =>
+    "must return CREATED when message is successfully forwarded" in forAll(
+      arbitraryUpscanResponse(true).arbitrary,
+      arbitraryMovementId.arbitrary,
+      arbitraryMessageId.arbitrary,
+      arbitraryObjectSummaryWithMd5.arbitrary
+    ) {
+      (successUpscanResponse, movementId, messageId, objectSummary) =>
         when(
           mockPersistenceConnector.postObjectStoreUri(
             any[String].asInstanceOf[MovementId],
@@ -437,6 +462,14 @@ class MessageControllerSpec
           )(any(), any())
         )
           .thenReturn(EitherT.fromEither(Right(PersistenceResponse(messageId))))
+
+        when(
+          mockObjectStoreService.addMessage(any[String].asInstanceOf[DownloadUrl], any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId])(
+            any(),
+            any()
+          )
+        ).thenReturn(EitherT.rightT(objectSummary))
+
         val request = fakeRequestLargeMessage(Json.toJson(successUpscanResponse), incomingLargeMessage)
 
         val result = controller().incomingLargeMessage(movementId, messageId)(request)
@@ -445,8 +478,13 @@ class MessageControllerSpec
         header("X-Message-Id", result) mustBe Some(messageId.value)
     }
 
-    "must return NOT_FOUND when target movement is invalid or archived" in forAll(arbitraryUpscanResponse(true).arbitrary) {
-      successUpscanResponse =>
+    "must return NOT_FOUND when target movement is invalid or archived" in forAll(
+      arbitraryUpscanResponse(true).arbitrary,
+      arbitraryMovementId.arbitrary,
+      arbitraryMessageId.arbitrary,
+      arbitraryObjectSummaryWithMd5.arbitrary
+    ) {
+      (successUpscanResponse, movementId, messageId, objectSummary) =>
         when(
           mockPersistenceConnector.postObjectStoreUri(
             any[String].asInstanceOf[MovementId],
@@ -457,27 +495,52 @@ class MessageControllerSpec
         )
           .thenReturn(EitherT.fromEither(Left(MovementNotFound(MovementId("ABC")))))
 
+        when(
+          mockObjectStoreService.addMessage(any[String].asInstanceOf[DownloadUrl], any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId])(
+            any(),
+            any()
+          )
+        ).thenReturn(EitherT.rightT(objectSummary))
+
         val request = fakeRequestLargeMessage(Json.toJson(successUpscanResponse), incomingLargeMessage)
         val result  = controller().incomingLargeMessage(movementId, messageId)(request)
 
         status(result) mustBe NOT_FOUND
     }
 
-    "must return BAD_REQUEST when malformed json received from callback" in {
-      when(
-        mockUpscanResponseParser.parseAndLogUpscanResponse(
-          any[String].asInstanceOf[JsValue]
-        )
-      ).thenReturn(EitherT.fromEither(Left(PresentationError.badRequestError("Unexpected Upscan callback response"))))
+    "must return BAD_REQUEST when malformed json received from callback" in forAll(
+      arbitraryMovementId.arbitrary,
+      arbitraryMessageId.arbitrary,
+      arbitraryObjectSummaryWithMd5.arbitrary
+    ) {
 
-      val request = fakeRequestLargeMessage(Json.obj("reference" -> "abc"), incomingLargeMessage)
-      val result  = controller().incomingLargeMessage(movementId, messageId)(request)
+      (movementId, messageId, objectSummary) =>
+        when(
+          mockUpscanResponseParser.parseAndLogUpscanResponse(
+            any[String].asInstanceOf[JsValue]
+          )
+        ).thenReturn(EitherT.fromEither(Left(PresentationError.badRequestError("Unexpected Upscan callback response"))))
 
-      status(result) mustBe BAD_REQUEST
+        when(
+          mockObjectStoreService.addMessage(any[String].asInstanceOf[DownloadUrl], any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId])(
+            any(),
+            any()
+          )
+        ).thenReturn(EitherT.rightT(objectSummary))
+
+        val request = fakeRequestLargeMessage(Json.obj("reference" -> "abc"), incomingLargeMessage)
+        val result  = controller().incomingLargeMessage(movementId, messageId)(request)
+
+        status(result) mustBe BAD_REQUEST
     }
 
-    "must return INTERNAL_SERVER_ERROR when persistence service fails unexpected" in forAll(arbitraryUpscanResponse(true).arbitrary) {
-      successUpscanResponse =>
+    "must return INTERNAL_SERVER_ERROR when persistence service fails unexpected" in forAll(
+      arbitraryUpscanResponse(true).arbitrary,
+      arbitraryMovementId.arbitrary,
+      arbitraryMessageId.arbitrary,
+      arbitraryObjectSummaryWithMd5.arbitrary
+    ) {
+      (successUpscanResponse, movementId, messageId, objectSummary) =>
         when(
           mockPersistenceConnector.postObjectStoreUri(
             any[String].asInstanceOf[MovementId],
@@ -487,12 +550,88 @@ class MessageControllerSpec
           )(any(), any())
         )
           .thenReturn(EitherT.fromEither(Left(Unexpected(None))))
+
+        when(
+          mockObjectStoreService.addMessage(any[String].asInstanceOf[DownloadUrl], any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId])(
+            any(),
+            any()
+          )
+        ).thenReturn(EitherT.rightT(objectSummary))
+
         val request = fakeRequestLargeMessage(Json.toJson(successUpscanResponse), incomingLargeMessage)
         val result  = controller().incomingLargeMessage(movementId, messageId)(request)
 
         status(result) mustBe INTERNAL_SERVER_ERROR
     }
 
+  }
+
+  "should return Ok when response from upscan is valid" - {
+    "and uploading to object-store succeeds" in forAll(
+      arbitraryMovementId.arbitrary,
+      arbitraryMessageId.arbitrary,
+      arbitraryObjectSummaryWithMd5.arbitrary
+    ) {
+      (movementId, messageId, objectSummary) =>
+        val request = FakeRequest(
+          POST,
+          routes.MessagesController.incomingLargeMessage(movementId, messageId).url,
+          headers = FakeHeaders(),
+          jsonSuccessUpscanResponse
+        )
+
+        when(
+          mockPersistenceConnector.postObjectStoreUri(
+            any[String].asInstanceOf[MovementId],
+            any[String].asInstanceOf[MessageId],
+            any[String].asInstanceOf[MessageType],
+            any[String].asInstanceOf[ObjectStoreURI]
+          )(any(), any())
+        )
+          .thenReturn(EitherT.fromEither(Right(PersistenceResponse(messageId))))
+
+        when(
+          mockObjectStoreService.addMessage(any[String].asInstanceOf[DownloadUrl], any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId])(
+            any(),
+            any()
+          )
+        ).thenReturn(EitherT.rightT(objectSummary))
+
+        val result = controller().incomingLargeMessage(movementId, messageId)(request)
+
+        status(result) mustBe CREATED
+    }
+
+    "and uploading to object-store fails" in forAll(arbitraryMovementId.arbitrary, arbitraryMessageId.arbitrary) {
+      (movementId, messageId) =>
+        when(
+          mockPersistenceConnector.postObjectStoreUri(
+            any[String].asInstanceOf[MovementId],
+            any[String].asInstanceOf[MessageId],
+            any[String].asInstanceOf[MessageType],
+            any[String].asInstanceOf[ObjectStoreURI]
+          )(any(), any())
+        )
+          .thenReturn(EitherT.fromEither(Right(PersistenceResponse(messageId))))
+
+        when(
+          mockObjectStoreService.addMessage(any[String].asInstanceOf[DownloadUrl], any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId])(
+            any(),
+            any()
+          )
+        ).thenReturn(EitherT.leftT(ObjectStoreError.UnexpectedError(None)))
+
+        val request = FakeRequest(
+          POST,
+          routes.MessagesController.incomingLargeMessage(movementId, messageId).url,
+          headers = FakeHeaders(),
+          jsonSuccessUpscanResponse
+        )
+
+        val result = controller().incomingLargeMessage(movementId, messageId)(request)
+
+        status(result) mustBe CREATED
+    }
   }
 
 }
