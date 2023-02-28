@@ -35,17 +35,17 @@ import play.api.http.Status.BAD_REQUEST
 import play.api.http.Status.INTERNAL_SERVER_ERROR
 import play.api.http.Status.NOT_FOUND
 import play.api.http.Status.OK
+import play.api.http.HeaderNames
+import play.api.http.MimeTypes
 import play.api.libs.json.Json
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.test.HttpClientV2Support
 import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
 import uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuite
-import uk.gov.hmrc.transitmovementsrouter.models.MessageId
 import uk.gov.hmrc.transitmovementsrouter.models.MessageType.DeclarationAmendment
-import uk.gov.hmrc.transitmovementsrouter.models.MovementId
-import uk.gov.hmrc.transitmovementsrouter.models.PersistenceResponse
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.MovementNotFound
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.Unexpected
+import uk.gov.hmrc.transitmovementsrouter.models._
 import uk.gov.hmrc.transitmovementsrouter.services.EISMessageTransformersImpl
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -75,8 +75,6 @@ class PersistenceConnectorSpec
       Url.parse(server.baseUrl())
   }
 
-  implicit val hc = HeaderCarrier()
-
   lazy val connector = new PersistenceConnectorImpl(httpClientV2, appConfig)
 
   val errorCodes = Gen.oneOf(
@@ -105,8 +103,9 @@ class PersistenceConnectorSpec
       val body = Json.obj("messageId" -> messageId.value).toString()
 
       stub(OK, Some(body))
-
-      whenReady(connector.post(movementId, messageId, DeclarationAmendment, source).value) {
+      implicit val hc: HeaderCarrier =
+        HeaderCarrier(extraHeaders = Seq("X-Message-Type" -> MessageType.DeclarationAmendment.code, HeaderNames.CONTENT_TYPE -> MimeTypes.XML))
+      whenReady(connector.post(movementId, messageId, DeclarationAmendment, Some(source), None).value) {
         x =>
           x.isRight mustBe true
           x mustBe Right(PersistenceResponse(messageId))
@@ -118,8 +117,9 @@ class PersistenceConnectorSpec
         server.resetAll()
 
         stub(statusCode)
-
-        whenReady(connector.post(movementId, messageId, DeclarationAmendment, source).value) {
+        implicit val hc: HeaderCarrier =
+          HeaderCarrier(extraHeaders = Seq("X-Message-Type" -> MessageType.DeclarationAmendment.code, HeaderNames.CONTENT_TYPE -> MimeTypes.XML))
+        whenReady(connector.post(movementId, messageId, DeclarationAmendment, Some(source), None).value) {
           x =>
             x.isLeft mustBe true
 
@@ -139,8 +139,62 @@ class PersistenceConnectorSpec
       stub(OK)
 
       val failingSource = Source.single(ByteString.fromString("<abc>asdadsadads")).via(new EISMessageTransformersImpl().unwrap)
+      implicit val hc: HeaderCarrier =
+        HeaderCarrier(extraHeaders = Seq("X-Message-Type" -> MessageType.DeclarationAmendment.code, HeaderNames.CONTENT_TYPE -> MimeTypes.XML))
+      whenReady(connector.post(movementId, messageId, DeclarationAmendment, Some(failingSource), None).value) {
+        res =>
+          res mustBe a[Left[Unexpected, _]]
+          res.left.toOption.get.asInstanceOf[Unexpected].thr.isDefined
+      }
+    }
 
-      whenReady(connector.post(movementId, messageId, DeclarationAmendment, failingSource).value) {
+  }
+
+  "post for Large Message" should {
+    "return messageId when post is successful" in {
+      val body           = Json.obj("messageId" -> messageId.value).toString()
+      val objectStoreURI = s"common-transit-convention-traders/movements/$movementId/x-conversion-id.xml"
+      stub(OK, Some(body))
+      implicit val hc: HeaderCarrier = HeaderCarrier(extraHeaders =
+        Seq("X-Message-Type" -> MessageType.DeclarationAmendment.code, "X-Object-Store-Uri" -> ObjectStoreURI(objectStoreURI).value)
+      )
+      whenReady(connector.post(movementId, messageId, DeclarationAmendment, None, Some(ObjectStoreURI(objectStoreURI))).value) {
+        x =>
+          x.isRight mustBe true
+          x mustBe Right(PersistenceResponse(messageId))
+      }
+    }
+
+    "return a PersistenceError when unsuccessful" in forAll(errorCodes) {
+      statusCode =>
+        server.resetAll()
+        val objectStoreURI = s"common-transit-convention-traders/movements/$movementId/x-conversion-id.xml"
+        stub(statusCode)
+        implicit val hc: HeaderCarrier = HeaderCarrier(extraHeaders =
+          Seq("X-Message-Type" -> MessageType.DeclarationAmendment.code, "X-Object-Store-Uri" -> ObjectStoreURI(objectStoreURI).value)
+        )
+        whenReady(connector.post(movementId, messageId, DeclarationAmendment, None, Some(ObjectStoreURI(objectStoreURI))).value) {
+          x =>
+            x.isLeft mustBe true
+
+            statusCode match {
+              case BAD_REQUEST           => x mustBe a[Left[Unexpected, _]]
+              case NOT_FOUND             => x mustBe a[Left[MovementNotFound, _]]
+              case INTERNAL_SERVER_ERROR => x mustBe a[Left[Unexpected, _]]
+              case _                     => fail()
+            }
+
+        }
+    }
+
+    "return Unexpected(throwable) when NonFatal exception is thrown" in {
+      server.resetAll()
+      val objectStoreURI = s"common-transit-convention-traders/movements/$movementId/x-conversion-id.xml"
+      stub(OK)
+      implicit val hc: HeaderCarrier = HeaderCarrier(extraHeaders =
+        Seq("X-Message-Type" -> MessageType.DeclarationAmendment.code, "X-Object-Store-Uri" -> ObjectStoreURI(objectStoreURI).value)
+      )
+      whenReady(connector.post(movementId, messageId, DeclarationAmendment, None, Some(ObjectStoreURI(objectStoreURI))).value) {
         res =>
           res mustBe a[Left[Unexpected, _]]
           res.left.toOption.get.asInstanceOf[Unexpected].thr.isDefined

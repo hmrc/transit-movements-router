@@ -354,7 +354,7 @@ class MessageControllerSpec
 
   "POST incoming" - {
     "must return CREATED when message is successfully forwarded" in {
-      when(mockPersistenceConnector.post(any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId], any(), any())(any(), any()))
+      when(mockPersistenceConnector.post(any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId], any(), any(), any())(any(), any()))
         .thenReturn(EitherT.fromEither(Right(PersistenceResponse(MessageId("1")))))
       when(mockMessageTypeExtractor.extract(any(), any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](MessageType.RequestOfRelease))
 
@@ -390,7 +390,7 @@ class MessageControllerSpec
 
     "must return NOT_FOUND when target movement is invalid or archived" in {
 
-      when(mockPersistenceConnector.post(any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId], any(), any())(any(), any()))
+      when(mockPersistenceConnector.post(any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId], any(), any(), any())(any(), any()))
         .thenReturn(EitherT.fromEither(Left(MovementNotFound(MovementId("ABC")))))
       when(mockMessageTypeExtractor.extract(any(), any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](MessageType.RequestOfRelease))
 
@@ -404,7 +404,7 @@ class MessageControllerSpec
 
     "must return INTERNAL_SERVER_ERROR when persistence service fails unexpected" in {
 
-      when(mockPersistenceConnector.post(any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId], any(), any())(any(), any()))
+      when(mockPersistenceConnector.post(any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId], any(), any(), any())(any(), any()))
         .thenReturn(EitherT.fromEither(Left(Unexpected(None))))
       when(mockMessageTypeExtractor.extract(any(), any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](MessageType.RequestOfRelease))
 

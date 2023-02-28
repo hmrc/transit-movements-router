@@ -14,14 +14,6 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovementsrouter.utils
+package uk.gov.hmrc.transitmovementsrouter.models
 
-object RouterHeaderNames {
-
-  val CORRELATION_ID      = "X-Correlation-Id"
-  val CONVERSATION_ID     = "X-Conversation-Id"
-  val CUSTOM_PROCESS_HOST = "CustomProcessHost"
-  val MESSAGE_TYPE        = "X-Message-Type"
-  val OBJECT_STORE_URI    = "X-Object-Store-Uri"
-
-}
+case class ObjectStoreURI(value: String) extends AnyVal
