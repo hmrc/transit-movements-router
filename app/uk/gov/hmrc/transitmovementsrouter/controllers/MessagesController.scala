@@ -89,7 +89,7 @@ class MessagesController @Inject() (
 
         (for {
           messageType         <- messageTypeExtractor.extract(request.headers, request.body).asPresentation
-          persistenceResponse <- persistenceConnector.post(movementId, messageId, messageType, Some(request.body), None).asPresentation
+          persistenceResponse <- persistenceConnector.postBody(movementId, messageId, messageType, request.body).asPresentation
           _ = pushNotificationsConnector.post(movementId, persistenceResponse.messageId, request.body).asPresentation
         } yield persistenceResponse)
           .fold[Result](

@@ -37,6 +37,7 @@ import uk.gov.hmrc.http.HttpResponse
 import uk.gov.hmrc.http.StringContextOps
 import uk.gov.hmrc.http.UpstreamErrorResponse
 import uk.gov.hmrc.http.client.HttpClientV2
+import uk.gov.hmrc.http.client.RequestBuilder
 import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.MovementNotFound
@@ -51,12 +52,21 @@ import scala.util.control.NonFatal
 @ImplementedBy(classOf[PersistenceConnectorImpl])
 trait PersistenceConnector {
 
-  def post(
+  def postBody(
     movementId: MovementId,
     messageId: MessageId,
     messageType: MessageType,
-    source: Option[Source[ByteString, _]],
-    objectStoreURI: Option[ObjectStoreURI]
+    source: Source[ByteString, _]
+  )(implicit
+    hc: HeaderCarrier,
+    ec: ExecutionContext
+  ): EitherT[Future, PersistenceError, PersistenceResponse]
+
+  def postObjectStoreUri(
+    movementId: MovementId,
+    messageId: MessageId,
+    messageType: MessageType,
+    objectStoreURI: ObjectStoreURI
   )(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
@@ -72,49 +82,56 @@ class PersistenceConnectorImpl @Inject() (httpClientV2: HttpClientV2, appConfig:
   private def persistenceSendMessage(movementId: MovementId): UrlPath =
     Url(path = s"$baseRoute/traders/movements/${movementId.value}/messages").path
 
-  override def post(
-    movementId: MovementId,
-    messageId: MessageId,
-    messageType: MessageType,
-    source: Option[Source[ByteString, _]],
-    objectStoreURI: Option[ObjectStoreURI]
-  )(implicit
+  override def postBody(movementId: MovementId, messageId: MessageId, messageType: MessageType, source: Source[ByteString, _])(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): EitherT[Future, PersistenceError, PersistenceResponse] =
     EitherT {
-      val url = baseUrl.withPath(persistenceSendMessage(movementId)).withQueryString(QueryString.fromPairs("triggerId" -> messageId.value))
+      val request = requestUrl(movementId, messageId)
+        .transform(_.addHttpHeaders(HeaderNames.CONTENT_TYPE -> MimeTypes.XML, RouterHeaderNames.MESSAGE_TYPE -> messageType.code))
+        .withBody(source)
+      execute(request, movementId)
 
-      val httpClient = httpClientV2
-        .post(url"$url")
-      ((source, objectStoreURI) match {
-        case (Some(src), _) =>
-          httpClient.transform(_.addHttpHeaders(HeaderNames.CONTENT_TYPE -> MimeTypes.XML, RouterHeaderNames.MESSAGE_TYPE -> messageType.code)).withBody(src)
-        case (_, Some(objectStoreURIHeader)) =>
-          httpClient.transform(
-            _.addHttpHeaders(
-              RouterHeaderNames.MESSAGE_TYPE     -> messageType.code,
-              RouterHeaderNames.OBJECT_STORE_URI -> objectStoreURIHeader.value
-            )
-          )
-      }).execute[Either[UpstreamErrorResponse, HttpResponse]]
-        .map {
-          case Right(res) =>
-            Json
-              .fromJson[PersistenceResponse](res.json)
-              .map(Right(_))
-              .getOrElse(Left(Unexpected()))
-          case Left(error) =>
-            error.statusCode match {
-              case BAD_REQUEST           => Left(Unexpected())
-              case NOT_FOUND             => Left(MovementNotFound(movementId))
-              case INTERNAL_SERVER_ERROR => Left(Unexpected())
-              case _                     => Left(Unexpected())
-            }
-        }
-        .recover {
-          case NonFatal(ex) => Left(Unexpected(Some(ex)))
-        }
     }
+
+  override def postObjectStoreUri(movementId: MovementId, messageId: MessageId, messageType: MessageType, objectStoreURI: ObjectStoreURI)(implicit
+    hc: HeaderCarrier,
+    ec: ExecutionContext
+  ): EitherT[Future, PersistenceError, PersistenceResponse] =
+    EitherT {
+      val request = requestUrl(movementId, messageId).transform(
+        _.addHttpHeaders(
+          RouterHeaderNames.MESSAGE_TYPE     -> messageType.code,
+          RouterHeaderNames.OBJECT_STORE_URI -> objectStoreURI.value
+        )
+      )
+      execute(request, movementId)
+    }
+
+  private def execute(requestBuilder: RequestBuilder, movementId: MovementId)(implicit hc: HeaderCarrier, ec: ExecutionContext) =
+    requestBuilder
+      .execute[Either[UpstreamErrorResponse, HttpResponse]]
+      .map {
+        case Right(res) =>
+          Json
+            .fromJson[PersistenceResponse](res.json)
+            .map(Right(_))
+            .getOrElse(Left(Unexpected()))
+        case Left(error) =>
+          error.statusCode match {
+            case BAD_REQUEST           => Left(Unexpected())
+            case NOT_FOUND             => Left(MovementNotFound(movementId))
+            case INTERNAL_SERVER_ERROR => Left(Unexpected())
+            case _                     => Left(Unexpected())
+          }
+      }
+      .recover {
+        case NonFatal(ex) => Left(Unexpected(Some(ex)))
+      }
+
+  private def requestUrl(movementId: MovementId, messageId: MessageId)(implicit hc: HeaderCarrier, ec: ExecutionContext) = {
+    val url = baseUrl.withPath(persistenceSendMessage(movementId)).withQueryString(QueryString.fromPairs("triggerId" -> messageId.value))
+    httpClientV2.post(url"$url")
+  }
 
 }

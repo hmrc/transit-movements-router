@@ -105,7 +105,7 @@ class PersistenceConnectorSpec
       stub(OK, Some(body))
       implicit val hc: HeaderCarrier =
         HeaderCarrier(extraHeaders = Seq("X-Message-Type" -> MessageType.DeclarationAmendment.code, HeaderNames.CONTENT_TYPE -> MimeTypes.XML))
-      whenReady(connector.post(movementId, messageId, DeclarationAmendment, Some(source), None).value) {
+      whenReady(connector.postBody(movementId, messageId, DeclarationAmendment, source).value) {
         x =>
           x.isRight mustBe true
           x mustBe Right(PersistenceResponse(messageId))
@@ -119,7 +119,7 @@ class PersistenceConnectorSpec
         stub(statusCode)
         implicit val hc: HeaderCarrier =
           HeaderCarrier(extraHeaders = Seq("X-Message-Type" -> MessageType.DeclarationAmendment.code, HeaderNames.CONTENT_TYPE -> MimeTypes.XML))
-        whenReady(connector.post(movementId, messageId, DeclarationAmendment, Some(source), None).value) {
+        whenReady(connector.postBody(movementId, messageId, DeclarationAmendment, source).value) {
           x =>
             x.isLeft mustBe true
 
@@ -141,7 +141,7 @@ class PersistenceConnectorSpec
       val failingSource = Source.single(ByteString.fromString("<abc>asdadsadads")).via(new EISMessageTransformersImpl().unwrap)
       implicit val hc: HeaderCarrier =
         HeaderCarrier(extraHeaders = Seq("X-Message-Type" -> MessageType.DeclarationAmendment.code, HeaderNames.CONTENT_TYPE -> MimeTypes.XML))
-      whenReady(connector.post(movementId, messageId, DeclarationAmendment, Some(failingSource), None).value) {
+      whenReady(connector.postBody(movementId, messageId, DeclarationAmendment, failingSource).value) {
         res =>
           res mustBe a[Left[Unexpected, _]]
           res.left.toOption.get.asInstanceOf[Unexpected].thr.isDefined
@@ -158,7 +158,7 @@ class PersistenceConnectorSpec
       implicit val hc: HeaderCarrier = HeaderCarrier(extraHeaders =
         Seq("X-Message-Type" -> MessageType.DeclarationAmendment.code, "X-Object-Store-Uri" -> ObjectStoreURI(objectStoreURI).value)
       )
-      whenReady(connector.post(movementId, messageId, DeclarationAmendment, None, Some(ObjectStoreURI(objectStoreURI))).value) {
+      whenReady(connector.postObjectStoreUri(movementId, messageId, DeclarationAmendment, ObjectStoreURI(objectStoreURI)).value) {
         x =>
           x.isRight mustBe true
           x mustBe Right(PersistenceResponse(messageId))
@@ -173,7 +173,7 @@ class PersistenceConnectorSpec
         implicit val hc: HeaderCarrier = HeaderCarrier(extraHeaders =
           Seq("X-Message-Type" -> MessageType.DeclarationAmendment.code, "X-Object-Store-Uri" -> ObjectStoreURI(objectStoreURI).value)
         )
-        whenReady(connector.post(movementId, messageId, DeclarationAmendment, None, Some(ObjectStoreURI(objectStoreURI))).value) {
+        whenReady(connector.postObjectStoreUri(movementId, messageId, DeclarationAmendment, ObjectStoreURI(objectStoreURI)).value) {
           x =>
             x.isLeft mustBe true
 
@@ -194,7 +194,7 @@ class PersistenceConnectorSpec
       implicit val hc: HeaderCarrier = HeaderCarrier(extraHeaders =
         Seq("X-Message-Type" -> MessageType.DeclarationAmendment.code, "X-Object-Store-Uri" -> ObjectStoreURI(objectStoreURI).value)
       )
-      whenReady(connector.post(movementId, messageId, DeclarationAmendment, None, Some(ObjectStoreURI(objectStoreURI))).value) {
+      whenReady(connector.postObjectStoreUri(movementId, messageId, DeclarationAmendment, ObjectStoreURI(objectStoreURI)).value) {
         res =>
           res mustBe a[Left[Unexpected, _]]
           res.left.toOption.get.asInstanceOf[Unexpected].thr.isDefined
