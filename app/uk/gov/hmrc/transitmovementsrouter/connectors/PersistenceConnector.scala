@@ -87,7 +87,7 @@ class PersistenceConnectorImpl @Inject() (httpClientV2: HttpClientV2, appConfig:
     ec: ExecutionContext
   ): EitherT[Future, PersistenceError, PersistenceResponse] =
     EitherT {
-      val request = requestUrl(movementId, messageId)
+      val request = createRequest(movementId, messageId)
         .transform(_.addHttpHeaders(HeaderNames.CONTENT_TYPE -> MimeTypes.XML, RouterHeaderNames.MESSAGE_TYPE -> messageType.code))
         .withBody(source)
       execute(request, movementId)
@@ -99,7 +99,7 @@ class PersistenceConnectorImpl @Inject() (httpClientV2: HttpClientV2, appConfig:
     ec: ExecutionContext
   ): EitherT[Future, PersistenceError, PersistenceResponse] =
     EitherT {
-      val request = requestUrl(movementId, messageId).transform(
+      val request = createRequest(movementId, messageId).transform(
         _.addHttpHeaders(
           RouterHeaderNames.MESSAGE_TYPE     -> messageType.code,
           RouterHeaderNames.OBJECT_STORE_URI -> objectStoreURI.value
@@ -129,7 +129,7 @@ class PersistenceConnectorImpl @Inject() (httpClientV2: HttpClientV2, appConfig:
         case NonFatal(ex) => Left(Unexpected(Some(ex)))
       }
 
-  private def requestUrl(movementId: MovementId, messageId: MessageId)(implicit hc: HeaderCarrier, ec: ExecutionContext) = {
+  private def createRequest(movementId: MovementId, messageId: MessageId)(implicit hc: HeaderCarrier, ec: ExecutionContext) = {
     val url = baseUrl.withPath(persistenceSendMessage(movementId)).withQueryString(QueryString.fromPairs("triggerId" -> messageId.value))
     httpClientV2.post(url"$url")
   }
