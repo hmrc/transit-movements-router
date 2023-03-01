@@ -179,4 +179,31 @@ class ConvertErrorSpec extends AnyFreeSpec with Matchers with OptionValues with 
     }
   }
 
+  "ObjectStore error" - {
+    import uk.gov.hmrc.transitmovementsrouter.services.error.ObjectStoreError
+    import uk.gov.hmrc.transitmovementsrouter.services.error.ObjectStoreError._
+
+    "for a success" in {
+      val input = Right[ObjectStoreError, Unit](()).toEitherT[Future]
+      whenReady(input.asPresentation.value) {
+        _ mustBe Right(())
+      }
+    }
+
+    "for a failure" in {
+      val exception = new Exception("unexpected failure")
+      val input     = Left[ObjectStoreError, Unit](UnexpectedError(Some(exception))).toEitherT[Future]
+      whenReady(input.asPresentation.value) {
+        _ mustBe Left(InternalServiceError("Internal server error", InternalServerError, Some(exception)))
+      }
+    }
+
+    "FileNotFound should result BadRequest status" in {
+      val input = Left[ObjectStoreError, Unit](FileNotFound("test")).toEitherT[Future]
+      whenReady(input.asPresentation.value) {
+        _.left.toOption.get.code mustBe BadRequest
+      }
+    }
+  }
+
 }

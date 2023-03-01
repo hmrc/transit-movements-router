@@ -45,8 +45,9 @@ import uk.gov.hmrc.transitmovementsrouter.models.MovementType
 import uk.gov.hmrc.transitmovementsrouter.models.ObjectStoreURI
 import uk.gov.hmrc.transitmovementsrouter.models.RequestMessageType
 import uk.gov.hmrc.transitmovementsrouter.services.EISMessageTransformers
-import uk.gov.hmrc.transitmovementsrouter.services.RoutingService
 import uk.gov.hmrc.transitmovementsrouter.services.MessageTypeExtractor
+import uk.gov.hmrc.transitmovementsrouter.services.ObjectStoreService
+import uk.gov.hmrc.transitmovementsrouter.services.RoutingService
 
 import javax.inject.Inject
 import scala.concurrent.Future
@@ -58,7 +59,8 @@ class MessagesController @Inject() (
   pushNotificationsConnector: PushNotificationsConnector,
   messageTypeExtractor: MessageTypeExtractor,
   authenticateEISToken: AuthenticateEISToken,
-  eisMessageTransformers: EISMessageTransformers
+  eisMessageTransformers: EISMessageTransformers,
+  objectStoreService: ObjectStoreService
 )(implicit
   val materializer: Materializer,
   val temporaryFileCreator: TemporaryFileCreator
@@ -66,6 +68,7 @@ class MessagesController @Inject() (
     with StreamingParsers
     with ConvertError
     with UpscanResponseParser
+    with ObjectStoreURIExtractor
     with Logging {
 
   def outgoing(eori: EoriNumber, movementType: MovementType, movementId: MovementId, messageId: MessageId): Action[Source[ByteString, _]] =
@@ -104,10 +107,13 @@ class MessagesController @Inject() (
       implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
       (for {
         _ <- parseAndLogUpscanResponse(request.body)
-        //TODO: Get the object store uri location and extract the message type, remove below hardcoded value and then pass actual value with below method
-        //TODO: Get the object store uri from object store remove below hardcoded value and then pass that too with below method
+        //TODO: Get the object store uri from object store remove below hardcoded value and then pass that with below method
+        objectStoreResourceLocation <- extractObjectStoreResourceLocation(ObjectStoreURI("common-transit-convention-traders/movements/abc.xml"))
+        source                      <- objectStoreService.getObjectStoreFile(objectStoreResourceLocation).asPresentation
+        messageType                 <- messageTypeExtractor.extractFromBody(source).asPresentation
+        //TODO: Get the object store uri from object store remove below hardcoded value and then pass that with below method
         persistenceResponse <- persistenceConnector
-          .postObjectStoreUri(movementId, messageId, MessageType.RequestOfRelease, ObjectStoreURI(""))
+          .postObjectStoreUri(movementId, messageId, messageType, ObjectStoreURI(""))
           .asPresentation
       } yield persistenceResponse)
         .fold[Result](

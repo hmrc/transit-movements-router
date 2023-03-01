@@ -20,6 +20,7 @@ import cats.data.EitherT
 import uk.gov.hmrc.transitmovementsrouter.models.errors.MessageTypeExtractionError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PushNotificationError
+import uk.gov.hmrc.transitmovementsrouter.services.error.ObjectStoreError
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError._
 
@@ -77,6 +78,16 @@ trait ConvertError {
       case UnableToExtractFromBody            => PresentationError.badRequestError(s"Message appears to be malformed -- message type was not detected")
       case InvalidMessageType(code: String)   => PresentationError.badRequestError(s"Invalid message type: $code")
       case Unexpected(thr: Option[Throwable]) => PresentationError.internalServiceError(cause = thr)
+    }
+  }
+
+  implicit val objectStoreErrorConverter = new Converter[ObjectStoreError] {
+
+    import uk.gov.hmrc.transitmovementsrouter.services.error.ObjectStoreError._
+
+    def convert(objectStoreError: ObjectStoreError): PresentationError = objectStoreError match {
+      case FileNotFound(fileLocation) => PresentationError.badRequestError(s"file not found at location: $fileLocation")
+      case UnexpectedError(ex)        => PresentationError.internalServiceError(cause = ex)
     }
   }
 }

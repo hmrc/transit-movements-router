@@ -1,7 +1,5 @@
 import play.core.PlayVersion
 import play.core.PlayVersion.current
-import play.sbt.PlayImport._
-import sbt.Keys.libraryDependencies
 import sbt._
 
 object AppDependencies {
@@ -13,6 +11,7 @@ object AppDependencies {
   val compile = Seq(
     "uk.gov.hmrc"        %% "bootstrap-backend-play-28" % boostrapPlayVersion,
     "org.typelevel"      %% "cats-core"                 % catsVersion,
+    "uk.gov.hmrc.objectstore" %% "object-store-client-play-28" % "1.0.0",
     "com.github.cb372"   %% "cats-retry"                % catsRetryVersion,
     "com.github.cb372"   %% "alleycats-retry"           % catsRetryVersion,
     "com.typesafe.akka"  %% "akka-slf4j"                % PlayVersion.akkaVersion,
