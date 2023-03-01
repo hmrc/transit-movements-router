@@ -463,7 +463,7 @@ class MessageControllerSpec
         header("X-Message-Id", result) mustBe Some(messageId.value)
     }
 
-    "must return BAD_REQUEST when the X-Message-Type header is missing or body seems to not contain an appropriate root tag" in forAll(
+    "must return BAD_REQUEST when body seems to not contain an appropriate root tag" in forAll(
       arbitraryUpscanResponse(true).arbitrary
     ) {
       successUpscanResponse =>
