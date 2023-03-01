@@ -42,6 +42,7 @@ import uk.gov.hmrc.transitmovementsrouter.models.MessageId
 import uk.gov.hmrc.transitmovementsrouter.models.MessageType
 import uk.gov.hmrc.transitmovementsrouter.models.MovementId
 import uk.gov.hmrc.transitmovementsrouter.models.MovementType
+import uk.gov.hmrc.transitmovementsrouter.models.ObjectStoreURI
 import uk.gov.hmrc.transitmovementsrouter.models.RequestMessageType
 import uk.gov.hmrc.transitmovementsrouter.services.EISMessageTransformers
 import uk.gov.hmrc.transitmovementsrouter.services.RoutingService
@@ -100,9 +101,19 @@ class MessagesController @Inject() (
 
   def incomingLargeMessage(movementId: MovementId, messageId: MessageId) = Action.async(cc.parsers.json) {
     implicit request =>
-      parseAndLogUpscanResponse(request.body)
-
-      Future.successful(Ok)
+      implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
+      (for {
+        _ <- parseAndLogUpscanResponse(request.body)
+        //TODO: Get the object store uri location and extract the message type, remove below hardcoded value and then pass actual value with below method
+        //TODO: Get the object store uri from object store remove below hardcoded value and then pass that too with below method
+        persistenceResponse <- persistenceConnector
+          .postObjectStoreUri(movementId, messageId, MessageType.RequestOfRelease, ObjectStoreURI(""))
+          .asPresentation
+      } yield persistenceResponse)
+        .fold[Result](
+          error => Status(error.code.statusCode)(Json.toJson(error)),
+          response => Created.withHeaders("X-Message-Id" -> response.messageId.value)
+        )
   }
 
   private def filterRequestMessageType(messageType: MessageType): EitherT[Future, PresentationError, RequestMessageType] = messageType match {

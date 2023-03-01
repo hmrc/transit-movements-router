@@ -30,15 +30,14 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.mockito.MockitoSugar.mock
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 import play.api.http.DefaultHttpErrorHandler
+import play.api.http.HeaderNames
 import play.api.http.HttpErrorConfig
+import play.api.http.MimeTypes
 import play.api.http.Status._
 import play.api.libs.Files.SingletonTemporaryFileCreator
+import play.api.libs.json.JsValue
 import play.api.libs.json.Json
-import play.api.mvc.AnyContent
-import play.api.mvc.BodyParser
-import play.api.mvc.PlayBodyParsers
-import play.api.mvc.Request
-import play.api.mvc.Result
+import play.api.mvc._
 import play.api.test.FakeHeaders
 import play.api.test.FakeRequest
 import play.api.test.Helpers.contentAsJson
@@ -52,19 +51,12 @@ import uk.gov.hmrc.transitmovementsrouter.base.StreamTestHelpers.createStream
 import uk.gov.hmrc.transitmovementsrouter.base.TestActorSystem
 import uk.gov.hmrc.transitmovementsrouter.connectors.PersistenceConnector
 import uk.gov.hmrc.transitmovementsrouter.connectors.PushNotificationsConnector
+import uk.gov.hmrc.transitmovementsrouter.controllers.actions.AuthenticateEISToken
+import uk.gov.hmrc.transitmovementsrouter.controllers.errors.PresentationError
+import uk.gov.hmrc.transitmovementsrouter.fakes.actions.FakeXmlTransformer
 import uk.gov.hmrc.transitmovementsrouter.generators.TestModelGenerators
 import uk.gov.hmrc.transitmovementsrouter.models.MessageType.RequestOfRelease
-import uk.gov.hmrc.transitmovementsrouter.controllers.actions.AuthenticateEISToken
-import uk.gov.hmrc.transitmovementsrouter.fakes.actions.FakeXmlTransformer
-import uk.gov.hmrc.transitmovementsrouter.models.ConversationId
-import uk.gov.hmrc.transitmovementsrouter.models.CustomsOffice
-import uk.gov.hmrc.transitmovementsrouter.models.EoriNumber
-import uk.gov.hmrc.transitmovementsrouter.models.MessageId
-import uk.gov.hmrc.transitmovementsrouter.models.MessageType
-import uk.gov.hmrc.transitmovementsrouter.models.MovementId
-import uk.gov.hmrc.transitmovementsrouter.models.MovementType
-import uk.gov.hmrc.transitmovementsrouter.models.PersistenceResponse
-import uk.gov.hmrc.transitmovementsrouter.models.RequestMessageType
+import uk.gov.hmrc.transitmovementsrouter.models._
 import uk.gov.hmrc.transitmovementsrouter.models.errors.MessageTypeExtractionError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.MovementNotFound
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.Unexpected
@@ -73,8 +65,8 @@ import uk.gov.hmrc.transitmovementsrouter.services.MessageTypeExtractor
 import uk.gov.hmrc.transitmovementsrouter.services.RoutingService
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
 
-import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.xml.NodeSeq
 
@@ -106,6 +98,7 @@ class MessageControllerSpec
   val mockRoutingService             = mock[RoutingService]
   val mockPersistenceConnector       = mock[PersistenceConnector]
   val mockPushNotificationsConnector = mock[PushNotificationsConnector]
+  val mockUpscanResponseParser       = mock[UpscanResponseParser]
   implicit val temporaryFileCreator  = SingletonTemporaryFileCreator
 
   val errorHandler                    = new DefaultHttpErrorHandler(HttpErrorConfig(showDevErrors = false, None), None, None)
@@ -134,8 +127,9 @@ class MessageControllerSpec
 
   def source = createStream(cc015cOfficeOfDepartureGB)
 
-  val outgoing = routes.MessagesController.outgoing(eori, movementType, movementId, messageId).url
-  val incoming = routes.MessagesController.incoming(ConversationId(movementId, messageId)).url
+  val outgoing             = routes.MessagesController.outgoing(eori, movementType, movementId, messageId).url
+  val incoming             = routes.MessagesController.incoming(ConversationId(movementId, messageId)).url
+  val incomingLargeMessage = routes.MessagesController.incomingLargeMessage(movementId, messageId).url
 
   def fakeRequest[A](
     body: NodeSeq,
@@ -149,9 +143,21 @@ class MessageControllerSpec
       body = createStream(body)
     )
 
+  def fakeRequestLargeMessage[A](
+    body: JsValue,
+    url: String
+  ): Request[JsValue] =
+    FakeRequest(
+      method = POST,
+      uri = url,
+      headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> MimeTypes.JSON)),
+      body = body
+    )
+
   override def afterEach(): Unit = {
     reset(mockRoutingService)
     reset(mockMessageTypeExtractor)
+    reset(mockPersistenceConnector)
     super.afterEach()
   }
 
@@ -418,35 +424,75 @@ class MessageControllerSpec
 
   }
 
-  "POST /movements/:movementId/messages/:messageId" - {
+  "POST incoming for Large message" - {
 
-    "should return ok given a success response from upscan" in forAll(arbitraryUpscanResponse(true).arbitrary) {
+    "must return CREATED when message is successfully forwarded" in forAll(arbitraryUpscanResponse(true).arbitrary) {
       successUpscanResponse =>
-        val request = FakeRequest(
-          POST,
-          routes.MessagesController.incomingLargeMessage(movementId, messageId).url,
-          headers = FakeHeaders(),
-          Json.toJson(successUpscanResponse)
+        when(
+          mockPersistenceConnector.postObjectStoreUri(
+            any[String].asInstanceOf[MovementId],
+            any[String].asInstanceOf[MessageId],
+            any[String].asInstanceOf[MessageType],
+            any[String].asInstanceOf[ObjectStoreURI]
+          )(any(), any())
         )
+          .thenReturn(EitherT.fromEither(Right(PersistenceResponse(messageId))))
+        val request = fakeRequestLargeMessage(Json.toJson(successUpscanResponse), incomingLargeMessage)
 
         val result = controller().incomingLargeMessage(movementId, messageId)(request)
 
-        status(result) mustBe OK
+        status(result) mustBe CREATED
+        header("X-Message-Id", result) mustBe Some(messageId.value)
     }
 
-    "should return ok given a failure response from upscan" in forAll(arbitraryUpscanResponse(false).arbitrary) {
-      failureUpscanResponse =>
-        val request = FakeRequest(
-          POST,
-          routes.MessagesController.incomingLargeMessage(movementId, messageId).url,
-          headers = FakeHeaders(),
-          Json.toJson(failureUpscanResponse)
+    "must return NOT_FOUND when target movement is invalid or archived" in forAll(arbitraryUpscanResponse(true).arbitrary) {
+      successUpscanResponse =>
+        when(
+          mockPersistenceConnector.postObjectStoreUri(
+            any[String].asInstanceOf[MovementId],
+            any[String].asInstanceOf[MessageId],
+            any[String].asInstanceOf[MessageType],
+            any[String].asInstanceOf[ObjectStoreURI]
+          )(any(), any())
         )
+          .thenReturn(EitherT.fromEither(Left(MovementNotFound(MovementId("ABC")))))
 
-        val result = controller().incomingLargeMessage(movementId, messageId)(request)
+        val request = fakeRequestLargeMessage(Json.toJson(successUpscanResponse), incomingLargeMessage)
+        val result  = controller().incomingLargeMessage(movementId, messageId)(request)
 
-        status(result) mustBe OK
+        status(result) mustBe NOT_FOUND
     }
+
+    "must return BAD_REQUEST when malformed json received from callback" in {
+      when(
+        mockUpscanResponseParser.parseAndLogUpscanResponse(
+          any[String].asInstanceOf[JsValue]
+        )
+      ).thenReturn(EitherT.fromEither(Left(PresentationError.badRequestError("Unexpected Upscan callback response"))))
+
+      val request = fakeRequestLargeMessage(Json.obj("reference" -> "abc"), incomingLargeMessage)
+      val result  = controller().incomingLargeMessage(movementId, messageId)(request)
+
+      status(result) mustBe BAD_REQUEST
+    }
+
+    "must return INTERNAL_SERVER_ERROR when persistence service fails unexpected" in forAll(arbitraryUpscanResponse(true).arbitrary) {
+      successUpscanResponse =>
+        when(
+          mockPersistenceConnector.postObjectStoreUri(
+            any[String].asInstanceOf[MovementId],
+            any[String].asInstanceOf[MessageId],
+            any[String].asInstanceOf[MessageType],
+            any[String].asInstanceOf[ObjectStoreURI]
+          )(any(), any())
+        )
+          .thenReturn(EitherT.fromEither(Left(Unexpected(None))))
+        val request = fakeRequestLargeMessage(Json.toJson(successUpscanResponse), incomingLargeMessage)
+        val result  = controller().incomingLargeMessage(movementId, messageId)(request)
+
+        status(result) mustBe INTERNAL_SERVER_ERROR
+    }
+
   }
 
 }
