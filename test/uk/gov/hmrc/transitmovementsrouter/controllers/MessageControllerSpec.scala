@@ -630,7 +630,7 @@ class MessageControllerSpec
 
         val result = controller().incomingLargeMessage(movementId, messageId)(request)
 
-        status(result) mustBe CREATED
+        status(result) mustBe INTERNAL_SERVER_ERROR
     }
   }
 

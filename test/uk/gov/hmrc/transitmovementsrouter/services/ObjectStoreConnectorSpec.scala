@@ -16,6 +16,7 @@
 
 package uk.gov.hmrc.transitmovementsrouter.services
 
+import org.scalatest.matchers.must.Matchers
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.freespec.AnyFreeSpec
@@ -26,9 +27,9 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks.forAll
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.objectstore.client.RetentionPeriod.SevenYears
 import uk.gov.hmrc.objectstore.client.config.ObjectStoreClientConfig
-import uk.gov.hmrc.transitmovementsrouter.base.CommonGenerators
 import uk.gov.hmrc.transitmovementsrouter.base.TestActorSystem
 import uk.gov.hmrc.transitmovementsrouter.fakes.objectstore.ObjectStoreStub
+import uk.gov.hmrc.transitmovementsrouter.generators.TestModelGenerators
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.DownloadUrl
 
 import java.time.Clock
@@ -36,10 +37,10 @@ import java.util.UUID.randomUUID
 
 class ObjectStoreServiceSpec
     extends AnyFreeSpec
-    with org.scalatest.matchers.must.Matchers
+    with Matchers
     with MockitoSugar
     with ScalaFutures
-    with CommonGenerators
+    with TestModelGenerators
     with TestActorSystem
     with BeforeAndAfterEach {
 

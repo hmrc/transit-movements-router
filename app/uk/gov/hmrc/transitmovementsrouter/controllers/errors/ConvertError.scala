@@ -31,9 +31,8 @@ trait ConvertError {
 
   implicit class FutureErrorConverter[E, A](value: EitherT[Future, E, A]) {
 
-    def asPresentation(implicit c: Converter[E], ec: ExecutionContext): EitherT[Future, PresentationError, A] = {
+    def asPresentation(implicit c: Converter[E], ec: ExecutionContext): EitherT[Future, PresentationError, A] =
       value.leftMap(c.convert)
-    }
   }
 
   sealed trait Converter[E] {
@@ -86,8 +85,8 @@ trait ConvertError {
 
     import uk.gov.hmrc.transitmovementsrouter.models.errors.ObjectStoreError._
 
-    def convert(error: ObjectStoreError): PresentationError = error match {
-      case UnexpectedError(thr: Option[Throwable]) => PresentationError.internalServiceError(cause = thr)
+    override def convert(objectStoreError: ObjectStoreError): PresentationError = objectStoreError match {
+      case UnexpectedError(thr) => PresentationError.internalServiceError(cause = thr)
     }
   }
 

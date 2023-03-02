@@ -25,7 +25,7 @@ import uk.gov.hmrc.objectstore.client.RetentionPeriod
 import uk.gov.hmrc.objectstore.client.config.ObjectStoreClientConfig
 import uk.gov.hmrc.objectstore.client.play.FutureEither
 import uk.gov.hmrc.objectstore.client.play.test.stub.StubPlayObjectStoreClientEither
-import uk.gov.hmrc.transitmovementsrouter.base.CommonGenerators
+import uk.gov.hmrc.transitmovementsrouter.generators.TestModelGenerators
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
@@ -34,7 +34,7 @@ class ObjectStoreStub(config: ObjectStoreClientConfig)(implicit
   m: Materializer,
   ec: ExecutionContext
 ) extends StubPlayObjectStoreClientEither(config)
-    with CommonGenerators {
+    with TestModelGenerators {
 
   override def uploadFromUrl(
     from: java.net.URL,

@@ -28,7 +28,6 @@ import play.api.mvc.ControllerComponents
 import play.api.mvc.DefaultActionBuilder
 import play.api.mvc.Result
 import uk.gov.hmrc.http.HeaderCarrier
-import uk.gov.hmrc.objectstore.client.ObjectSummaryWithMd5
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
 import uk.gov.hmrc.play.http.HeaderCarrierConverter
 import uk.gov.hmrc.transitmovementsrouter.connectors.PersistenceConnector
@@ -38,7 +37,8 @@ import uk.gov.hmrc.transitmovementsrouter.controllers.errors.ConvertError
 import uk.gov.hmrc.transitmovementsrouter.controllers.errors.PresentationError
 import uk.gov.hmrc.transitmovementsrouter.controllers.stream.StreamingParsers
 import uk.gov.hmrc.transitmovementsrouter.models._
-import uk.gov.hmrc.transitmovementsrouter.models.errors.ObjectStoreError
+import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse
+import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.DownloadUrl
 import uk.gov.hmrc.transitmovementsrouter.services.EISMessageTransformers
 import uk.gov.hmrc.transitmovementsrouter.services.MessageTypeExtractor
 import uk.gov.hmrc.transitmovementsrouter.services.ObjectStoreService
@@ -99,40 +99,32 @@ class MessagesController @Inject() (
   def incomingLargeMessage(movementId: MovementId, messageId: MessageId) = Action.async(cc.parsers.json) {
     implicit request =>
       implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
-      (for {
+      val result = for {
         upscanResponse <- parseAndLogUpscanResponse(request.body)
-        objectStoreResponse <- mapToOptionalResponse[
-          ObjectStoreError,
-          ObjectSummaryWithMd5
-        ](
-          objectStoreService.addMessage(upscanResponse.downloadUrl.get, movementId, messageId)
-        )
-
+        downloadUrl    <- handleUpscanSuccessResponse(upscanResponse)
+        objectSummary  <- objectStoreService.addMessage(downloadUrl, movementId, messageId).asPresentation
         //TODO: Get the object store uri location and extract the message type, remove below hardcoded value and then pass actual value with below method
         //TODO: Get the object store uri from object store remove below hardcoded value and then pass that too with below method
         persistenceResponse <- persistenceConnector
           .postObjectStoreUri(movementId, messageId, MessageType.RequestOfRelease, ObjectStoreURI(""))
           .asPresentation
-      } yield persistenceResponse)
-        .fold[Result](
-          error => Status(error.code.statusCode)(Json.toJson(error)),
-          response => Created.withHeaders("X-Message-Id" -> response.messageId.value)
-        )
+      } yield persistenceResponse
+      result.fold(
+        presentationError => Status(presentationError.code.statusCode)(Json.toJson(presentationError)),
+        response => Created.withHeaders("X-Message-Id" -> response.messageId.value)
+      )
   }
+
+  private def handleUpscanSuccessResponse(upscanResponse: UpscanResponse): EitherT[Future, PresentationError, DownloadUrl] =
+    EitherT {
+      Future.successful(upscanResponse.downloadUrl.toRight {
+        PresentationError.badRequestError("Upscan failed to process file")
+      })
+    }
 
   private def filterRequestMessageType(messageType: MessageType): EitherT[Future, PresentationError, RequestMessageType] = messageType match {
     case t: RequestMessageType => EitherT.rightT(t)
     case _                     => EitherT.leftT(PresentationError.badRequestError(s"${messageType.code} is not valid for requests"))
   }
-
-  private def mapToOptionalResponse[E, R](
-    eitherT: EitherT[Future, E, R]
-  ): EitherT[Future, PresentationError, Option[R]] =
-    EitherT[Future, PresentationError, Option[R]] {
-      eitherT.fold(
-        _ => Right(None),
-        r => Right(Some(r))
-      )
-    }
 
 }

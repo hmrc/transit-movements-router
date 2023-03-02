@@ -17,7 +17,6 @@
 package uk.gov.hmrc.transitmovementsrouter.services
 
 import cats.data.EitherT
-import cats.implicits._
 import com.google.inject.ImplementedBy
 import play.api.Logging
 import uk.gov.hmrc.http.HeaderCarrier
@@ -38,6 +37,8 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
+import scala.util.Try
+import scala.util.control.NonFatal
 
 @ImplementedBy(classOf[ObjectStoreServiceImpl])
 trait ObjectStoreService {
@@ -58,28 +59,23 @@ class ObjectStoreServiceImpl @Inject() (clock: Clock, client: PlayObjectStoreCli
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): EitherT[Future, ObjectStoreError, ObjectSummaryWithMd5] =
-    EitherT
-      .fromEither[Future] {
-        Either
-          .catchNonFatal(new URL(upscanUrl.value))
-          .leftMap(
-            e => ObjectStoreError.UnexpectedError(thr = Some(e))
-          )
-      }
-      .flatMap {
-        upscanURL =>
-          val formattedDateTime = dateTimeFormatter.format(OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC))
+    EitherT {
+      val formattedDateTime = dateTimeFormatter.format(OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC))
 
-          EitherT(
-            client
-              .uploadFromUrl(
-                from = upscanURL,
-                to = Path.Directory("common-transit-convention-traders").file(s"${movementId.value}-${messageId.value}-$formattedDateTime.xml")
-              )
-              .map {
-                case Left(thr)     => Left(ObjectStoreError.UnexpectedError(thr = Some(thr)))
-                case Right(result) => Right(result)
-              }
+      (for {
+        url <- Future.fromTry(Try(new URL(upscanUrl.value)))
+        response <- client
+          .uploadFromUrl(
+            from = url,
+            to = Path.Directory(s"movements/${movementId.value}").file(s"${movementId.value}-${messageId.value}-$formattedDateTime.xml"),
+            owner = "common-transit-convention-traders"
           )
+          .map {
+            case Right(load) => Right(load)
+            case Left(thr)   => Left(ObjectStoreError.UnexpectedError(thr = Some(thr)))
+          }
+      } yield response).recover {
+        case NonFatal(thr) => Left(ObjectStoreError.UnexpectedError(thr = Some(thr)))
       }
+    }
 }

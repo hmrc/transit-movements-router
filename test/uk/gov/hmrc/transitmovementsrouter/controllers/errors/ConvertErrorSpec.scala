@@ -16,18 +16,21 @@
 
 package uk.gov.hmrc.transitmovementsrouter.controllers.errors
 
+import cats.data.EitherT
 import cats.syntax.all._
 import org.scalacheck.Gen
 import org.scalatest.OptionValues
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
+import org.scalatest.matchers.should.Matchers.convertToAnyShouldWrapper
 import org.scalatestplus.mockito.MockitoSugar
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 import uk.gov.hmrc.http.UpstreamErrorResponse
 import uk.gov.hmrc.transitmovementsrouter.models.CustomsOffice
 import uk.gov.hmrc.transitmovementsrouter.models.MovementId
 import uk.gov.hmrc.transitmovementsrouter.models.errors.MessageTypeExtractionError
+import uk.gov.hmrc.transitmovementsrouter.models.errors.ObjectStoreError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PushNotificationError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.ErrorCode.BadRequest
@@ -46,6 +49,7 @@ import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError.Upstream
 
 import java.time.format.DateTimeParseException
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 
 class ConvertErrorSpec extends AnyFreeSpec with Matchers with OptionValues with ScalaFutures with MockitoSugar with ScalaCheckDrivenPropertyChecks {
@@ -175,6 +179,23 @@ class ConvertErrorSpec extends AnyFreeSpec with Matchers with OptionValues with 
       val input = Left[MessageTypeExtractionError, Unit](InvalidMessageType("code")).toEitherT[Future]
       whenReady(input.asPresentation.value) {
         _ mustBe Left(StandardError("Invalid message type: code", BadRequest))
+      }
+    }
+  }
+
+  "objectStoreError error" - {
+    "an UnexpectedError Error with exception returns an internal service error with an exception" in {
+      val exception = new IllegalStateException()
+      val input     = Left[ObjectStoreError, Unit](ObjectStoreError.UnexpectedError(Some(exception))).toEitherT[Future]
+      whenReady(input.asPresentation.value) {
+        _ mustBe Left(InternalServiceError("Internal server error", InternalServerError, Some(exception)))
+      }
+    }
+
+    "an UnexpectedError Error with no exception returns an internal service error with no exception" in {
+      val input = Left[ObjectStoreError, Unit](ObjectStoreError.UnexpectedError(None)).toEitherT[Future]
+      whenReady(input.asPresentation.value) {
+        _ mustBe Left(InternalServiceError("Internal server error", InternalServerError, None))
       }
     }
   }
