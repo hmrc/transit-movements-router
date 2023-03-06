@@ -57,11 +57,10 @@ import uk.gov.hmrc.transitmovementsrouter.fakes.actions.FakeXmlTransformer
 import uk.gov.hmrc.transitmovementsrouter.generators.TestModelGenerators
 import uk.gov.hmrc.transitmovementsrouter.models.MessageType.RequestOfRelease
 import uk.gov.hmrc.transitmovementsrouter.models._
-import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.MovementNotFound
-import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.Unexpected
 import uk.gov.hmrc.transitmovementsrouter.models.errors.MessageTypeExtractionError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.ObjectStoreError
-import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse
+import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.MovementNotFound
+import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.Unexpected
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.DownloadUrl
 import uk.gov.hmrc.transitmovementsrouter.services.EISMessageTransformers
 import uk.gov.hmrc.transitmovementsrouter.services.MessageTypeExtractor
@@ -172,19 +171,6 @@ class MessageControllerSpec
     EitherT.rightT(())
 
   lazy val messageTypeHeader = FakeHeaders(Seq(("X-Message-Type", MessageType.DeclarationData.code)))
-
-  val jsonSuccessUpscanResponse = Json.obj(
-    "reference"   -> "11370e18-6e24-453e-b45a-76d3e32ea33d",
-    "downloadUrl" -> "https://bucketName.s3.eu-west-2.amazonaws.com?1235676",
-    "fileStatus"  -> "READY",
-    "uploadDetails" -> Json.obj(
-      "fileName"        -> "test.pdf",
-      "fileMimeType"    -> "application/pdf",
-      "uploadTimestamp" -> "2018-04-24T09:30:00Z",
-      "checksum"        -> "396f101dd52e8b2ace0dcf5ed09b1d1f030e608938510ce46e7a5c7a4e775100",
-      "size"            -> 987
-    )
-  )
 
   "POST outgoing" - {
     "must return ACCEPTED when declaration is submitted successfully" in {
@@ -564,55 +550,12 @@ class MessageControllerSpec
         status(result) mustBe INTERNAL_SERVER_ERROR
     }
 
-  }
-
-  "should return Ok when response from upscan is valid" - {
-    "and uploading to object-store succeeds" in forAll(
+    "must return INTERNAL_SERVER_ERROR when uploading to object-store fails" in forAll(
+      arbitraryUpscanResponse(true).arbitrary,
       arbitraryMovementId.arbitrary,
-      arbitraryMessageId.arbitrary,
-      arbitraryObjectSummaryWithMd5.arbitrary
+      arbitraryMessageId.arbitrary
     ) {
-      (movementId, messageId, objectSummary) =>
-        val request = FakeRequest(
-          POST,
-          routes.MessagesController.incomingLargeMessage(movementId, messageId).url,
-          headers = FakeHeaders(),
-          jsonSuccessUpscanResponse
-        )
-
-        when(
-          mockPersistenceConnector.postObjectStoreUri(
-            any[String].asInstanceOf[MovementId],
-            any[String].asInstanceOf[MessageId],
-            any[String].asInstanceOf[MessageType],
-            any[String].asInstanceOf[ObjectStoreURI]
-          )(any(), any())
-        )
-          .thenReturn(EitherT.fromEither(Right(PersistenceResponse(messageId))))
-
-        when(
-          mockObjectStoreService.addMessage(any[String].asInstanceOf[DownloadUrl], any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId])(
-            any(),
-            any()
-          )
-        ).thenReturn(EitherT.rightT(objectSummary))
-
-        val result = controller().incomingLargeMessage(movementId, messageId)(request)
-
-        status(result) mustBe CREATED
-    }
-
-    "and uploading to object-store fails" in forAll(arbitraryMovementId.arbitrary, arbitraryMessageId.arbitrary) {
-      (movementId, messageId) =>
-        when(
-          mockPersistenceConnector.postObjectStoreUri(
-            any[String].asInstanceOf[MovementId],
-            any[String].asInstanceOf[MessageId],
-            any[String].asInstanceOf[MessageType],
-            any[String].asInstanceOf[ObjectStoreURI]
-          )(any(), any())
-        )
-          .thenReturn(EitherT.fromEither(Right(PersistenceResponse(messageId))))
+      (successUpscanResponse, movementId, messageId) =>
 
         when(
           mockObjectStoreService.addMessage(any[String].asInstanceOf[DownloadUrl], any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId])(
@@ -621,17 +564,12 @@ class MessageControllerSpec
           )
         ).thenReturn(EitherT.leftT(ObjectStoreError.UnexpectedError(None)))
 
-        val request = FakeRequest(
-          POST,
-          routes.MessagesController.incomingLargeMessage(movementId, messageId).url,
-          headers = FakeHeaders(),
-          jsonSuccessUpscanResponse
-        )
+        val request = fakeRequestLargeMessage(Json.toJson(successUpscanResponse), incomingLargeMessage)
 
         val result = controller().incomingLargeMessage(movementId, messageId)(request)
 
         status(result) mustBe INTERNAL_SERVER_ERROR
     }
-  }
 
+  }
 }
