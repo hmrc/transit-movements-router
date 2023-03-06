@@ -36,17 +36,13 @@ import uk.gov.hmrc.transitmovementsrouter.controllers.actions.AuthenticateEISTok
 import uk.gov.hmrc.transitmovementsrouter.controllers.errors.ConvertError
 import uk.gov.hmrc.transitmovementsrouter.controllers.errors.PresentationError
 import uk.gov.hmrc.transitmovementsrouter.controllers.stream.StreamingParsers
-import uk.gov.hmrc.transitmovementsrouter.models.ConversationId
-import uk.gov.hmrc.transitmovementsrouter.models.EoriNumber
-import uk.gov.hmrc.transitmovementsrouter.models.MessageId
-import uk.gov.hmrc.transitmovementsrouter.models.MessageType
-import uk.gov.hmrc.transitmovementsrouter.models.MovementId
-import uk.gov.hmrc.transitmovementsrouter.models.MovementType
-import uk.gov.hmrc.transitmovementsrouter.models.ObjectStoreURI
-import uk.gov.hmrc.transitmovementsrouter.models.RequestMessageType
+import uk.gov.hmrc.transitmovementsrouter.models._
+import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse
+import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.DownloadUrl
 import uk.gov.hmrc.transitmovementsrouter.services.EISMessageTransformers
-import uk.gov.hmrc.transitmovementsrouter.services.RoutingService
 import uk.gov.hmrc.transitmovementsrouter.services.MessageTypeExtractor
+import uk.gov.hmrc.transitmovementsrouter.services.ObjectStoreService
+import uk.gov.hmrc.transitmovementsrouter.services.RoutingService
 
 import javax.inject.Inject
 import scala.concurrent.Future
@@ -58,7 +54,8 @@ class MessagesController @Inject() (
   pushNotificationsConnector: PushNotificationsConnector,
   messageTypeExtractor: MessageTypeExtractor,
   authenticateEISToken: AuthenticateEISToken,
-  eisMessageTransformers: EISMessageTransformers
+  eisMessageTransformers: EISMessageTransformers,
+  objectStoreService: ObjectStoreService
 )(implicit
   val materializer: Materializer,
   val temporaryFileCreator: TemporaryFileCreator
@@ -102,19 +99,28 @@ class MessagesController @Inject() (
   def incomingLargeMessage(movementId: MovementId, messageId: MessageId) = Action.async(cc.parsers.json) {
     implicit request =>
       implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
-      (for {
-        _ <- parseAndLogUpscanResponse(request.body)
+      val result = for {
+        upscanResponse <- parseAndLogUpscanResponse(request.body)
+        downloadUrl    <- handleUpscanSuccessResponse(upscanResponse)
+        objectSummary  <- objectStoreService.addMessage(downloadUrl, movementId, messageId).asPresentation
         //TODO: Get the object store uri location and extract the message type, remove below hardcoded value and then pass actual value with below method
         //TODO: Get the object store uri from object store remove below hardcoded value and then pass that too with below method
         persistenceResponse <- persistenceConnector
           .postObjectStoreUri(movementId, messageId, MessageType.RequestOfRelease, ObjectStoreURI(""))
           .asPresentation
-      } yield persistenceResponse)
-        .fold[Result](
-          error => Status(error.code.statusCode)(Json.toJson(error)),
-          response => Created.withHeaders("X-Message-Id" -> response.messageId.value)
-        )
+      } yield persistenceResponse
+      result.fold(
+        presentationError => Status(presentationError.code.statusCode)(Json.toJson(presentationError)),
+        response => Created.withHeaders("X-Message-Id" -> response.messageId.value)
+      )
   }
+
+  private def handleUpscanSuccessResponse(upscanResponse: UpscanResponse): EitherT[Future, PresentationError, DownloadUrl] =
+    EitherT {
+      Future.successful(upscanResponse.downloadUrl.toRight {
+        PresentationError.badRequestError("Upscan failed to process file")
+      })
+    }
 
   private def filterRequestMessageType(messageType: MessageType): EitherT[Future, PresentationError, RequestMessageType] = messageType match {
     case t: RequestMessageType => EitherT.rightT(t)

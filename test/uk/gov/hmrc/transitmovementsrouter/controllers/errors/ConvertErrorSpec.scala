@@ -27,22 +27,18 @@ import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 import uk.gov.hmrc.http.UpstreamErrorResponse
 import uk.gov.hmrc.transitmovementsrouter.models.CustomsOffice
 import uk.gov.hmrc.transitmovementsrouter.models.MovementId
-import uk.gov.hmrc.transitmovementsrouter.models.errors.MessageTypeExtractionError
-import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError
-import uk.gov.hmrc.transitmovementsrouter.models.errors.PushNotificationError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.ErrorCode.BadRequest
 import uk.gov.hmrc.transitmovementsrouter.models.errors.ErrorCode.InternalServerError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.ErrorCode.InvalidOffice
 import uk.gov.hmrc.transitmovementsrouter.models.errors.ErrorCode.NotFound
 import uk.gov.hmrc.transitmovementsrouter.models.errors.MessageTypeExtractionError.InvalidMessageType
 import uk.gov.hmrc.transitmovementsrouter.models.errors.MessageTypeExtractionError.UnableToExtractFromBody
+import uk.gov.hmrc.transitmovementsrouter.models.errors.MessageTypeExtractionError
+import uk.gov.hmrc.transitmovementsrouter.models.errors.ObjectStoreError
+import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError
+import uk.gov.hmrc.transitmovementsrouter.models.errors.PushNotificationError
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
-import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError.BadDateTime
-import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError.NoElementFound
-import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError.TooManyElementsFound
-import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError.Unexpected
-import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError.UnrecognisedOffice
-import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError.Upstream
+import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError._
 
 import java.time.format.DateTimeParseException
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -175,6 +171,23 @@ class ConvertErrorSpec extends AnyFreeSpec with Matchers with OptionValues with 
       val input = Left[MessageTypeExtractionError, Unit](InvalidMessageType("code")).toEitherT[Future]
       whenReady(input.asPresentation.value) {
         _ mustBe Left(StandardError("Invalid message type: code", BadRequest))
+      }
+    }
+  }
+
+  "objectStoreError error" - {
+    "an UnexpectedError Error with exception returns an internal service error with an exception" in {
+      val exception = new IllegalStateException()
+      val input     = Left[ObjectStoreError, Unit](ObjectStoreError.UnexpectedError(Some(exception))).toEitherT[Future]
+      whenReady(input.asPresentation.value) {
+        _ mustBe Left(InternalServiceError("Internal server error", InternalServerError, Some(exception)))
+      }
+    }
+
+    "an UnexpectedError Error with no exception returns an internal service error with no exception" in {
+      val input = Left[ObjectStoreError, Unit](ObjectStoreError.UnexpectedError(None)).toEitherT[Future]
+      whenReady(input.asPresentation.value) {
+        _ mustBe Left(InternalServiceError("Internal server error", InternalServerError, None))
       }
     }
   }

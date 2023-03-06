@@ -18,6 +18,7 @@ package uk.gov.hmrc.transitmovementsrouter.controllers.errors
 
 import cats.data.EitherT
 import uk.gov.hmrc.transitmovementsrouter.models.errors.MessageTypeExtractionError
+import uk.gov.hmrc.transitmovementsrouter.models.errors.ObjectStoreError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PushNotificationError
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
@@ -79,4 +80,14 @@ trait ConvertError {
       case Unexpected(thr: Option[Throwable]) => PresentationError.internalServiceError(cause = thr)
     }
   }
+
+  implicit val objectStoreErrorConverter = new Converter[ObjectStoreError] {
+
+    import uk.gov.hmrc.transitmovementsrouter.models.errors.ObjectStoreError._
+
+    override def convert(objectStoreError: ObjectStoreError): PresentationError = objectStoreError match {
+      case UnexpectedError(thr) => PresentationError.internalServiceError(cause = thr)
+    }
+  }
+
 }

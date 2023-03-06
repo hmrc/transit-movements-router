@@ -18,11 +18,10 @@ package uk.gov.hmrc.transitmovementsrouter.generators
 
 import org.scalacheck.Arbitrary
 import org.scalacheck.Gen
-import uk.gov.hmrc.transitmovementsrouter.models.CustomsOffice
-import uk.gov.hmrc.transitmovementsrouter.models.MessageId
-import uk.gov.hmrc.transitmovementsrouter.models.MessageType
-import uk.gov.hmrc.transitmovementsrouter.models.MovementId
-import uk.gov.hmrc.transitmovementsrouter.models.RequestMessageType
+import uk.gov.hmrc.objectstore.client.Md5Hash
+import uk.gov.hmrc.objectstore.client.ObjectSummaryWithMd5
+import uk.gov.hmrc.objectstore.client.Path
+import uk.gov.hmrc.transitmovementsrouter.models._
 import uk.gov.hmrc.transitmovementsrouter.models.responses.FailureDetails
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UploadDetails
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse
@@ -33,6 +32,7 @@ import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.Refere
 import java.time.Instant
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 
 trait TestModelGenerators extends BaseGenerators {
 
@@ -92,6 +92,22 @@ trait TestModelGenerators extends BaseGenerators {
       uploadDetails  = if (isSuccess) arbitraryUploadDetails.arbitrary.sample else None
       failureDetails = if (!isSuccess) arbitraryFailureDetails.arbitrary.sample else None
     } yield UpscanResponse(Reference(reference), fileStatus, downloadUrl, uploadDetails, failureDetails)
+  }
+
+  implicit val arbitraryObjectSummaryWithMd5: Arbitrary[ObjectSummaryWithMd5] = Arbitrary {
+    for {
+      movementId <- arbitraryMovementId.arbitrary
+      messageId  <- arbitraryMessageId.arbitrary
+      lastModified      = Instant.now()
+      formattedDateTime = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").withZone(ZoneOffset.UTC).format(lastModified)
+      contentLen <- Gen.long
+      hash       <- Gen.alphaNumStr.map(Md5Hash)
+    } yield ObjectSummaryWithMd5(
+      Path.Directory("common-transit-convention-traders").file(s"${movementId.value}-${messageId.value}-$formattedDateTime.xml"),
+      contentLen,
+      hash,
+      lastModified
+    )
   }
 
 }

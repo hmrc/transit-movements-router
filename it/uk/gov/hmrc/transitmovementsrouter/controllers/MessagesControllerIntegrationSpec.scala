@@ -30,13 +30,7 @@ import org.scalatest.matchers.must.Matchers
 import org.scalatestplus.play.guice.GuiceOneAppPerSuite
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 import play.api.http.HeaderNames
-import play.api.http.Status.ACCEPTED
-import play.api.http.Status.BAD_REQUEST
-import play.api.http.Status.CREATED
-import play.api.http.Status.FORBIDDEN
-import play.api.http.Status.INTERNAL_SERVER_ERROR
-import play.api.http.Status.OK
-import play.api.http.Status.UNAUTHORIZED
+import play.api.http.Status._
 import play.api.inject.bind
 import play.api.inject.guice.GuiceApplicationBuilder
 import play.api.inject.guice.GuiceableModule
