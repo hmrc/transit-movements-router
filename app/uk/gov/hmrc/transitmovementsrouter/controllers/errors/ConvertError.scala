@@ -18,9 +18,9 @@ package uk.gov.hmrc.transitmovementsrouter.controllers.errors
 
 import cats.data.EitherT
 import uk.gov.hmrc.transitmovementsrouter.models.errors.MessageTypeExtractionError
+import uk.gov.hmrc.transitmovementsrouter.models.errors.ObjectStoreError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PushNotificationError
-import uk.gov.hmrc.transitmovementsrouter.services.error.ObjectStoreError
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError._
 
@@ -82,12 +82,12 @@ trait ConvertError {
   }
 
   implicit val objectStoreErrorConverter = new Converter[ObjectStoreError] {
+    import uk.gov.hmrc.transitmovementsrouter.models.errors.ObjectStoreError._
 
-    import uk.gov.hmrc.transitmovementsrouter.services.error.ObjectStoreError._
-
-    def convert(objectStoreError: ObjectStoreError): PresentationError = objectStoreError match {
+    override def convert(objectStoreError: ObjectStoreError): PresentationError = objectStoreError match {
       case FileNotFound(fileLocation) => PresentationError.badRequestError(s"file not found at location: $fileLocation")
-      case UnexpectedError(ex)        => PresentationError.internalServiceError(cause = ex)
+      case UnexpectedError(thr)       => PresentationError.internalServiceError(cause = thr)
     }
   }
+
 }

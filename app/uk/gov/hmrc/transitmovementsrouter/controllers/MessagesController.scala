@@ -36,14 +36,9 @@ import uk.gov.hmrc.transitmovementsrouter.controllers.actions.AuthenticateEISTok
 import uk.gov.hmrc.transitmovementsrouter.controllers.errors.ConvertError
 import uk.gov.hmrc.transitmovementsrouter.controllers.errors.PresentationError
 import uk.gov.hmrc.transitmovementsrouter.controllers.stream.StreamingParsers
-import uk.gov.hmrc.transitmovementsrouter.models.ConversationId
-import uk.gov.hmrc.transitmovementsrouter.models.EoriNumber
-import uk.gov.hmrc.transitmovementsrouter.models.MessageId
-import uk.gov.hmrc.transitmovementsrouter.models.MessageType
-import uk.gov.hmrc.transitmovementsrouter.models.MovementId
-import uk.gov.hmrc.transitmovementsrouter.models.MovementType
-import uk.gov.hmrc.transitmovementsrouter.models.ObjectStoreURI
-import uk.gov.hmrc.transitmovementsrouter.models.RequestMessageType
+import uk.gov.hmrc.transitmovementsrouter.models._
+import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse
+import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.DownloadUrl
 import uk.gov.hmrc.transitmovementsrouter.services.EISMessageTransformers
 import uk.gov.hmrc.transitmovementsrouter.services.MessageTypeExtractor
 import uk.gov.hmrc.transitmovementsrouter.services.ObjectStoreService
@@ -106,21 +101,28 @@ class MessagesController @Inject() (
     implicit request =>
       implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
       (for {
-        _ <- parseAndLogUpscanResponse(request.body)
-        //TODO: Get the object store uri from object store remove below hardcoded value and then pass that with below method
-        objectStoreResourceLocation <- extractObjectStoreResourceLocation(ObjectStoreURI("common-transit-convention-traders/movements/abc.xml"))
+        upscanResponse              <- parseAndLogUpscanResponse(request.body)
+        downloadUrl                 <- handleUpscanSuccessResponse(upscanResponse)
+        objectSummary               <- objectStoreService.addMessage(downloadUrl, movementId, messageId).asPresentation
+        objectStoreResourceLocation <- extractObjectStoreResourceLocation(ObjectStoreURI(objectSummary.location.asUri))
         source                      <- objectStoreService.getObjectStoreFile(objectStoreResourceLocation).asPresentation
         messageType                 <- messageTypeExtractor.extractFromBody(source).asPresentation
-        //TODO: Get the object store uri from object store remove below hardcoded value and then pass that with below method
         persistenceResponse <- persistenceConnector
-          .postObjectStoreUri(movementId, messageId, messageType, ObjectStoreURI(""))
+          .postObjectStoreUri(movementId, messageId, messageType, ObjectStoreURI(objectSummary.location.asUri))
           .asPresentation
       } yield persistenceResponse)
         .fold[Result](
-          error => Status(error.code.statusCode)(Json.toJson(error)),
+          presentationError => Status(presentationError.code.statusCode)(Json.toJson(presentationError)),
           response => Created.withHeaders("X-Message-Id" -> response.messageId.value)
         )
   }
+
+  private def handleUpscanSuccessResponse(upscanResponse: UpscanResponse): EitherT[Future, PresentationError, DownloadUrl] =
+    EitherT {
+      Future.successful(upscanResponse.downloadUrl.toRight {
+        PresentationError.badRequestError("Upscan failed to process file")
+      })
+    }
 
   private def filterRequestMessageType(messageType: MessageType): EitherT[Future, PresentationError, RequestMessageType] = messageType match {
     case t: RequestMessageType => EitherT.rightT(t)
