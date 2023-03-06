@@ -431,7 +431,6 @@ class MessageControllerSpec
   }
 
   "POST incoming for Large message" - {
-
     "must return CREATED when message is successfully forwarded" in forAll(
       arbitraryUpscanResponse(true).arbitrary,
       arbitraryMovementId.arbitrary,
@@ -556,7 +555,6 @@ class MessageControllerSpec
       arbitraryMessageId.arbitrary
     ) {
       (successUpscanResponse, movementId, messageId) =>
-
         when(
           mockObjectStoreService.addMessage(any[String].asInstanceOf[DownloadUrl], any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId])(
             any(),
