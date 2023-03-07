@@ -82,11 +82,11 @@ trait ConvertError {
   }
 
   implicit val objectStoreErrorConverter = new Converter[ObjectStoreError] {
-
     import uk.gov.hmrc.transitmovementsrouter.models.errors.ObjectStoreError._
 
     override def convert(objectStoreError: ObjectStoreError): PresentationError = objectStoreError match {
-      case UnexpectedError(thr) => PresentationError.internalServiceError(cause = thr)
+      case FileNotFound(fileLocation) => PresentationError.badRequestError(s"file not found at location: $fileLocation")
+      case UnexpectedError(thr)       => PresentationError.internalServiceError(cause = thr)
     }
   }
 

@@ -63,6 +63,7 @@ class MessagesController @Inject() (
     with StreamingParsers
     with ConvertError
     with UpscanResponseParser
+    with ObjectStoreURIExtractor
     with Logging {
 
   def outgoing(eori: EoriNumber, movementType: MovementType, movementId: MovementId, messageId: MessageId): Action[Source[ByteString, _]] =
@@ -99,20 +100,21 @@ class MessagesController @Inject() (
   def incomingLargeMessage(movementId: MovementId, messageId: MessageId) = Action.async(cc.parsers.json) {
     implicit request =>
       implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
-      val result = for {
-        upscanResponse <- parseAndLogUpscanResponse(request.body)
-        downloadUrl    <- handleUpscanSuccessResponse(upscanResponse)
-        objectSummary  <- objectStoreService.addMessage(downloadUrl, movementId, messageId).asPresentation
-        //TODO: Get the object store uri location and extract the message type, remove below hardcoded value and then pass actual value with below method
-        //TODO: Get the object store uri from object store remove below hardcoded value and then pass that too with below method
+      (for {
+        upscanResponse              <- parseAndLogUpscanResponse(request.body)
+        downloadUrl                 <- handleUpscanSuccessResponse(upscanResponse)
+        objectSummary               <- objectStoreService.addMessage(downloadUrl, movementId, messageId).asPresentation
+        objectStoreResourceLocation <- extractObjectStoreResourceLocation(ObjectStoreURI(objectSummary.location.asUri))
+        source                      <- objectStoreService.getObjectStoreFile(objectStoreResourceLocation).asPresentation
+        messageType                 <- messageTypeExtractor.extractFromBody(source).asPresentation
         persistenceResponse <- persistenceConnector
-          .postObjectStoreUri(movementId, messageId, MessageType.RequestOfRelease, ObjectStoreURI(""))
+          .postObjectStoreUri(movementId, messageId, messageType, ObjectStoreURI(objectSummary.location.asUri))
           .asPresentation
-      } yield persistenceResponse
-      result.fold(
-        presentationError => Status(presentationError.code.statusCode)(Json.toJson(presentationError)),
-        response => Created.withHeaders("X-Message-Id" -> response.messageId.value)
-      )
+      } yield persistenceResponse)
+        .fold[Result](
+          presentationError => Status(presentationError.code.statusCode)(Json.toJson(presentationError)),
+          response => Created.withHeaders("X-Message-Id" -> response.messageId.value)
+        )
   }
 
   private def handleUpscanSuccessResponse(upscanResponse: UpscanResponse): EitherT[Future, PresentationError, DownloadUrl] =

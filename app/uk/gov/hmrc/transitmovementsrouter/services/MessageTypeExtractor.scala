@@ -48,6 +48,8 @@ trait MessageTypeExtractor {
 
   def extractFromHeaders(headers: Headers): EitherT[Future, MessageTypeExtractionError, MessageType]
 
+  def extractFromBody(source: Source[ByteString, _]): EitherT[Future, MessageTypeExtractionError, MessageType]
+
 }
 
 @Singleton
@@ -96,6 +98,6 @@ class MessageTypeExtractorImpl @Inject() (implicit ec: ExecutionContext, mat: Ma
       }
     }
 
-  def extractFromBody(source: Source[ByteString, _]): EitherT[Future, MessageTypeExtractionError, MessageType] =
+  override def extractFromBody(source: Source[ByteString, _]): EitherT[Future, MessageTypeExtractionError, MessageType] =
     EitherT(source.runWith(messageTypeExtractor))
 }

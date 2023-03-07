@@ -17,16 +17,25 @@
 package uk.gov.hmrc.transitmovementsrouter.fakes.objectstore
 
 import akka.stream.Materializer
+import akka.stream.scaladsl.Source
+import akka.util.ByteString
 import uk.gov.hmrc.http.HeaderCarrier
+import uk.gov.hmrc.objectstore.client.Path.File
+import uk.gov.hmrc.objectstore.client.config.ObjectStoreClientConfig
+import uk.gov.hmrc.objectstore.client.http.ObjectStoreContentRead
+import uk.gov.hmrc.objectstore.client.play.test.stub.StubPlayObjectStoreClientEither
+import uk.gov.hmrc.objectstore.client.play.FutureEither
+import uk.gov.hmrc.objectstore.client.play.ResBody
 import uk.gov.hmrc.objectstore.client.Md5Hash
+import uk.gov.hmrc.objectstore.client.Object
+import uk.gov.hmrc.objectstore.client.ObjectMetadata
 import uk.gov.hmrc.objectstore.client.ObjectSummaryWithMd5
 import uk.gov.hmrc.objectstore.client.Path
 import uk.gov.hmrc.objectstore.client.RetentionPeriod
-import uk.gov.hmrc.objectstore.client.config.ObjectStoreClientConfig
-import uk.gov.hmrc.objectstore.client.play.FutureEither
-import uk.gov.hmrc.objectstore.client.play.test.stub.StubPlayObjectStoreClientEither
 import uk.gov.hmrc.transitmovementsrouter.generators.TestModelGenerators
+import uk.gov.hmrc.transitmovementsrouter.models.errors.ObjectStoreError
 
+import java.time.Instant
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 
@@ -46,6 +55,26 @@ class ObjectStoreStub(config: ObjectStoreClientConfig)(implicit
   )(implicit hc: HeaderCarrier): FutureEither[ObjectSummaryWithMd5] = {
     val objectSummaryWithMd5 = arbitraryObjectSummaryWithMd5.arbitrary.sample.get
     Future.successful(Right(objectSummaryWithMd5))
+  }
+
+  override def getObject[CONTENT](path: File, owner: String)(implicit
+    cr: ObjectStoreContentRead[FutureEither, ResBody, CONTENT],
+    hc: HeaderCarrier
+  ): FutureEither[Option[Object[CONTENT]]] = {
+    val filePath =
+      Path.Directory("movements/movementId").file("x-conversation-id.xml")
+    val metadata = ObjectMetadata("", 0, Md5Hash(""), Instant.now(), Map.empty[String, String])
+    val content  = "content"
+    if (filePath.asUri.equals(path.asUri)) {
+      cr.readContent(Source.single(ByteString(content))).map {
+        case Right(content) => Right(Option(Object(filePath, content, metadata)))
+        case _              => Right(None)
+      }
+    } else if (path.asUri.contains("/")) {
+      Future.successful(Right(None))
+    } else {
+      Future.failed(ObjectStoreError.UnexpectedError(None))
+    }
   }
 
 }

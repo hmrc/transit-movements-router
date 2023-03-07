@@ -14,11 +14,6 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovementsrouter.models.errors
+package uk.gov.hmrc.transitmovementsrouter.models
 
-sealed trait ObjectStoreError extends Throwable
-
-object ObjectStoreError {
-  case class UnexpectedError(thr: Option[Throwable] = None) extends ObjectStoreError
-  case class FileNotFound(fileLocation: String)             extends ObjectStoreError
-}
+case class ObjectStoreResourceLocation(value: String) extends AnyVal

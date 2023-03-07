@@ -16,15 +16,20 @@
 
 package uk.gov.hmrc.transitmovementsrouter.services
 
+import akka.NotUsed
+import akka.stream.scaladsl.Source
+import akka.util.ByteString
 import cats.data.EitherT
 import com.google.inject.ImplementedBy
 import play.api.Logging
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.objectstore.client.ObjectSummaryWithMd5
 import uk.gov.hmrc.objectstore.client.Path
+import uk.gov.hmrc.objectstore.client.play.Implicits._
 import uk.gov.hmrc.objectstore.client.play.PlayObjectStoreClientEither
 import uk.gov.hmrc.transitmovementsrouter.models.MessageId
 import uk.gov.hmrc.transitmovementsrouter.models.MovementId
+import uk.gov.hmrc.transitmovementsrouter.models.ObjectStoreResourceLocation
 import uk.gov.hmrc.transitmovementsrouter.models.errors.ObjectStoreError
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.DownloadUrl
 
@@ -47,6 +52,11 @@ trait ObjectStoreService {
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): EitherT[Future, ObjectStoreError, ObjectSummaryWithMd5]
+
+  def getObjectStoreFile(objectStoreResourceLocation: ObjectStoreResourceLocation)(implicit
+    hc: HeaderCarrier,
+    ec: ExecutionContext
+  ): EitherT[Future, ObjectStoreError, Source[ByteString, _]]
 
 }
 
@@ -78,4 +88,23 @@ class ObjectStoreServiceImpl @Inject() (clock: Clock, client: PlayObjectStoreCli
         case NonFatal(thr) => Left(ObjectStoreError.UnexpectedError(thr = Some(thr)))
       }
     }
+
+  override def getObjectStoreFile(objectStoreResourceLocation: ObjectStoreResourceLocation)(implicit
+    hc: HeaderCarrier,
+    ec: ExecutionContext
+  ): EitherT[Future, ObjectStoreError, Source[ByteString, _]] =
+    EitherT(
+      client
+        .getObject[Source[ByteString, NotUsed]](
+          Path.File(objectStoreResourceLocation.value),
+          "common-transit-conversion-traders"
+        )
+        .map {
+          case Right(Some(source)) => Right(source.content)
+          case _                   => Left(ObjectStoreError.FileNotFound(objectStoreResourceLocation.value))
+        }
+        .recover {
+          case NonFatal(ex) => Left(ObjectStoreError.UnexpectedError(Some(ex)))
+        }
+    )
 }

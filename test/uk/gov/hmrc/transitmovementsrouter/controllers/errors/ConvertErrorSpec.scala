@@ -176,6 +176,14 @@ class ConvertErrorSpec extends AnyFreeSpec with Matchers with OptionValues with 
   }
 
   "objectStoreError error" - {
+
+    "FileNotFound should result BadRequest error" in {
+      val input = Left[ObjectStoreError, Unit](ObjectStoreError.FileNotFound("test")).toEitherT[Future]
+      whenReady(input.asPresentation.value) {
+        _ mustBe Left(StandardError("file not found at location: test", BadRequest))
+      }
+    }
+
     "an UnexpectedError Error with exception returns an internal service error with an exception" in {
       val exception = new IllegalStateException()
       val input     = Left[ObjectStoreError, Unit](ObjectStoreError.UnexpectedError(Some(exception))).toEitherT[Future]
@@ -188,6 +196,7 @@ class ConvertErrorSpec extends AnyFreeSpec with Matchers with OptionValues with 
       val input = Left[ObjectStoreError, Unit](ObjectStoreError.UnexpectedError(None)).toEitherT[Future]
       whenReady(input.asPresentation.value) {
         _ mustBe Left(InternalServiceError("Internal server error", InternalServerError, None))
+
       }
     }
   }
