@@ -25,29 +25,42 @@ import com.google.inject.Singleton
 import io.lemonlabs.uri.UrlPath
 import play.api.http.HeaderNames
 import play.api.http.MimeTypes
+import play.api.http.Status.BAD_REQUEST
 import play.api.http.Status.INTERNAL_SERVER_ERROR
 import play.api.http.Status.NOT_FOUND
+import play.api.libs.json._
+import uk.gov.hmrc.http.HttpReads.Implicits._
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.HttpResponse
 import uk.gov.hmrc.http.StringContextOps
 import uk.gov.hmrc.http.UpstreamErrorResponse
 import uk.gov.hmrc.http.client.HttpClientV2
+import uk.gov.hmrc.http.client.RequestBuilder
 import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
-import uk.gov.hmrc.transitmovementsrouter.models.MessageId
-import uk.gov.hmrc.transitmovementsrouter.models.MovementId
+import uk.gov.hmrc.transitmovementsrouter.models._
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PushNotificationError
+import uk.gov.hmrc.transitmovementsrouter.models.errors.PushNotificationError.MovementNotFound
+import uk.gov.hmrc.transitmovementsrouter.models.errors.PushNotificationError.Unexpected
+import uk.gov.hmrc.transitmovementsrouter.utils.RouterHeaderNames
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.util.control.NonFatal
-import uk.gov.hmrc.http.HttpReads.Implicits._
-import uk.gov.hmrc.transitmovementsrouter.models.errors.PushNotificationError.MovementNotFound
-import uk.gov.hmrc.transitmovementsrouter.models.errors.PushNotificationError.Unexpected
 
 @ImplementedBy(classOf[PushNotificationsConnectorImpl])
 trait PushNotificationsConnector {
 
   def post(movementId: MovementId, messageId: MessageId, source: Source[ByteString, _])(implicit
+    hc: HeaderCarrier,
+    ec: ExecutionContext
+  ): EitherT[Future, PushNotificationError, Unit]
+
+  def postForLargeMessages(
+    movementId: MovementId,
+    messageId: MessageId,
+    messageType: MessageType,
+    objectStoreURI: ObjectStoreURI
+  )(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): EitherT[Future, PushNotificationError, Unit]
@@ -92,4 +105,63 @@ class PushNotificationsConnectorImpl @Inject() (httpClientV2: HttpClientV2, appC
       }
     }
 
+  override def postForLargeMessages(
+    movementId: MovementId,
+    messageId: MessageId,
+    messageType: MessageType,
+    objectStoreURI: ObjectStoreURI
+  )(implicit
+    hc: HeaderCarrier,
+    ec: ExecutionContext
+  ): EitherT[Future, PushNotificationError, Unit] =
+    EitherT {
+      if (appConfig.pushNotificationsEnabled) {
+        val request = createRequest(movementId, messageId).transform(
+          _.addHttpHeaders(
+            RouterHeaderNames.MESSAGE_TYPE     -> messageType.code,
+            RouterHeaderNames.OBJECT_STORE_URI -> objectStoreURI.value
+          )
+        )
+        execute(request, movementId)
+      } else {
+        Future.successful(Right(()))
+      }
+    }
+
+  private def createRequest(movementId: MovementId, messageId: MessageId)(implicit hc: HeaderCarrier, ec: ExecutionContext) = {
+    val url = baseUrl.withPath(pushNotificationMessageUpdate(movementId, messageId))
+    httpClientV2.post(url"$url")
+  }
+
+  private def execute(requestBuilder: RequestBuilder, movementId: MovementId)(implicit hc: HeaderCarrier, ec: ExecutionContext) =
+    requestBuilder
+      .execute[Either[UpstreamErrorResponse, HttpResponse]]
+      .map {
+        case Right(res) if res.body.length > 0 =>
+          Json
+            .fromJson[Unit](res.json)(
+              OFormat[Unit](
+                Reads {
+                  _ => JsSuccess(())
+                }: Reads[Unit],
+                OWrites {
+                  _ => Json.obj()
+                }: OWrites[Unit]
+              )
+            )
+            .map(Right(_))
+            .getOrElse(Left(Unexpected(Some(new Exception("Unexpected response from push notifications service")))))
+        case Right(_) =>
+          Right(())
+        case Left(error) =>
+          error.statusCode match {
+            case BAD_REQUEST           => Left(Unexpected(Some(new Exception("Bad request"))))
+            case NOT_FOUND             => Left(MovementNotFound(movementId))
+            case INTERNAL_SERVER_ERROR => Left(Unexpected(Some(new Exception("Internal server error"))))
+            case _                     => Left(Unexpected(Some(new Exception("Unexpected response from push notifications service"))))
+          }
+      }
+      .recover {
+        case NonFatal(ex) => Left(Unexpected(Some(ex)))
+      }
 }

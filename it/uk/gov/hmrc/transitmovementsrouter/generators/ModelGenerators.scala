@@ -22,6 +22,7 @@ import uk.gov.hmrc.transitmovementsrouter.models.CustomsOffice
 import uk.gov.hmrc.transitmovementsrouter.models.MessageId
 import uk.gov.hmrc.transitmovementsrouter.models.MessageType
 import uk.gov.hmrc.transitmovementsrouter.models.MovementId
+import uk.gov.hmrc.transitmovementsrouter.models.ObjectStoreURI
 
 import java.time.Instant
 import java.time.OffsetDateTime
@@ -58,4 +59,6 @@ trait ModelGenerators extends BaseGenerators {
       } yield OffsetDateTime.ofInstant(Instant.ofEpochMilli(millis), ZoneOffset.UTC)
     }
 
+  implicit lazy val arbitraryObjectStoreURI: Arbitrary[ObjectStoreURI] =
+    Arbitrary(Gen.alphaNumStr.map(ObjectStoreURI.apply))
 }

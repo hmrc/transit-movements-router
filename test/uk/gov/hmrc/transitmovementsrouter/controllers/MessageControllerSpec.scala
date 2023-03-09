@@ -470,6 +470,15 @@ class MessageControllerSpec
           )(any(), any())
         ).thenReturn(EitherT.fromEither(Right(PersistenceResponse(messageId))))
 
+        when(
+          mockPushNotificationsConnector.postForLargeMessages(
+            any[String].asInstanceOf[MovementId],
+            any[String].asInstanceOf[MessageId],
+            any[String].asInstanceOf[MessageType],
+            any[String].asInstanceOf[ObjectStoreURI]
+          )(any(), any())
+        ).thenReturn(EitherT.fromEither(Right(PersistenceResponse(messageId))))
+
         val request = fakeRequestLargeMessage(Json.toJson(successUpscanResponse), incomingLargeMessage)
 
         val result = controller().incomingLargeMessage(movementId, messageId)(request)

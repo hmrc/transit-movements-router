@@ -31,6 +31,7 @@ import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.mockito.MockitoSugar
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+import play.api.http.Status.BAD_REQUEST
 import play.api.http.Status.INTERNAL_SERVER_ERROR
 import play.api.http.Status.NOT_FOUND
 import play.api.http.Status.OK
@@ -39,6 +40,7 @@ import uk.gov.hmrc.http.test.HttpClientV2Support
 import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
 import uk.gov.hmrc.transitmovementsrouter.generators.ModelGenerators
 import uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuite
+import uk.gov.hmrc.transitmovementsrouter.models.ObjectStoreURI
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PushNotificationError.MovementNotFound
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PushNotificationError.Unexpected
 import uk.gov.hmrc.transitmovementsrouter.services.EISMessageTransformersImpl
@@ -56,8 +58,10 @@ class PushNotificationConnectorSpec
     with ScalaCheckPropertyChecks
     with ModelGenerators {
 
-  val movementId = arbitraryMovementId.arbitrary.sample.get
-  val messageId  = arbitraryMessageId.arbitrary.sample.get
+  val movementId     = arbitraryMovementId.arbitrary.sample.get
+  val messageId      = arbitraryMessageId.arbitrary.sample.get
+  val messageType    = arbitraryMessageType.arbitrary.sample.get
+  val objectStoreURI = arbitraryObjectStoreURI.arbitrary.sample.get
 
   val uriPushNotifications =
     UrlPath.parse(s"/transit-movements-push-notifications/traders/movements/${movementId.value}/messages/${messageId.value}").toString()
@@ -147,6 +151,80 @@ class PushNotificationConnectorSpec
         case Right(_) =>
       }
 
+    }
+  }
+
+  "postForLargeMessages" should {
+
+    "return Right(()) when the request is successful" in {
+
+      val objectStoreURI = ObjectStoreURI("http://example.com")
+
+      when(mockAppConfig.pushNotificationsEnabled).thenReturn(true)
+
+      stub(204)
+
+      val result = connector.postForLargeMessages(movementId, messageId, messageType, objectStoreURI).value.futureValue
+      result mustBe Right(())
+    }
+
+    "return MovementNotFound when the message is not found" in {
+      when(mockAppConfig.pushNotificationsEnabled).thenReturn(true)
+      stub(NOT_FOUND)
+
+      whenReady(connector.postForLargeMessages(movementId, messageId, messageType, objectStoreURI).value) {
+        x =>
+          x.isLeft mustBe true
+          x.left.get mustBe MovementNotFound(movementId)
+      }
+    }
+
+    "return Unexpected when there is an internal server error" in {
+      when(mockAppConfig.pushNotificationsEnabled).thenReturn(true)
+      stub(INTERNAL_SERVER_ERROR)
+
+      whenReady(connector.postForLargeMessages(movementId, messageId, messageType, objectStoreURI).value) {
+        x =>
+          x.isLeft mustBe true
+          x.left.get mustBe a[Unexpected]
+      }
+    }
+
+    "return Unexpected when there is an unexpected response from the server" in {
+      when(mockAppConfig.pushNotificationsEnabled).thenReturn(true)
+      stub(BAD_REQUEST)
+
+      whenReady(connector.postForLargeMessages(movementId, messageId, messageType, objectStoreURI).value) {
+        x =>
+          x.isLeft mustBe true
+          x.left.get mustBe a[Unexpected]
+      }
+    }
+
+    "return Unexpected when an exception is thrown" in {
+      when(mockAppConfig.pushNotificationsEnabled).thenReturn(true)
+
+      whenReady(
+        connector
+          .postForLargeMessages(
+            arbitraryMovementId.arbitrary.sample.get,
+            arbitraryMessageId.arbitrary.sample.get,
+            arbitraryMessageType.arbitrary.sample.get,
+            ObjectStoreURI("")
+          )
+          .value
+      ) {
+        x =>
+          x.isLeft mustBe true
+      }
+    }
+
+    "return Right(()) when push notifications are disabled" in {
+      when(mockAppConfig.pushNotificationsEnabled).thenReturn(false)
+
+      val result = connector.postForLargeMessages(movementId, messageId, messageType, objectStoreURI).value.futureValue
+
+      result mustEqual Right(())
     }
   }
 }

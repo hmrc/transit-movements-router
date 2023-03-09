@@ -110,6 +110,9 @@ class MessagesController @Inject() (
         persistenceResponse <- persistenceConnector
           .postObjectStoreUri(movementId, messageId, messageType, ObjectStoreURI(objectSummary.location.asUri))
           .asPresentation
+        _ = pushNotificationsConnector
+          .postForLargeMessages(movementId, persistenceResponse.messageId, messageType, ObjectStoreURI(objectSummary.location.asUri))
+          .asPresentation
       } yield persistenceResponse)
         .fold[Result](
           presentationError => Status(presentationError.code.statusCode)(Json.toJson(presentationError)),
