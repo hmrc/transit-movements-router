@@ -18,4 +18,4 @@ package uk.gov.hmrc.transitmovementsrouter.models
 
 import uk.gov.hmrc.objectstore.client.RetentionPeriod
 
-case class ObjectStoreRetentionPeriod(value: RetentionPeriod) extends AnyVal
+case class ObjectStoreRetentionPeriod(value: RetentionPeriod)

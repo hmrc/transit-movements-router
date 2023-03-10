@@ -16,4 +16,4 @@
 
 package uk.gov.hmrc.transitmovementsrouter.models
 
-case class ObjectStoreResourceLocation(value: String) extends AnyVal
+case class ObjectStoreResourceLocation(contextPath: String, resourceLocation: String)

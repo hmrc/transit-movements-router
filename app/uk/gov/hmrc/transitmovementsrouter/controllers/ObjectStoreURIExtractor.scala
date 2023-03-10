@@ -45,7 +45,7 @@ trait ObjectStoreURIExtractor {
       Future.successful(
         for {
           objectStoreResourceLocation <- getObjectStoreResourceLocation(objectStoreURI)
-        } yield ObjectStoreResourceLocation(objectStoreResourceLocation)
+        } yield ObjectStoreResourceLocation(objectStoreURI.value, objectStoreResourceLocation)
       )
     )
 
@@ -55,7 +55,7 @@ trait ObjectStoreURIExtractor {
         for {
           headerValue                 <- getHeader(headers.get(RouterHeaderNames.OBJECT_STORE_URI))
           objectStoreResourceLocation <- getObjectStoreResourceLocation(ObjectStoreURI(headerValue))
-        } yield ObjectStoreResourceLocation(objectStoreResourceLocation)
+        } yield ObjectStoreResourceLocation(headerValue, objectStoreResourceLocation)
       )
     )
 

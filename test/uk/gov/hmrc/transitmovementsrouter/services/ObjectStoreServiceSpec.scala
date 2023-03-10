@@ -17,6 +17,7 @@
 package uk.gov.hmrc.transitmovementsrouter.services
 
 import akka.stream.scaladsl.Sink
+import org.mockito.MockitoSugar.when
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.freespec.AnyFreeSpec
@@ -27,16 +28,13 @@ import org.scalatestplus.mockito.MockitoSugar
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks.forAll
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.objectstore.client.Path
-import uk.gov.hmrc.objectstore.client.RetentionPeriod
 import uk.gov.hmrc.objectstore.client.RetentionPeriod.SevenYears
 import uk.gov.hmrc.objectstore.client.config.ObjectStoreClientConfig
 import uk.gov.hmrc.transitmovementsrouter.base.TestActorSystem
+import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
 import uk.gov.hmrc.transitmovementsrouter.fakes.objectstore.ObjectStoreStub
 import uk.gov.hmrc.transitmovementsrouter.generators.TestModelGenerators
-import uk.gov.hmrc.transitmovementsrouter.models.ObjectStoreFileDirectory
-import uk.gov.hmrc.transitmovementsrouter.models.ObjectStoreOwner
 import uk.gov.hmrc.transitmovementsrouter.models.ObjectStoreResourceLocation
-import uk.gov.hmrc.transitmovementsrouter.models.ObjectStoreRetentionPeriod
 import uk.gov.hmrc.transitmovementsrouter.models.errors.ObjectStoreError
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.DownloadUrl
 
@@ -61,25 +59,19 @@ class ObjectStoreServiceSpec
   implicit val ec = materializer.executionContext
 
   lazy val objectStoreStub = new ObjectStoreStub(config)
+  val appConfig            = mock[AppConfig]
+  val objectStoreService   = new ObjectStoreServiceImpl(Clock.systemUTC(), appConfig, objectStoreStub)
 
-  val objectStoreService = new ObjectStoreServiceImpl(objectStoreStub)
-
-  val filePath =
-    Path.Directory("abc/movementId").file("x-conversation-id.xml")
-
-  "On adding a message to object store" - {
+  "On adding incoming message to object store" - {
     "given a successful response from the connector, should return a Right with Object Store Summary" in forAll(
       arbitraryMovementId.arbitrary,
       arbitraryMessageId.arbitrary
     ) {
       (movementId, messageId) =>
-        val result = objectStoreService.addMessage(
+        val result = objectStoreService.storeIncoming(
           DownloadUrl("https://bucketName.s3.eu-west-2.amazonaws.com"),
           movementId,
-          messageId,
-          ObjectStoreFileDirectory(filePath),
-          ObjectStoreOwner("common-transit-convention-traders"),
-          ObjectStoreRetentionPeriod(RetentionPeriod.SevenYears)
+          messageId
         )
 
         whenReady(result.value, timeout(Span(6, Seconds))) {
@@ -93,13 +85,42 @@ class ObjectStoreServiceSpec
       arbitraryMessageId.arbitrary
     ) {
       (movementId, messageId) =>
-        val result = objectStoreService.addMessage(
+        val result = objectStoreService.storeIncoming(
           DownloadUrl("invalidURL"),
           movementId,
-          messageId,
-          ObjectStoreFileDirectory(filePath),
-          ObjectStoreOwner("common-transit-conventions-traders"),
-          ObjectStoreRetentionPeriod(RetentionPeriod.SevenYears)
+          messageId
+        )
+
+        whenReady(result.value) {
+          case Right(_) => fail("should have returned a Left")
+          case Left(x)  => x
+        }
+    }
+  }
+
+  "On adding outgoing message to object store" - {
+    "given a successful response from the connector, should return a Right with Object Store Summary" in forAll(
+      arbitraryObjectStoreResourceLocation.arbitrary
+    ) {
+      objectStoreResourceLocation =>
+        when(appConfig.objectStoreUrl).thenReturn("http://localhost:8084/object-store/object")
+        val result = objectStoreService.storeOutgoing(
+          objectStoreResourceLocation
+        )
+
+        whenReady(result.value, timeout(Span(6, Seconds))) {
+          case Left(e)  => fail(e.toString)
+          case Right(x) => x
+        }
+    }
+
+    "given an exception is thrown in the service, should return a Left with the exception in an ObjectStoreError" in forAll(
+      arbitraryObjectStoreResourceLocation.arbitrary
+    ) {
+      objectStoreResourceLocation =>
+        when(appConfig.objectStoreUrl).thenReturn("invalid")
+        val result = objectStoreService.storeOutgoing(
+          objectStoreResourceLocation
         )
 
         whenReady(result.value) {
@@ -113,7 +134,7 @@ class ObjectStoreServiceSpec
     "should return the contents of a file" in {
       val filePath =
         Path.Directory("movements/movementId").file("x-conversation-id.xml").asUri
-      val result = objectStoreService.getObjectStoreFile(ObjectStoreResourceLocation(filePath))
+      val result = objectStoreService.getObjectStoreFile(ObjectStoreResourceLocation("", filePath))
 
       whenReady(result.value) {
         r =>
@@ -125,7 +146,7 @@ class ObjectStoreServiceSpec
     "should return an error when the file is not found on path" in {
       val filePath =
         Path.Directory("abc/movementId").file("x-conversation-id.xml").asUri
-      val result = objectStoreService.getObjectStoreFile(ObjectStoreResourceLocation(filePath))
+      val result = objectStoreService.getObjectStoreFile(ObjectStoreResourceLocation("", filePath))
 
       whenReady(result.value, timeout(Span(6, Seconds))) {
         case Left(_: ObjectStoreError.FileNotFound) => succeed
@@ -137,7 +158,7 @@ class ObjectStoreServiceSpec
     "on a failed submission, should return a Left with an UnexpectedError" in {
       val filePath =
         Path.File("x-conversation-id.xml").asUri
-      val result = objectStoreService.getObjectStoreFile(ObjectStoreResourceLocation(filePath))
+      val result = objectStoreService.getObjectStoreFile(ObjectStoreResourceLocation("", filePath))
 
       whenReady(result.value, timeout(Span(6, Seconds))) {
         case Left(_: ObjectStoreError.UnexpectedError) => succeed

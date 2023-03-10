@@ -18,4 +18,4 @@ package uk.gov.hmrc.transitmovementsrouter.models
 
 import uk.gov.hmrc.objectstore.client.Path
 
-case class ObjectStoreFileDirectory(value: Path.File) extends AnyVal
+case class ObjectStoreFileDirectory(value: Path.File)

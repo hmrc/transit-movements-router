@@ -110,4 +110,17 @@ trait TestModelGenerators extends BaseGenerators {
     )
   }
 
+  implicit val arbitraryObjectStoreResourceLocation: Arbitrary[ObjectStoreResourceLocation] = Arbitrary {
+    for {
+      movementId <- arbitraryMovementId.arbitrary
+      messageId  <- arbitraryMessageId.arbitrary
+      lastModified      = Instant.now()
+      formattedDateTime = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").withZone(ZoneOffset.UTC).format(lastModified)
+
+    } yield ObjectStoreResourceLocation(
+      Path.Directory("common-transit-convention-traders").file(s"${movementId.value}-${messageId.value}-$formattedDateTime.xml").asUri,
+      Path.File(s"${movementId.value}-${messageId.value}-$formattedDateTime.xml").asUri
+    )
+  }
+
 }

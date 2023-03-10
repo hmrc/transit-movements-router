@@ -56,7 +56,7 @@ class ObjectStoreURIExtractorSpec extends AnyFreeSpec with Matchers with Mockito
       val result = objectStoreURIExtractor.extractObjectStoreResourceLocation(ObjectStoreURI(filePath))
 
       whenReady(result.value) {
-        _ mustBe Right(ObjectStoreResourceLocation("movements/movementId/abc.xml"))
+        _ mustBe Right(ObjectStoreResourceLocation(filePath, "movements/movementId/abc.xml"))
       }
     }
 
@@ -88,13 +88,12 @@ class ObjectStoreURIExtractorSpec extends AnyFreeSpec with Matchers with Mockito
 
     "if object store uri header supplied is valid, return Right" in {
       val filePath                  = "common-transit-convention-traders/movements/movementId/abc.xml"
-      val objectStoreURI            = ObjectStoreResourceLocation(filePath).value
-      val validObjectStoreURIHeader = Headers("X-Object-Store-Uri" -> objectStoreURI)
+      val validObjectStoreURIHeader = Headers("X-Object-Store-Uri" -> filePath)
 
       val result = objectStoreURIExtractor.extractObjectStoreURIHeader(validObjectStoreURIHeader)
 
       whenReady(result.value) {
-        _ mustBe Right(ObjectStoreResourceLocation("movements/movementId/abc.xml"))
+        _ mustBe Right(ObjectStoreResourceLocation(filePath, "movements/movementId/abc.xml"))
       }
     }
 

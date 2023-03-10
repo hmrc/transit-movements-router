@@ -28,11 +28,8 @@ import play.api.mvc.ControllerComponents
 import play.api.mvc.DefaultActionBuilder
 import play.api.mvc.Result
 import uk.gov.hmrc.http.HeaderCarrier
-import uk.gov.hmrc.objectstore.client.Path
-import uk.gov.hmrc.objectstore.client.RetentionPeriod
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
 import uk.gov.hmrc.play.http.HeaderCarrierConverter
-import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
 import uk.gov.hmrc.transitmovementsrouter.connectors.PersistenceConnector
 import uk.gov.hmrc.transitmovementsrouter.connectors.PushNotificationsConnector
 import uk.gov.hmrc.transitmovementsrouter.controllers.actions.AuthenticateEISToken
@@ -46,12 +43,7 @@ import uk.gov.hmrc.transitmovementsrouter.services.EISMessageTransformers
 import uk.gov.hmrc.transitmovementsrouter.services.MessageTypeExtractor
 import uk.gov.hmrc.transitmovementsrouter.services.ObjectStoreService
 import uk.gov.hmrc.transitmovementsrouter.services.RoutingService
-import uk.gov.hmrc.transitmovementsrouter.utils.RouterHeaderNames
 
-import java.time.format.DateTimeFormatter
-import java.time.Clock
-import java.time.OffsetDateTime
-import java.time.ZoneOffset
 import javax.inject.Inject
 import scala.concurrent.Future
 
@@ -63,9 +55,7 @@ class MessagesController @Inject() (
   messageTypeExtractor: MessageTypeExtractor,
   authenticateEISToken: AuthenticateEISToken,
   eisMessageTransformers: EISMessageTransformers,
-  objectStoreService: ObjectStoreService,
-  appConfig: AppConfig,
-  clock: Clock
+  objectStoreService: ObjectStoreService
 )(implicit
   val materializer: Materializer,
   val temporaryFileCreator: TemporaryFileCreator
@@ -92,14 +82,7 @@ class MessagesController @Inject() (
           requestMessageType          <- filterRequestMessageType(messageType)
           objectStoreResourceLocation <- extractObjectStoreURIHeader(request.headers)
           objectSummary <- objectStoreService
-            .addMessage(
-              DownloadUrl(s"${appConfig.objectStoreUrl}/${request.headers.get(RouterHeaderNames.OBJECT_STORE_URI).get}"),
-              movementId,
-              messageId,
-              ObjectStoreFileDirectory(Path.File(s"sdes/" + objectStoreResourceLocation.value)),
-              ObjectStoreOwner("transit-movements-router"),
-              ObjectStoreRetentionPeriod(RetentionPeriod.OneWeek)
-            )
+            .storeOutgoing(objectStoreResourceLocation)
             .asPresentation
         } yield objectSummary).fold[Result](
           error => Status(error.code.statusCode)(Json.toJson(error)),
@@ -145,16 +128,7 @@ class MessagesController @Inject() (
         upscanResponse <- parseAndLogUpscanResponse(request.body)
         downloadUrl    <- handleUpscanSuccessResponse(upscanResponse)
         objectSummary <- objectStoreService
-          .addMessage(
-            downloadUrl,
-            movementId,
-            messageId,
-            ObjectStoreFileDirectory(
-              Path.File(s"movements/${movementId.value}/${movementId.value}-${messageId.value}-${fileFormat(clock)}.xml")
-            ),
-            ObjectStoreOwner("common-transit-convention-traders"),
-            ObjectStoreRetentionPeriod(RetentionPeriod.SevenYears)
-          )
+          .storeIncoming(downloadUrl, movementId, messageId)
           .asPresentation
         objectStoreResourceLocation <- extractObjectStoreResourceLocation(ObjectStoreURI(objectSummary.location.asUri))
         source                      <- objectStoreService.getObjectStoreFile(objectStoreResourceLocation).asPresentation
@@ -179,11 +153,6 @@ class MessagesController @Inject() (
   private def filterRequestMessageType(messageType: MessageType): EitherT[Future, PresentationError, RequestMessageType] = messageType match {
     case t: RequestMessageType => EitherT.rightT(t)
     case _                     => EitherT.leftT(PresentationError.badRequestError(s"${messageType.code} is not valid for requests"))
-  }
-
-  private def fileFormat(clock: Clock) = {
-    val dateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").withZone(ZoneOffset.UTC)
-    dateTimeFormatter.format(OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC))
   }
 
 }
