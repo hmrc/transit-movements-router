@@ -23,21 +23,21 @@ import cats.data.EitherT
 import com.google.inject.ImplementedBy
 import play.api.Logging
 import uk.gov.hmrc.http.HeaderCarrier
-import uk.gov.hmrc.objectstore.client.play.Implicits._
-import uk.gov.hmrc.objectstore.client.play.PlayObjectStoreClientEither
 import uk.gov.hmrc.objectstore.client.ObjectSummaryWithMd5
 import uk.gov.hmrc.objectstore.client.Path
 import uk.gov.hmrc.objectstore.client.RetentionPeriod
+import uk.gov.hmrc.objectstore.client.play.Implicits._
+import uk.gov.hmrc.objectstore.client.play.PlayObjectStoreClientEither
 import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
 import uk.gov.hmrc.transitmovementsrouter.models._
 import uk.gov.hmrc.transitmovementsrouter.models.errors.ObjectStoreError
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.DownloadUrl
 
 import java.net.URL
-import java.time.format.DateTimeFormatter
 import java.time.Clock
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 import javax.inject.Singleton
 import scala.concurrent.ExecutionContext
@@ -79,9 +79,9 @@ class ObjectStoreServiceImpl @Inject() (clock: Clock, appConfig: AppConfig, clie
   ): EitherT[Future, ObjectStoreError, ObjectSummaryWithMd5] =
     addMessage(
       upscanUrl,
-      ObjectStoreFileDirectory(Path.File(s"movements/${movementId.value}/${movementId.value}-${messageId.value}-${fileFormat(clock)}.xml")),
+      Path.File(s"movements/${movementId.value}/${movementId.value}-${messageId.value}-${fileFormat(clock)}.xml"),
       ObjectStoreOwner("common-transit-convention-traders"),
-      ObjectStoreRetentionPeriod(RetentionPeriod.SevenYears)
+      RetentionPeriod.SevenYears
     )
 
   override def storeOutgoing(objectStoreResourceLocation: ObjectStoreResourceLocation)(implicit
@@ -90,16 +90,16 @@ class ObjectStoreServiceImpl @Inject() (clock: Clock, appConfig: AppConfig, clie
   ): EitherT[Future, ObjectStoreError, ObjectSummaryWithMd5] =
     addMessage(
       DownloadUrl(s"${appConfig.objectStoreUrl}/${objectStoreResourceLocation.contextPath}"),
-      ObjectStoreFileDirectory(Path.File(s"sdes/" + objectStoreResourceLocation.resourceLocation)),
+      Path.File(s"sdes/" + objectStoreResourceLocation.resourceLocation),
       ObjectStoreOwner("transit-movements-router"),
-      ObjectStoreRetentionPeriod(RetentionPeriod.OneWeek)
+      RetentionPeriod.OneWeek
     )
 
   private def addMessage(
     upscanUrl: DownloadUrl,
-    objectStoreFileDirectory: ObjectStoreFileDirectory,
+    objectStoreFileDirectory: Path.File,
     objectStoreOwner: ObjectStoreOwner,
-    retentionPeriod: ObjectStoreRetentionPeriod
+    retentionPeriod: RetentionPeriod
   )(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
@@ -111,9 +111,9 @@ class ObjectStoreServiceImpl @Inject() (clock: Clock, appConfig: AppConfig, clie
         response <- client
           .uploadFromUrl(
             from = url,
-            to = objectStoreFileDirectory.value,
+            to = objectStoreFileDirectory,
             owner = objectStoreOwner.value,
-            retentionPeriod = retentionPeriod.value
+            retentionPeriod = retentionPeriod
           )
           .map {
             case Right(load) => Right(load)
