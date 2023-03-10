@@ -18,10 +18,12 @@ package uk.gov.hmrc.transitmovementsrouter.controllers
 
 import cats.data.EitherT
 import play.api.mvc.BaseController
+import play.api.mvc.Headers
 import uk.gov.hmrc.transitmovementsrouter.controllers.ObjectStoreURIExtractor.expectedUriPattern
 import uk.gov.hmrc.transitmovementsrouter.controllers.errors.PresentationError
 import uk.gov.hmrc.transitmovementsrouter.models.ObjectStoreResourceLocation
 import uk.gov.hmrc.transitmovementsrouter.models.ObjectStoreURI
+import uk.gov.hmrc.transitmovementsrouter.utils.RouterHeaderNames
 
 import scala.concurrent.Future
 import scala.util.matching.Regex
@@ -47,7 +49,20 @@ trait ObjectStoreURIExtractor {
       )
     )
 
-  def getObjectStoreResourceLocation(objectStoreURI: ObjectStoreURI) =
+  def extractObjectStoreURIHeader(headers: Headers): EitherT[Future, PresentationError, ObjectStoreResourceLocation] =
+    EitherT(
+      Future.successful(
+        for {
+          headerValue                 <- getHeader(headers.get(RouterHeaderNames.OBJECT_STORE_URI))
+          objectStoreResourceLocation <- getObjectStoreResourceLocation(ObjectStoreURI(headerValue))
+        } yield ObjectStoreResourceLocation(objectStoreResourceLocation)
+      )
+    )
+
+  private def getHeader(objectStoreURI: Option[String]) =
+    objectStoreURI.toRight(PresentationError.badRequestError("Missing X-Object-Store-Uri header value"))
+
+  private def getObjectStoreResourceLocation(objectStoreURI: ObjectStoreURI) =
     expectedUriPattern
       .findFirstMatchIn(objectStoreURI.value)
       .map(_.group(1))

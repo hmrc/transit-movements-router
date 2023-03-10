@@ -27,12 +27,16 @@ import org.scalatestplus.mockito.MockitoSugar
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks.forAll
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.objectstore.client.Path
+import uk.gov.hmrc.objectstore.client.RetentionPeriod
 import uk.gov.hmrc.objectstore.client.RetentionPeriod.SevenYears
 import uk.gov.hmrc.objectstore.client.config.ObjectStoreClientConfig
 import uk.gov.hmrc.transitmovementsrouter.base.TestActorSystem
 import uk.gov.hmrc.transitmovementsrouter.fakes.objectstore.ObjectStoreStub
 import uk.gov.hmrc.transitmovementsrouter.generators.TestModelGenerators
+import uk.gov.hmrc.transitmovementsrouter.models.ObjectStoreFileDirectory
+import uk.gov.hmrc.transitmovementsrouter.models.ObjectStoreOwner
 import uk.gov.hmrc.transitmovementsrouter.models.ObjectStoreResourceLocation
+import uk.gov.hmrc.transitmovementsrouter.models.ObjectStoreRetentionPeriod
 import uk.gov.hmrc.transitmovementsrouter.models.errors.ObjectStoreError
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.DownloadUrl
 
@@ -58,15 +62,25 @@ class ObjectStoreServiceSpec
 
   lazy val objectStoreStub = new ObjectStoreStub(config)
 
-  val objectStoreService = new ObjectStoreServiceImpl(Clock.systemUTC(), objectStoreStub)
+  val objectStoreService = new ObjectStoreServiceImpl(objectStoreStub)
+
+  val filePath =
+    Path.Directory("abc/movementId").file("x-conversation-id.xml")
 
   "On adding a message to object store" - {
     "given a successful response from the connector, should return a Right with Object Store Summary" in forAll(
       arbitraryMovementId.arbitrary,
       arbitraryMessageId.arbitrary
     ) {
-      (movemementId, messageId) =>
-        val result = objectStoreService.addMessage(DownloadUrl("https://bucketName.s3.eu-west-2.amazonaws.com"), movemementId, messageId)
+      (movementId, messageId) =>
+        val result = objectStoreService.addMessage(
+          DownloadUrl("https://bucketName.s3.eu-west-2.amazonaws.com"),
+          movementId,
+          messageId,
+          ObjectStoreFileDirectory(filePath),
+          ObjectStoreOwner("common-transit-convention-traders"),
+          ObjectStoreRetentionPeriod(RetentionPeriod.SevenYears)
+        )
 
         whenReady(result.value, timeout(Span(6, Seconds))) {
           case Left(e)  => fail(e.toString)
@@ -78,8 +92,15 @@ class ObjectStoreServiceSpec
       arbitraryMovementId.arbitrary,
       arbitraryMessageId.arbitrary
     ) {
-      (movemementId, messageId) =>
-        val result = objectStoreService.addMessage(DownloadUrl("invalidURL"), movemementId, messageId)
+      (movementId, messageId) =>
+        val result = objectStoreService.addMessage(
+          DownloadUrl("invalidURL"),
+          movementId,
+          messageId,
+          ObjectStoreFileDirectory(filePath),
+          ObjectStoreOwner("common-transit-conventions-traders"),
+          ObjectStoreRetentionPeriod(RetentionPeriod.SevenYears)
+        )
 
         whenReady(result.value) {
           case Right(_) => fail("should have returned a Left")

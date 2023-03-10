@@ -27,17 +27,11 @@ import uk.gov.hmrc.objectstore.client.ObjectSummaryWithMd5
 import uk.gov.hmrc.objectstore.client.Path
 import uk.gov.hmrc.objectstore.client.play.Implicits._
 import uk.gov.hmrc.objectstore.client.play.PlayObjectStoreClientEither
-import uk.gov.hmrc.transitmovementsrouter.models.MessageId
-import uk.gov.hmrc.transitmovementsrouter.models.MovementId
-import uk.gov.hmrc.transitmovementsrouter.models.ObjectStoreResourceLocation
 import uk.gov.hmrc.transitmovementsrouter.models.errors.ObjectStoreError
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.DownloadUrl
+import uk.gov.hmrc.transitmovementsrouter.models._
 
 import java.net.URL
-import java.time.Clock
-import java.time.OffsetDateTime
-import java.time.ZoneOffset
-import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 import javax.inject.Singleton
 import scala.concurrent.ExecutionContext
@@ -48,7 +42,14 @@ import scala.util.control.NonFatal
 @ImplementedBy(classOf[ObjectStoreServiceImpl])
 trait ObjectStoreService {
 
-  def addMessage(upscanUrl: DownloadUrl, movementId: MovementId, messageId: MessageId)(implicit
+  def addMessage(
+    upscanUrl: DownloadUrl,
+    movementId: MovementId,
+    messageId: MessageId,
+    objectStoreFileDirectory: ObjectStoreFileDirectory,
+    objectStoreOwner: ObjectStoreOwner,
+    retentionPeriod: ObjectStoreRetentionPeriod
+  )(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): EitherT[Future, ObjectStoreError, ObjectSummaryWithMd5]
@@ -61,24 +62,29 @@ trait ObjectStoreService {
 }
 
 @Singleton
-class ObjectStoreServiceImpl @Inject() (clock: Clock, client: PlayObjectStoreClientEither) extends ObjectStoreService with Logging {
+class ObjectStoreServiceImpl @Inject() (client: PlayObjectStoreClientEither) extends ObjectStoreService with Logging {
 
-  private val dateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").withZone(ZoneOffset.UTC)
-
-  override def addMessage(upscanUrl: DownloadUrl, movementId: MovementId, messageId: MessageId)(implicit
+  override def addMessage(
+    upscanUrl: DownloadUrl,
+    movementId: MovementId,
+    messageId: MessageId,
+    objectStoreFileDirectory: ObjectStoreFileDirectory,
+    objectStoreOwner: ObjectStoreOwner,
+    retentionPeriod: ObjectStoreRetentionPeriod
+  )(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): EitherT[Future, ObjectStoreError, ObjectSummaryWithMd5] =
     EitherT {
-      val formattedDateTime = dateTimeFormatter.format(OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC))
 
       (for {
         url <- Future.fromTry(Try(new URL(upscanUrl.value)))
         response <- client
           .uploadFromUrl(
             from = url,
-            to = Path.Directory(s"movements/${movementId.value}").file(s"${movementId.value}-${messageId.value}-$formattedDateTime.xml"),
-            owner = "common-transit-convention-traders"
+            to = objectStoreFileDirectory.value,
+            owner = objectStoreOwner.value,
+            retentionPeriod = retentionPeriod.value
           )
           .map {
             case Right(load) => Right(load)
