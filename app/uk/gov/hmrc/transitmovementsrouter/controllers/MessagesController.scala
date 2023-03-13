@@ -89,7 +89,7 @@ class MessagesController @Inject() (
         (for {
           messageType         <- messageTypeExtractor.extract(request.headers, request.body).asPresentation
           persistenceResponse <- persistenceConnector.postBody(movementId, messageId, messageType, request.body).asPresentation
-          _ = pushNotificationsConnector.post(movementId, persistenceResponse.messageId, request.body).asPresentation
+          _ = pushNotificationsConnector.post(movementId, persistenceResponse.messageId, Some(request.body)).asPresentation
         } yield persistenceResponse)
           .fold[Result](
             error => Status(error.code.statusCode)(Json.toJson(error)),
@@ -111,8 +111,6 @@ class MessagesController @Inject() (
           .postObjectStoreUri(movementId, messageId, messageType, ObjectStoreURI(objectSummary.location.asUri))
           .asPresentation
         _ = pushNotificationsConnector
-          .postForLargeMessages(movementId, persistenceResponse.messageId, messageType, ObjectStoreURI(objectSummary.location.asUri))
-          .asPresentation
       } yield persistenceResponse)
         .fold[Result](
           presentationError => Status(presentationError.code.statusCode)(Json.toJson(presentationError)),

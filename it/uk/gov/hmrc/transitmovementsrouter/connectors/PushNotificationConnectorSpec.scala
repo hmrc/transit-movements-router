@@ -16,6 +16,9 @@
 
 package uk.gov.hmrc.transitmovementsrouter.connectors
 
+import akka.actor.ActorSystem
+import akka.stream.ActorMaterializer
+import akka.stream.Materializer
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import com.github.tomakehurst.wiremock.client.WireMock.aResponse
@@ -31,7 +34,6 @@ import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.mockito.MockitoSugar
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
-import play.api.http.Status.BAD_REQUEST
 import play.api.http.Status.INTERNAL_SERVER_ERROR
 import play.api.http.Status.NOT_FOUND
 import play.api.http.Status.OK
@@ -39,8 +41,8 @@ import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.test.HttpClientV2Support
 import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
 import uk.gov.hmrc.transitmovementsrouter.generators.ModelGenerators
+import uk.gov.hmrc.transitmovementsrouter.it.base.TestActorSystem
 import uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuite
-import uk.gov.hmrc.transitmovementsrouter.models.ObjectStoreURI
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PushNotificationError.MovementNotFound
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PushNotificationError.Unexpected
 import uk.gov.hmrc.transitmovementsrouter.services.EISMessageTransformersImpl
@@ -56,7 +58,8 @@ class PushNotificationConnectorSpec
     with MockitoSugar
     with IntegrationPatience
     with ScalaCheckPropertyChecks
-    with ModelGenerators {
+    with ModelGenerators
+    with TestActorSystem {
 
   val movementId     = arbitraryMovementId.arbitrary.sample.get
   val messageId      = arbitraryMessageId.arbitrary.sample.get
@@ -98,7 +101,10 @@ class PushNotificationConnectorSpec
 
       stub(OK)
 
-      whenReady(connector.post(movementId, messageId, source).value) {
+      implicit val system: ActorSystem             = ActorSystem("test")
+      implicit val materializer: ActorMaterializer = ActorMaterializer()
+
+      whenReady(connector.post(movementId, messageId, Some(source)).value) {
         x =>
           x mustBe Right(())
       }
@@ -112,7 +118,7 @@ class PushNotificationConnectorSpec
 
         stub(statusCode)
 
-        whenReady(connector.post(movementId, messageId, source).value) {
+        whenReady(connector.post(movementId, messageId, Some(source)).value) {
           x =>
             x.isLeft mustBe true
 
@@ -134,7 +140,7 @@ class PushNotificationConnectorSpec
 
       val failingSource = Source.single(ByteString.fromString("{}")).via(new EISMessageTransformersImpl().unwrap)
 
-      whenReady(connector.post(movementId, messageId, failingSource).value) {
+      whenReady(connector.post(movementId, messageId, Some(failingSource)).value) {
         res =>
           res mustBe a[Left[Unexpected, _]]
           res.left.toOption.get.asInstanceOf[Unexpected].exception.isDefined
@@ -146,85 +152,24 @@ class PushNotificationConnectorSpec
 
       stub(INTERNAL_SERVER_ERROR)
 
-      whenReady(connector.post(movementId, messageId, source).value) {
+      whenReady(connector.post(movementId, messageId, Some(source)).value) {
         case Left(_)  => fail("The stub should never have been hit and therefore should always return a right")
         case Right(_) =>
       }
-
-    }
-  }
-
-  "postForLargeMessages" should {
-
-    "return Right(()) when the request is successful" in {
-
-      val objectStoreURI = ObjectStoreURI("http://example.com")
-
-      when(mockAppConfig.pushNotificationsEnabled).thenReturn(true)
-
-      stub(204)
-
-      val result = connector.postForLargeMessages(movementId, messageId, messageType, objectStoreURI).value.futureValue
-      result mustBe Right(())
     }
 
-    "return MovementNotFound when the message is not found" in {
+    "return unit when post is successful sent with no body" in {
       when(mockAppConfig.pushNotificationsEnabled).thenReturn(true)
-      stub(NOT_FOUND)
 
-      whenReady(connector.postForLargeMessages(movementId, messageId, messageType, objectStoreURI).value) {
+      stub(OK)
+
+      implicit val system: ActorSystem             = ActorSystem("test")
+      implicit val materializer: ActorMaterializer = ActorMaterializer()
+
+      whenReady(connector.post(movementId, messageId, None).value) {
         x =>
-          x.isLeft mustBe true
-          x.left.get mustBe MovementNotFound(movementId)
+          x mustBe Right(())
       }
-    }
-
-    "return Unexpected when there is an internal server error" in {
-      when(mockAppConfig.pushNotificationsEnabled).thenReturn(true)
-      stub(INTERNAL_SERVER_ERROR)
-
-      whenReady(connector.postForLargeMessages(movementId, messageId, messageType, objectStoreURI).value) {
-        x =>
-          x.isLeft mustBe true
-          x.left.get mustBe a[Unexpected]
-      }
-    }
-
-    "return Unexpected when there is an unexpected response from the server" in {
-      when(mockAppConfig.pushNotificationsEnabled).thenReturn(true)
-      stub(BAD_REQUEST)
-
-      whenReady(connector.postForLargeMessages(movementId, messageId, messageType, objectStoreURI).value) {
-        x =>
-          x.isLeft mustBe true
-          x.left.get mustBe a[Unexpected]
-      }
-    }
-
-    "return Unexpected when an exception is thrown" in {
-      when(mockAppConfig.pushNotificationsEnabled).thenReturn(true)
-
-      whenReady(
-        connector
-          .postForLargeMessages(
-            arbitraryMovementId.arbitrary.sample.get,
-            arbitraryMessageId.arbitrary.sample.get,
-            arbitraryMessageType.arbitrary.sample.get,
-            ObjectStoreURI("")
-          )
-          .value
-      ) {
-        x =>
-          x.isLeft mustBe true
-      }
-    }
-
-    "return Right(()) when push notifications are disabled" in {
-      when(mockAppConfig.pushNotificationsEnabled).thenReturn(false)
-
-      val result = connector.postForLargeMessages(movementId, messageId, messageType, objectStoreURI).value.futureValue
-
-      result mustEqual Right(())
     }
   }
 }

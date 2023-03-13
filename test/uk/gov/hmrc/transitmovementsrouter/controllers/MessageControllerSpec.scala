@@ -16,6 +16,7 @@
 
 package uk.gov.hmrc.transitmovementsrouter.controllers
 
+import akka.stream.Materializer
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import cats.data.EitherT
@@ -194,9 +195,10 @@ class MessageControllerSpec
 
       when(
         mockPushNotificationsConnector
-          .post(any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId], any[Source[ByteString, _]])(
+          .post(any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId], Some(any[Source[ByteString, _]]))(
             any[HeaderCarrier],
-            any[ExecutionContext]
+            any[ExecutionContext],
+            any[Materializer]
           )
       ).thenReturn(EitherT.rightT(()))
 
@@ -463,15 +465,6 @@ class MessageControllerSpec
 
         when(
           mockPersistenceConnector.postObjectStoreUri(
-            any[String].asInstanceOf[MovementId],
-            any[String].asInstanceOf[MessageId],
-            any[String].asInstanceOf[MessageType],
-            any[String].asInstanceOf[ObjectStoreURI]
-          )(any(), any())
-        ).thenReturn(EitherT.fromEither(Right(PersistenceResponse(messageId))))
-
-        when(
-          mockPushNotificationsConnector.postForLargeMessages(
             any[String].asInstanceOf[MovementId],
             any[String].asInstanceOf[MessageId],
             any[String].asInstanceOf[MessageType],
