@@ -47,10 +47,14 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.util.control.NonFatal
 
+import akka.stream.Materializer
+import akka.actor.ActorSystem
+import akka.stream.ActorMaterializer
+
 @ImplementedBy(classOf[PushNotificationsConnectorImpl])
 trait PushNotificationsConnector {
 
-  def post(movementId: MovementId, messageId: MessageId, source: Source[ByteString, _])(implicit
+  def post(movementId: MovementId, messageId: MessageId, source: Option[Source[ByteString, _]])(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): EitherT[Future, PushNotificationError, Unit]
@@ -75,7 +79,7 @@ class PushNotificationsConnectorImpl @Inject() (httpClientV2: HttpClientV2, appC
   private def pushNotificationMessageUpdate(movementId: MovementId, messageId: MessageId): UrlPath =
     UrlPath.parse(s"$baseRoute/traders/movements/${movementId.value}/messages/${messageId.value}")
 
-  override def post(movementId: MovementId, messageId: MessageId, source: Source[ByteString, _])(implicit
+  override def post(movementId: MovementId, messageId: MessageId, bodyData: Option[Source[ByteString, _]])(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): EitherT[Future, PushNotificationError, Unit] =
@@ -84,10 +88,24 @@ class PushNotificationsConnectorImpl @Inject() (httpClientV2: HttpClientV2, appC
       else {
         val url = baseUrl.withPath(pushNotificationMessageUpdate(movementId, messageId))
 
-        httpClientV2
-          .post(url"$url")
-          .transform(_.addHttpHeaders(HeaderNames.CONTENT_TYPE -> MimeTypes.XML))
-          .withBody(source)
+        val requestBuilder = httpClientV2.post(url"$url").transform(_.addHttpHeaders(HeaderNames.CONTENT_TYPE -> MimeTypes.XML))
+
+        implicit val system: ActorSystem             = ActorSystem("my-system")
+        implicit val materializer: ActorMaterializer = ActorMaterializer()
+
+        bodyData match {
+          case None => requestBuilder.execute[Either[UpstreamErrorResponse, HttpResponse]]
+          case Some(body) =>
+            val chunksFuture = body.runFold("")(
+              (acc, chunk) => acc + chunk.utf8String
+            )
+            chunksFuture.flatMap {
+              chunks =>
+                requestBuilder.withBody(Json.obj("chunks" -> Seq(chunks))).execute[Either[UpstreamErrorResponse, HttpResponse]]
+            }
+        }
+
+        requestBuilder
           .execute[Either[UpstreamErrorResponse, HttpResponse]]
           .map {
             case Right(_) =>
