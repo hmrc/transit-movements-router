@@ -16,35 +16,24 @@
 
 package uk.gov.hmrc.transitmovementsrouter.connectors
 
-import akka.actor.ActorSystem
-import akka.stream.ActorMaterializer
-import akka.stream.Materializer
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
-import com.github.tomakehurst.wiremock.client.WireMock.aResponse
-import com.github.tomakehurst.wiremock.client.WireMock.post
-import com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo
-import io.lemonlabs.uri.Url
-import io.lemonlabs.uri.UrlPath
+import com.github.tomakehurst.wiremock.client.WireMock.{aResponse, post, urlEqualTo}
+import io.lemonlabs.uri.{Url, UrlPath}
 import org.mockito.Mockito.when
 import org.scalacheck.Gen
-import org.scalatest.concurrent.IntegrationPatience
-import org.scalatest.concurrent.ScalaFutures
+import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.mockito.MockitoSugar
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
-import play.api.http.Status.INTERNAL_SERVER_ERROR
-import play.api.http.Status.NOT_FOUND
-import play.api.http.Status.OK
+import play.api.http.Status.{INTERNAL_SERVER_ERROR, NOT_FOUND, OK}
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.test.HttpClientV2Support
 import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
 import uk.gov.hmrc.transitmovementsrouter.generators.ModelGenerators
-import uk.gov.hmrc.transitmovementsrouter.it.base.TestActorSystem
-import uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuite
-import uk.gov.hmrc.transitmovementsrouter.models.errors.PushNotificationError.MovementNotFound
-import uk.gov.hmrc.transitmovementsrouter.models.errors.PushNotificationError.Unexpected
+import uk.gov.hmrc.transitmovementsrouter.it.base.{TestActorSystem, WiremockSuite}
+import uk.gov.hmrc.transitmovementsrouter.models.errors.PushNotificationError.{MovementNotFound, Unexpected}
 import uk.gov.hmrc.transitmovementsrouter.services.EISMessageTransformersImpl
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -63,8 +52,7 @@ class PushNotificationConnectorSpec
 
   val movementId     = arbitraryMovementId.arbitrary.sample.get
   val messageId      = arbitraryMessageId.arbitrary.sample.get
-  val messageType    = arbitraryMessageType.arbitrary.sample.get
-  val objectStoreURI = arbitraryObjectStoreURI.arbitrary.sample.get
+
 
   val uriPushNotifications =
     UrlPath.parse(s"/transit-movements-push-notifications/traders/movements/${movementId.value}/messages/${messageId.value}").toString()
@@ -95,14 +83,14 @@ class PushNotificationConnectorSpec
     ).willReturn(aResponse().withStatus(codeToReturn))
   )
 
+
+
+
   "post" should {
-    "return unit when post is successful" in {
+    "return unit when post is successful with body" in {
       when(mockAppConfig.pushNotificationsEnabled).thenReturn(true)
 
       stub(OK)
-
-      implicit val system: ActorSystem             = ActorSystem("test")
-      implicit val materializer: ActorMaterializer = ActorMaterializer()
 
       whenReady(connector.post(movementId, messageId, Some(source)).value) {
         x =>
@@ -110,7 +98,7 @@ class PushNotificationConnectorSpec
       }
     }
 
-    "return a PushNotificationError when unsuccessful" in forAll(errorCodes) {
+    "return a PushNotificationError when unsuccessful with body" in forAll(errorCodes) {
       statusCode =>
         server.resetAll()
 
@@ -131,7 +119,7 @@ class PushNotificationConnectorSpec
         }
     }
 
-    "return Unexpected(throwable) when NonFatal exception is thrown" in {
+    "return Unexpected(throwable) when NonFatal exception is thrown with body" in {
       server.resetAll()
 
       when(mockAppConfig.pushNotificationsEnabled).thenReturn(true)
@@ -158,18 +146,38 @@ class PushNotificationConnectorSpec
       }
     }
 
-    "return unit when post is successful sent with no body" in {
+    "successfully post a push notification with no body" in {
       when(mockAppConfig.pushNotificationsEnabled).thenReturn(true)
 
       stub(OK)
 
-      implicit val system: ActorSystem             = ActorSystem("test")
-      implicit val materializer: ActorMaterializer = ActorMaterializer()
-
+      implicit val hc = HeaderCarrier()
       whenReady(connector.post(movementId, messageId, None).value) {
         x =>
           x mustBe Right(())
       }
+    }
+
+    "return a PushNotificationError when unsuccessful without a body" in forAll(errorCodes) {
+      statusCode =>
+        server.resetAll()
+
+        when(mockAppConfig.pushNotificationsEnabled).thenReturn(true)
+
+        stub(statusCode)
+
+        implicit val hc = HeaderCarrier()
+
+        whenReady(connector.post(movementId, messageId, None).value) {
+          x =>
+            x.isLeft mustBe true
+
+            statusCode match {
+              case NOT_FOUND             => x mustBe a[Left[MovementNotFound, _]]
+              case INTERNAL_SERVER_ERROR => x mustBe a[Left[Unexpected, _]]
+              case _                     => fail()
+            }
+        }
     }
   }
 }

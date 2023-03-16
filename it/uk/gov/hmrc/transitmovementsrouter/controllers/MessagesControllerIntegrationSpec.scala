@@ -19,43 +19,29 @@ package uk.gov.hmrc.transitmovementsrouter.controllers
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import com.github.tomakehurst.wiremock.client.WireMock._
-import com.github.tomakehurst.wiremock.matching.AnythingPattern
-import com.github.tomakehurst.wiremock.matching.EqualToPattern
-import com.github.tomakehurst.wiremock.matching.StringValuePattern
-import com.github.tomakehurst.wiremock.matching.UrlPathPattern
+import com.github.tomakehurst.wiremock.matching.{AnythingPattern, EqualToPattern, StringValuePattern, UrlPathPattern}
 import com.kenshoo.play.metrics.Metrics
 import org.scalacheck.Gen
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
 import org.scalatestplus.play.guice.GuiceOneAppPerSuite
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
-import play.api.http.HeaderNames
+import play.api.http.{HeaderNames, MimeTypes}
 import play.api.http.Status._
 import play.api.inject.bind
-import play.api.inject.guice.GuiceApplicationBuilder
-import play.api.inject.guice.GuiceableModule
+import play.api.inject.guice.{GuiceApplicationBuilder, GuiceableModule}
 import play.api.libs.json.Json
-import play.api.test.FakeHeaders
-import play.api.test.FakeRequest
-import play.api.test.Helpers
-import play.api.test.Helpers.defaultAwaitTimeout
-import play.api.test.Helpers.running
-import uk.gov.hmrc.transitmovementsrouter.it.base.RegexPatterns
-import uk.gov.hmrc.transitmovementsrouter.it.base.TestMetrics
-import uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuiteWithGuice
-import uk.gov.hmrc.transitmovementsrouter.models.ConversationId
-import uk.gov.hmrc.transitmovementsrouter.models.EoriNumber
-import uk.gov.hmrc.transitmovementsrouter.models.MessageId
-import uk.gov.hmrc.transitmovementsrouter.models.MovementType
+import play.api.test.{FakeHeaders, FakeRequest, Helpers}
+import play.api.test.Helpers.{defaultAwaitTimeout, running}
+import uk.gov.hmrc.transitmovementsrouter.it.base.{RegexPatterns, TestMetrics, WiremockSuiteWithGuice}
+import uk.gov.hmrc.transitmovementsrouter.models.{ConversationId, EoriNumber, MessageId, MovementType}
 
-import java.time.OffsetDateTime
-import java.time.ZoneOffset
+import java.time.{OffsetDateTime, ZoneOffset}
 import java.time.format.DateTimeFormatter
-import java.util.Locale
-import java.util.UUID
+import java.util.{Locale, UUID}
 
 class MessagesControllerIntegrationSpec
-    extends AnyFreeSpec
+  extends AnyFreeSpec
     with GuiceOneAppPerSuite
     with Matchers
     with WiremockSuiteWithGuice
@@ -64,9 +50,9 @@ class MessagesControllerIntegrationSpec
   // We don't care about the content in this XML fragment, only the root tag and its child.
   val sampleIncomingXml: String =
     <n1:TraderChannelResponse xmlns:txd="http://ncts.dgtaxud.ec"
-                                xmlns:n1="http://www.hmrc.gov.uk/eis/ncts5/v1"
-                                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                                xsi:schemaLocation="http://www.hmrc.gov.uk/eis/ncts5/v1 EIS_WrapperV10_TraderChannelSubmission-51.8.xsd">
+                              xmlns:n1="http://www.hmrc.gov.uk/eis/ncts5/v1"
+                              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                              xsi:schemaLocation="http://www.hmrc.gov.uk/eis/ncts5/v1 EIS_WrapperV10_TraderChannelSubmission-51.8.xsd">
       <txd:CC029C PhaseID="NCTS5.0">
         <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
         <CustomsOfficeOfDeparture>
@@ -78,11 +64,11 @@ class MessagesControllerIntegrationSpec
   // We don't care about the content in this XML fragment, only the root tag and its child.
   val sampleOutgoingXml: String =
     <ncts:CC015C PhaseID="NCTS5.0" xmlns:ncts="http://ncts.dgtaxud.ec">
-        <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
-        <CustomsOfficeOfDeparture>
-          <referenceNumber>GB1234567</referenceNumber>
-        </CustomsOfficeOfDeparture>
-      </ncts:CC015C>.mkString
+      <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
+      <CustomsOfficeOfDeparture>
+        <referenceNumber>GB1234567</referenceNumber>
+      </CustomsOfficeOfDeparture>
+    </ncts:CC015C>.mkString
 
   val sampleOutgoingXIXml: String =
     <ncts:CC015C PhaseID="NCTS5.0" xmlns:ncts="http://ncts.dgtaxud.ec">
@@ -148,8 +134,9 @@ class MessagesControllerIntegrationSpec
         s"/traders/GB0123456789/movements/departures/${movementId.value}/messages/${messageId.value}",
         FakeHeaders(
           Seq(
-            "x-message-type" -> "IE015",
-            "x-request-id"   -> UUID.randomUUID().toString
+            "x-message-type"         -> "IE015",
+            "x-request-id"           -> UUID.randomUUID().toString,
+            HeaderNames.CONTENT_TYPE -> MimeTypes.XML
           )
         ),
         Source.single(ByteString(sampleOutgoingXml))
@@ -193,9 +180,10 @@ class MessagesControllerIntegrationSpec
         s"/traders/GB0123456789/movements/departures/${movementId.value}/messages/${messageId.value}",
         FakeHeaders(
           Seq(
-            "Date"           -> formatted,
-            "x-message-type" -> "IE015",
-            "x-request-id"   -> UUID.randomUUID().toString
+            "Date"                   -> formatted,
+            "x-message-type"         -> "IE015",
+            "x-request-id"           -> UUID.randomUUID().toString,
+            HeaderNames.CONTENT_TYPE -> MimeTypes.XML
           )
         ),
         Source.single(ByteString(sampleOutgoingXIXml))
@@ -236,8 +224,9 @@ class MessagesControllerIntegrationSpec
         s"/traders/GB0123456789/movements/departures/${movementId.value}/messages/${messageId.value}",
         FakeHeaders(
           Seq(
-            "x-message-type" -> "IE015",
-            "x-request-id"   -> UUID.randomUUID().toString
+            "x-message-type"         -> "IE015",
+            "x-request-id"           -> UUID.randomUUID().toString,
+            HeaderNames.CONTENT_TYPE -> MimeTypes.XML
           )
         ),
         Source.single(ByteString(sampleOutgoingXml))
@@ -267,9 +256,10 @@ class MessagesControllerIntegrationSpec
         s"/traders/GB0123456789/movements/departures/${movementId.value}/messages/${messageId.value}",
         FakeHeaders(
           Seq(
-            "Date"           -> formatted,
-            "x-message-type" -> "IE015",
-            "x-request-id"   -> UUID.randomUUID().toString
+            "Date"                   -> formatted,
+            "x-message-type"         -> "IE015",
+            "x-request-id"           -> UUID.randomUUID().toString,
+            HeaderNames.CONTENT_TYPE -> MimeTypes.XML
           )
         ),
         Source.single(ByteString(sampleIncomingXml)) // note this is the IE029, not the IE015
@@ -299,9 +289,10 @@ class MessagesControllerIntegrationSpec
         s"/traders/GB0123456789/movements/departures/${movementId.value}/messages/${messageId.value}",
         FakeHeaders(
           Seq(
-            "Date"           -> formatted,
-            "x-message-type" -> "IE015",
-            "x-request-id"   -> UUID.randomUUID().toString
+            "Date"                   -> formatted,
+            "x-message-type"         -> "IE015",
+            "x-request-id"           -> UUID.randomUUID().toString,
+            HeaderNames.CONTENT_TYPE -> MimeTypes.XML
           )
         ),
         Source.single(ByteString(brokenXml))

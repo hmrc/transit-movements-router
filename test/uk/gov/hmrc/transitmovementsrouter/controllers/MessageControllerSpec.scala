@@ -16,13 +16,11 @@
 
 package uk.gov.hmrc.transitmovementsrouter.controllers
 
-import akka.stream.Materializer
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import cats.data.EitherT
 import org.mockito.ArgumentMatchers.any
-import org.mockito.MockitoSugar.reset
-import org.mockito.MockitoSugar.when
+import org.mockito.MockitoSugar.{reset, when}
 import org.scalacheck.Gen
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.freespec.AnyFreeSpec
@@ -30,50 +28,34 @@ import org.scalatest.matchers.must.Matchers.convertToAnyMustWrapper
 import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.mockito.MockitoSugar.mock
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
-import play.api.http.DefaultHttpErrorHandler
-import play.api.http.HeaderNames
-import play.api.http.HttpErrorConfig
-import play.api.http.MimeTypes
+import play.api.http.{DefaultHttpErrorHandler, HeaderNames, HttpErrorConfig, MimeTypes}
 import play.api.http.Status._
 import play.api.libs.Files.SingletonTemporaryFileCreator
-import play.api.libs.json.JsValue
-import play.api.libs.json.Json
+import play.api.libs.json.{JsValue, Json}
 import play.api.mvc._
-import play.api.test.FakeHeaders
-import play.api.test.FakeRequest
-import play.api.test.Helpers.contentAsJson
-import play.api.test.Helpers.defaultAwaitTimeout
-import play.api.test.Helpers.header
-import play.api.test.Helpers.status
-import play.api.test.Helpers.stubControllerComponents
+import play.api.test.{FakeHeaders, FakeRequest}
+import play.api.test.Helpers.{contentAsJson, defaultAwaitTimeout, header, status, stubControllerComponents}
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.HttpVerbs.POST
 import uk.gov.hmrc.objectstore.client.Path
 import uk.gov.hmrc.transitmovementsrouter.base.StreamTestHelpers.createStream
 import uk.gov.hmrc.transitmovementsrouter.base.TestActorSystem
-import uk.gov.hmrc.transitmovementsrouter.connectors.PersistenceConnector
-import uk.gov.hmrc.transitmovementsrouter.connectors.PushNotificationsConnector
+import uk.gov.hmrc.transitmovementsrouter.connectors.{PersistenceConnector, PushNotificationsConnector}
 import uk.gov.hmrc.transitmovementsrouter.controllers.actions.AuthenticateEISToken
 import uk.gov.hmrc.transitmovementsrouter.controllers.errors.PresentationError
 import uk.gov.hmrc.transitmovementsrouter.fakes.actions.FakeXmlTransformer
 import uk.gov.hmrc.transitmovementsrouter.generators.TestModelGenerators
 import uk.gov.hmrc.transitmovementsrouter.models.MessageType.RequestOfRelease
 import uk.gov.hmrc.transitmovementsrouter.models._
-import uk.gov.hmrc.transitmovementsrouter.models.errors.MessageTypeExtractionError
-import uk.gov.hmrc.transitmovementsrouter.models.errors.ObjectStoreError
-import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.MovementNotFound
-import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.Unexpected
+import uk.gov.hmrc.transitmovementsrouter.models.errors.{MessageTypeExtractionError, ObjectStoreError}
+import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.{MovementNotFound, Unexpected}
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.DownloadUrl
-import uk.gov.hmrc.transitmovementsrouter.services.EISMessageTransformers
-import uk.gov.hmrc.transitmovementsrouter.services.MessageTypeExtractor
-import uk.gov.hmrc.transitmovementsrouter.services.ObjectStoreService
-import uk.gov.hmrc.transitmovementsrouter.services.RoutingService
+import uk.gov.hmrc.transitmovementsrouter.services.{EISMessageTransformers, MessageTypeExtractor, ObjectStoreService, RoutingService}
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
 
 import java.util.UUID.randomUUID
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.ExecutionContext
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 import scala.xml.NodeSeq
 
 class MessageControllerSpec
@@ -197,8 +179,7 @@ class MessageControllerSpec
         mockPushNotificationsConnector
           .post(any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId], Some(any[Source[ByteString, _]]))(
             any[HeaderCarrier],
-            any[ExecutionContext],
-            any[Materializer]
+            any[ExecutionContext]
           )
       ).thenReturn(EitherT.rightT(()))
 
@@ -471,6 +452,14 @@ class MessageControllerSpec
             any[String].asInstanceOf[ObjectStoreURI]
           )(any(), any())
         ).thenReturn(EitherT.fromEither(Right(PersistenceResponse(messageId))))
+
+        when(
+          mockPushNotificationsConnector
+            .post(any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId], Some(any[Source[ByteString, _]]))(
+              any(),
+              any()
+            )
+        ).thenReturn(EitherT.rightT(()))
 
         val request = fakeRequestLargeMessage(Json.toJson(successUpscanResponse), incomingLargeMessage)
 
