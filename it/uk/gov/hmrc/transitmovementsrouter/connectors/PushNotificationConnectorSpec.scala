@@ -18,22 +18,30 @@ package uk.gov.hmrc.transitmovementsrouter.connectors
 
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
-import com.github.tomakehurst.wiremock.client.WireMock.{aResponse, post, urlEqualTo}
-import io.lemonlabs.uri.{Url, UrlPath}
+import com.github.tomakehurst.wiremock.client.WireMock.aResponse
+import com.github.tomakehurst.wiremock.client.WireMock.post
+import com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo
+import io.lemonlabs.uri.Url
+import io.lemonlabs.uri.UrlPath
 import org.mockito.Mockito.when
 import org.scalacheck.Gen
-import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
+import org.scalatest.concurrent.IntegrationPatience
+import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.mockito.MockitoSugar
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
-import play.api.http.Status.{INTERNAL_SERVER_ERROR, NOT_FOUND, OK}
+import play.api.http.Status.INTERNAL_SERVER_ERROR
+import play.api.http.Status.NOT_FOUND
+import play.api.http.Status.OK
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.test.HttpClientV2Support
 import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
 import uk.gov.hmrc.transitmovementsrouter.generators.ModelGenerators
-import uk.gov.hmrc.transitmovementsrouter.it.base.{TestActorSystem, WiremockSuite}
-import uk.gov.hmrc.transitmovementsrouter.models.errors.PushNotificationError.{MovementNotFound, Unexpected}
+import uk.gov.hmrc.transitmovementsrouter.it.base.TestActorSystem
+import uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuite
+import uk.gov.hmrc.transitmovementsrouter.models.errors.PushNotificationError.MovementNotFound
+import uk.gov.hmrc.transitmovementsrouter.models.errors.PushNotificationError.Unexpected
 import uk.gov.hmrc.transitmovementsrouter.services.EISMessageTransformersImpl
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -50,9 +58,8 @@ class PushNotificationConnectorSpec
     with ModelGenerators
     with TestActorSystem {
 
-  val movementId     = arbitraryMovementId.arbitrary.sample.get
-  val messageId      = arbitraryMessageId.arbitrary.sample.get
-
+  val movementId = arbitraryMovementId.arbitrary.sample.get
+  val messageId  = arbitraryMessageId.arbitrary.sample.get
 
   val uriPushNotifications =
     UrlPath.parse(s"/transit-movements-push-notifications/traders/movements/${movementId.value}/messages/${messageId.value}").toString()
@@ -82,9 +89,6 @@ class PushNotificationConnectorSpec
       urlEqualTo(uriPushNotifications)
     ).willReturn(aResponse().withStatus(codeToReturn))
   )
-
-
-
 
   "post" should {
     "return unit when post is successful with body" in {

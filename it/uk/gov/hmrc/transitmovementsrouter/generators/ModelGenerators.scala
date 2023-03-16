@@ -16,10 +16,16 @@
 
 package uk.gov.hmrc.transitmovementsrouter.generators
 
-import org.scalacheck.{Arbitrary, Gen}
-import uk.gov.hmrc.transitmovementsrouter.models.{CustomsOffice, MessageId, MessageType, MovementId}
+import org.scalacheck.Arbitrary
+import org.scalacheck.Gen
+import uk.gov.hmrc.transitmovementsrouter.models.CustomsOffice
+import uk.gov.hmrc.transitmovementsrouter.models.MessageId
+import uk.gov.hmrc.transitmovementsrouter.models.MessageType
+import uk.gov.hmrc.transitmovementsrouter.models.MovementId
 
-import java.time.{Instant, OffsetDateTime, ZoneOffset}
+import java.time.Instant
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
 
 trait ModelGenerators extends BaseGenerators {
 

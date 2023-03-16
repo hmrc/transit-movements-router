@@ -19,7 +19,10 @@ package uk.gov.hmrc.transitmovementsrouter.controllers
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import com.github.tomakehurst.wiremock.client.WireMock._
-import com.github.tomakehurst.wiremock.matching.{AnythingPattern, EqualToPattern, StringValuePattern, UrlPathPattern}
+import com.github.tomakehurst.wiremock.matching.AnythingPattern
+import com.github.tomakehurst.wiremock.matching.EqualToPattern
+import com.github.tomakehurst.wiremock.matching.StringValuePattern
+import com.github.tomakehurst.wiremock.matching.UrlPathPattern
 import com.kenshoo.play.metrics.Metrics
 import org.scalacheck.Gen
 import org.scalatest.freespec.AnyFreeSpec
@@ -27,21 +30,33 @@ import org.scalatest.matchers.must.Matchers
 import org.scalatestplus.play.guice.GuiceOneAppPerSuite
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 import play.api.http.Status._
-import play.api.http.{HeaderNames, MimeTypes}
+import play.api.http.HeaderNames
+import play.api.http.MimeTypes
 import play.api.inject.bind
-import play.api.inject.guice.{GuiceApplicationBuilder, GuiceableModule}
+import play.api.inject.guice.GuiceApplicationBuilder
+import play.api.inject.guice.GuiceableModule
 import play.api.libs.json.Json
-import play.api.test.Helpers.{defaultAwaitTimeout, running}
-import play.api.test.{FakeHeaders, FakeRequest, Helpers}
-import uk.gov.hmrc.transitmovementsrouter.it.base.{RegexPatterns, TestMetrics, WiremockSuiteWithGuice}
-import uk.gov.hmrc.transitmovementsrouter.models.{ConversationId, EoriNumber, MessageId, MovementType}
+import play.api.test.Helpers.defaultAwaitTimeout
+import play.api.test.Helpers.running
+import play.api.test.FakeHeaders
+import play.api.test.FakeRequest
+import play.api.test.Helpers
+import uk.gov.hmrc.transitmovementsrouter.it.base.RegexPatterns
+import uk.gov.hmrc.transitmovementsrouter.it.base.TestMetrics
+import uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuiteWithGuice
+import uk.gov.hmrc.transitmovementsrouter.models.ConversationId
+import uk.gov.hmrc.transitmovementsrouter.models.EoriNumber
+import uk.gov.hmrc.transitmovementsrouter.models.MessageId
+import uk.gov.hmrc.transitmovementsrouter.models.MovementType
 
 import java.time.format.DateTimeFormatter
-import java.time.{OffsetDateTime, ZoneOffset}
-import java.util.{Locale, UUID}
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
+import java.util.Locale
+import java.util.UUID
 
 class MessagesControllerIntegrationSpec
-  extends AnyFreeSpec
+    extends AnyFreeSpec
     with GuiceOneAppPerSuite
     with Matchers
     with WiremockSuiteWithGuice
