@@ -37,7 +37,6 @@ import play.api.test.{FakeHeaders, FakeRequest}
 import play.api.test.Helpers.{contentAsJson, defaultAwaitTimeout, header, status, stubControllerComponents}
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.HttpVerbs.POST
-import uk.gov.hmrc.objectstore.client.Path
 import uk.gov.hmrc.transitmovementsrouter.base.StreamTestHelpers.createStream
 import uk.gov.hmrc.transitmovementsrouter.base.TestActorSystem
 import uk.gov.hmrc.transitmovementsrouter.connectors.{PersistenceConnector, PushNotificationsConnector}
@@ -53,7 +52,6 @@ import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.Downlo
 import uk.gov.hmrc.transitmovementsrouter.services.{EISMessageTransformers, MessageTypeExtractor, ObjectStoreService, RoutingService}
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
 
-import java.util.UUID.randomUUID
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.{ExecutionContext, Future}
 import scala.xml.NodeSeq
@@ -70,9 +68,6 @@ class MessageControllerSpec
   val movementType = MovementType("departures")
   val movementId   = MovementId("abcdef1234567890")
   val messageId    = MessageId("0987654321fedcba")
-
-  lazy val filePath =
-    Path.Directory(s"movements/${arbitraryMovementId.arbitrary.sample.get}").file(randomUUID.toString).asUri
 
   val cc015cOfficeOfDepartureGB: NodeSeq =
     <ncts:CC015C PhaseID="NCTS5.0" xmlns:ncts="http://ncts.dgtaxud.ec">
@@ -134,7 +129,7 @@ class MessageControllerSpec
     FakeRequest(
       method = POST,
       uri = url,
-      headers = headers,
+      headers = headers.add(HeaderNames.CONTENT_TYPE -> MimeTypes.XML),
       body = createStream(body)
     )
 
@@ -354,6 +349,169 @@ class MessageControllerSpec
 
   }
 
+  "POST outgoing Large message" - {
+    "must return ACCEPTED when declaration is submitted successfully" in forAll(
+      arbitraryMovementId.arbitrary,
+      arbitraryMessageId.arbitrary,
+      arbitraryObjectSummaryWithMd5.arbitrary,
+      arbitraryObjectStoreResourceLocation.arbitrary
+    ) {
+      (movementId, messageId, objectSummary, objectStoreResourceLocation) =>
+        when(mockMessageTypeExtractor.extractFromHeaders(any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](MessageType.DeclarationData))
+
+        when(mockObjectStoreURIExtractor.extractObjectStoreURIHeader(any[Headers]))
+          .thenReturn(EitherT.rightT(objectStoreResourceLocation))
+
+        when(
+          mockObjectStoreService.storeOutgoing(
+            any[String].asInstanceOf[ObjectStoreResourceLocation]
+          )(
+            any(),
+            any()
+          )
+        ).thenReturn(EitherT.rightT(objectSummary))
+
+        lazy val request = FakeRequest(
+          method = "POST",
+          uri = outgoing,
+          headers = FakeHeaders(Seq("X-Message-Type" -> MessageType.DeclarationData.code, "X-Object-Store-Uri" -> objectStoreResourceLocation.contextPath)),
+          body = AnyContentAsEmpty
+        )
+
+        val result = controller().outgoing(eori, movementType, movementId, messageId)(request)
+
+        status(result) mustBe ACCEPTED
+    }
+
+    "must return message to inform that the X-Message-Type header is not present" in forAll(
+      arbitraryMovementId.arbitrary,
+      arbitraryMessageId.arbitrary,
+      arbitraryObjectStoreResourceLocation.arbitrary
+    ) {
+      (movementId, messageId, objectStoreResourceLocation) =>
+        when(mockMessageTypeExtractor.extractFromHeaders(any()))
+          .thenReturn(EitherT.leftT[Future, MessageType](MessageTypeExtractionError.UnableToExtractFromHeader))
+
+        val request = FakeRequest(
+          method = "POST",
+          uri = outgoing,
+          headers = FakeHeaders(Seq("X-Object-Store-Uri" -> objectStoreResourceLocation.contextPath)),
+          body = AnyContentAsEmpty
+        )
+
+        val result = controller().outgoing(eori, movementType, movementId, messageId)(request)
+
+        status(result) mustBe BAD_REQUEST
+        contentAsJson(result) mustBe Json.obj(
+          "code"    -> "BAD_REQUEST",
+          "message" -> "Missing header: X-Message-Type"
+        )
+    }
+
+    "must return message to inform that the X-Message-Type header value is invalid" in forAll(
+      arbitraryMovementId.arbitrary,
+      arbitraryMessageId.arbitrary,
+      arbitraryObjectStoreResourceLocation.arbitrary
+    ) {
+      (movementId, messageId, objectStoreResourceLocation) =>
+        when(mockMessageTypeExtractor.extractFromHeaders(any()))
+          .thenReturn(EitherT.leftT[Future, MessageType](MessageTypeExtractionError.InvalidMessageType("EEinvalid")))
+
+        val request = FakeRequest(
+          method = "POST",
+          uri = outgoing,
+          headers = FakeHeaders(Seq("X-Message-Type" -> MessageType.DeclarationData.code, "X-Object-Store-Uri" -> objectStoreResourceLocation.contextPath)),
+          body = AnyContentAsEmpty
+        )
+
+        val result = controller().outgoing(eori, movementType, movementId, messageId)(request)
+
+        status(result) mustBe BAD_REQUEST
+        contentAsJson(result) mustBe Json.obj(
+          "code"    -> "BAD_REQUEST",
+          "message" -> "Invalid message type: EEinvalid"
+        )
+    }
+
+    "must return BAD_REQUEST when a message is not a request message" in {
+
+      when(mockMessageTypeExtractor.extractFromHeaders(any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](MessageType.Discrepancies))
+
+      val request = FakeRequest(
+        method = "POST",
+        uri = outgoing,
+        headers = FakeHeaders(Seq("X-Message-Type" -> MessageType.Discrepancies.code)),
+        body = AnyContentAsEmpty
+      )
+      val result = controller().outgoing(eori, movementType, movementId, messageId)(request)
+
+      status(result) mustBe BAD_REQUEST
+      contentAsJson(result) mustBe Json.obj(
+        "code"    -> "BAD_REQUEST",
+        "message" -> s"${MessageType.Discrepancies.code} is not valid for requests"
+      )
+    }
+
+    "must return message to inform that the X-Object-Store-Uri header is not present" in forAll(
+      arbitraryMovementId.arbitrary,
+      arbitraryMessageId.arbitrary
+    ) {
+      (movementId, messageId) =>
+        when(mockMessageTypeExtractor.extractFromHeaders(any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](MessageType.DeclarationData))
+        when(mockObjectStoreURIExtractor.extractObjectStoreURIHeader(any[Headers]))
+          .thenReturn(EitherT.leftT(PresentationError.badRequestError("Missing X-Object-Store-Uri header value")))
+
+        val request = FakeRequest(
+          method = "POST",
+          uri = outgoing,
+          headers = FakeHeaders(Seq("X-Message-Type" -> MessageType.DeclarationData.code)),
+          body = AnyContentAsEmpty
+        )
+        val result = controller().outgoing(eori, movementType, movementId, messageId)(request)
+
+        status(result) mustBe BAD_REQUEST
+        contentAsJson(result) mustBe Json.obj(
+          "code"    -> "BAD_REQUEST",
+          "message" -> "Missing X-Object-Store-Uri header value"
+        )
+    }
+
+    "must return INTERNAL_SERVER_ERROR when declaration submission fails due to unexpected error" in forAll(
+      arbitraryMovementId.arbitrary,
+      arbitraryMessageId.arbitrary,
+      arbitraryObjectStoreResourceLocation.arbitrary
+    ) {
+      (movementId, messageId, objectStoreResourceLocation) =>
+        when(mockMessageTypeExtractor.extractFromHeaders(any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](MessageType.DeclarationData))
+        when(mockObjectStoreURIExtractor.extractObjectStoreURIHeader(any[Headers]))
+          .thenReturn(EitherT.rightT(objectStoreResourceLocation))
+        when(
+          mockObjectStoreService.storeOutgoing(
+            any[String].asInstanceOf[ObjectStoreResourceLocation]
+          )(
+            any(),
+            any()
+          )
+        ).thenReturn(EitherT.leftT(ObjectStoreError.UnexpectedError(None)))
+
+        val request = FakeRequest(
+          method = "POST",
+          uri = outgoing,
+          headers = FakeHeaders(Seq("X-Message-Type" -> MessageType.DeclarationData.code, "X-Object-Store-Uri" -> objectStoreResourceLocation.contextPath)),
+          body = AnyContentAsEmpty
+        )
+
+        val result = controller().outgoing(eori, movementType, movementId, messageId)(request)
+
+        status(result) mustBe INTERNAL_SERVER_ERROR
+        contentAsJson(result) mustBe Json.obj(
+          "code"    -> "INTERNAL_SERVER_ERROR",
+          "message" -> "Internal server error"
+        )
+    }
+
+  }
+
   "POST incoming" - {
     "must return CREATED when message is successfully forwarded" in {
       when(mockPersistenceConnector.postBody(any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId], any(), any())(any(), any()))
@@ -426,18 +584,23 @@ class MessageControllerSpec
       arbitraryUpscanResponse(true).arbitrary,
       arbitraryMovementId.arbitrary,
       arbitraryMessageId.arbitrary,
-      arbitraryObjectSummaryWithMd5.arbitrary
+      arbitraryObjectSummaryWithMd5.arbitrary,
+      arbitraryObjectStoreResourceLocation.arbitrary
     ) {
-      (successUpscanResponse, movementId, messageId, objectSummary) =>
+      (successUpscanResponse, movementId, messageId, objectSummary, objectStoreResourceLocation) =>
         when(
-          mockObjectStoreService.addMessage(any[String].asInstanceOf[DownloadUrl], any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId])(
+          mockObjectStoreService.storeIncoming(
+            any[String].asInstanceOf[DownloadUrl],
+            any[String].asInstanceOf[MovementId],
+            any[String].asInstanceOf[MessageId]
+          )(
             any(),
             any()
           )
         ).thenReturn(EitherT.rightT(objectSummary))
 
         when(mockObjectStoreURIExtractor.extractObjectStoreResourceLocation(any[String].asInstanceOf[ObjectStoreURI]))
-          .thenReturn(EitherT.rightT(ObjectStoreResourceLocation(filePath)))
+          .thenReturn(EitherT.rightT(objectStoreResourceLocation))
 
         when(mockObjectStoreService.getObjectStoreFile(any[String].asInstanceOf[ObjectStoreResourceLocation])(any[HeaderCarrier], any[ExecutionContext]))
           .thenReturn(EitherT.rightT(Source.single(ByteString("this is test content"))))
@@ -473,18 +636,23 @@ class MessageControllerSpec
       arbitraryUpscanResponse(true).arbitrary,
       arbitraryMovementId.arbitrary,
       arbitraryMessageId.arbitrary,
-      arbitraryObjectSummaryWithMd5.arbitrary
+      arbitraryObjectSummaryWithMd5.arbitrary,
+      arbitraryObjectStoreResourceLocation.arbitrary
     ) {
-      (successUpscanResponse, movementId, messageId, objectSummary) =>
+      (successUpscanResponse, movementId, messageId, objectSummary, objectStoreResourceLocation) =>
         when(
-          mockObjectStoreService.addMessage(any[String].asInstanceOf[DownloadUrl], any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId])(
+          mockObjectStoreService.storeIncoming(
+            any[String].asInstanceOf[DownloadUrl],
+            any[String].asInstanceOf[MovementId],
+            any[String].asInstanceOf[MessageId]
+          )(
             any(),
             any()
           )
         ).thenReturn(EitherT.rightT(objectSummary))
 
         when(mockObjectStoreURIExtractor.extractObjectStoreResourceLocation(any[String].asInstanceOf[ObjectStoreURI]))
-          .thenReturn(EitherT.rightT(ObjectStoreResourceLocation(filePath)))
+          .thenReturn(EitherT.rightT(objectStoreResourceLocation))
 
         when(mockObjectStoreService.getObjectStoreFile(any[String].asInstanceOf[ObjectStoreResourceLocation])(any[HeaderCarrier], any[ExecutionContext]))
           .thenReturn(EitherT.rightT(Source.single(ByteString("this is test content"))))
@@ -531,7 +699,11 @@ class MessageControllerSpec
     ) {
       (successUpscanResponse, movementId, messageId) =>
         when(
-          mockObjectStoreService.addMessage(any[String].asInstanceOf[DownloadUrl], any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId])(
+          mockObjectStoreService.storeIncoming(
+            any[String].asInstanceOf[DownloadUrl],
+            any[String].asInstanceOf[MovementId],
+            any[String].asInstanceOf[MessageId]
+          )(
             any(),
             any()
           )
@@ -548,18 +720,23 @@ class MessageControllerSpec
       arbitraryUpscanResponse(true).arbitrary,
       arbitraryMovementId.arbitrary,
       arbitraryMessageId.arbitrary,
-      arbitraryObjectSummaryWithMd5.arbitrary
+      arbitraryObjectSummaryWithMd5.arbitrary,
+      arbitraryObjectStoreResourceLocation.arbitrary
     ) {
-      (successUpscanResponse, movementId, messageId, objectSummary) =>
+      (successUpscanResponse, movementId, messageId, objectSummary, objectStoreResourceLocation) =>
         when(
-          mockObjectStoreService.addMessage(any[String].asInstanceOf[DownloadUrl], any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId])(
+          mockObjectStoreService.storeIncoming(
+            any[String].asInstanceOf[DownloadUrl],
+            any[String].asInstanceOf[MovementId],
+            any[String].asInstanceOf[MessageId]
+          )(
             any(),
             any()
           )
         ).thenReturn(EitherT.rightT(objectSummary))
 
         when(mockObjectStoreURIExtractor.extractObjectStoreResourceLocation(any[String].asInstanceOf[ObjectStoreURI]))
-          .thenReturn(EitherT.rightT(ObjectStoreResourceLocation(filePath)))
+          .thenReturn(EitherT.rightT(objectStoreResourceLocation))
 
         when(mockObjectStoreService.getObjectStoreFile(any[String].asInstanceOf[ObjectStoreResourceLocation])(any[HeaderCarrier], any[ExecutionContext]))
           .thenReturn(EitherT.rightT(Source.single(ByteString("this is test content"))))
@@ -576,18 +753,23 @@ class MessageControllerSpec
       arbitraryUpscanResponse(true).arbitrary,
       arbitraryMovementId.arbitrary,
       arbitraryMessageId.arbitrary,
-      arbitraryObjectSummaryWithMd5.arbitrary
+      arbitraryObjectSummaryWithMd5.arbitrary,
+      arbitraryObjectStoreResourceLocation.arbitrary
     ) {
-      (successUpscanResponse, movementId, messageId, objectSummary) =>
+      (successUpscanResponse, movementId, messageId, objectSummary, objectStoreResourceLocation) =>
         when(
-          mockObjectStoreService.addMessage(any[String].asInstanceOf[DownloadUrl], any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId])(
+          mockObjectStoreService.storeIncoming(
+            any[String].asInstanceOf[DownloadUrl],
+            any[String].asInstanceOf[MovementId],
+            any[String].asInstanceOf[MessageId]
+          )(
             any(),
             any()
           )
         ).thenReturn(EitherT.rightT(objectSummary))
 
         when(mockObjectStoreURIExtractor.extractObjectStoreResourceLocation(any[String].asInstanceOf[ObjectStoreURI]))
-          .thenReturn(EitherT.rightT(ObjectStoreResourceLocation(filePath)))
+          .thenReturn(EitherT.rightT(objectStoreResourceLocation))
 
         when(mockObjectStoreService.getObjectStoreFile(any[String].asInstanceOf[ObjectStoreResourceLocation])(any[HeaderCarrier], any[ExecutionContext]))
           .thenReturn(EitherT.rightT(Source.single(ByteString("this is test content"))))
@@ -605,21 +787,26 @@ class MessageControllerSpec
       arbitraryUpscanResponse(true).arbitrary,
       arbitraryMovementId.arbitrary,
       arbitraryMessageId.arbitrary,
-      arbitraryObjectSummaryWithMd5.arbitrary
+      arbitraryObjectSummaryWithMd5.arbitrary,
+      arbitraryObjectStoreResourceLocation.arbitrary
     ) {
-      (successUpscanResponse, movementId, messageId, objectSummary) =>
+      (successUpscanResponse, movementId, messageId, objectSummary, objectStoreResourceLocation) =>
         when(
-          mockObjectStoreService.addMessage(any[String].asInstanceOf[DownloadUrl], any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId])(
+          mockObjectStoreService.storeIncoming(
+            any[String].asInstanceOf[DownloadUrl],
+            any[String].asInstanceOf[MovementId],
+            any[String].asInstanceOf[MessageId]
+          )(
             any(),
             any()
           )
         ).thenReturn(EitherT.rightT(objectSummary))
 
         when(mockObjectStoreURIExtractor.extractObjectStoreResourceLocation(any[String].asInstanceOf[ObjectStoreURI]))
-          .thenReturn(EitherT.rightT(ObjectStoreResourceLocation(filePath)))
+          .thenReturn(EitherT.rightT(objectStoreResourceLocation))
 
         when(mockObjectStoreService.getObjectStoreFile(any[String].asInstanceOf[ObjectStoreResourceLocation])(any[HeaderCarrier], any[ExecutionContext]))
-          .thenReturn(EitherT.leftT(ObjectStoreError.FileNotFound(filePath)))
+          .thenReturn(EitherT.leftT(ObjectStoreError.FileNotFound(objectStoreResourceLocation.contextPath)))
 
         val request = fakeRequestLargeMessage(Json.toJson(successUpscanResponse), incomingLargeMessage)
         val result  = controller().incomingLargeMessage(movementId, messageId)(request)
@@ -627,7 +814,7 @@ class MessageControllerSpec
         status(result) mustBe BAD_REQUEST
         contentAsJson(result) mustBe Json.obj(
           "code"    -> "BAD_REQUEST",
-          "message" -> s"file not found at location: $filePath"
+          "message" -> s"file not found at location: ${objectStoreResourceLocation.contextPath}"
         )
     }
 
@@ -635,18 +822,23 @@ class MessageControllerSpec
       arbitraryUpscanResponse(true).arbitrary,
       arbitraryMovementId.arbitrary,
       arbitraryMessageId.arbitrary,
-      arbitraryObjectSummaryWithMd5.arbitrary
+      arbitraryObjectSummaryWithMd5.arbitrary,
+      arbitraryObjectStoreResourceLocation.arbitrary
     ) {
-      (successUpscanResponse, movementId, messageId, objectSummary) =>
+      (successUpscanResponse, movementId, messageId, objectSummary, objectStoreResourceLocation) =>
         when(
-          mockObjectStoreService.addMessage(any[String].asInstanceOf[DownloadUrl], any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId])(
+          mockObjectStoreService.storeIncoming(
+            any[String].asInstanceOf[DownloadUrl],
+            any[String].asInstanceOf[MovementId],
+            any[String].asInstanceOf[MessageId]
+          )(
             any(),
             any()
           )
         ).thenReturn(EitherT.rightT(objectSummary))
 
         when(mockObjectStoreURIExtractor.extractObjectStoreResourceLocation(any[String].asInstanceOf[ObjectStoreURI]))
-          .thenReturn(EitherT.rightT(ObjectStoreResourceLocation(filePath)))
+          .thenReturn(EitherT.rightT(objectStoreResourceLocation))
 
         when(mockObjectStoreService.getObjectStoreFile(any[String].asInstanceOf[ObjectStoreResourceLocation])(any[HeaderCarrier], any[ExecutionContext]))
           .thenReturn(EitherT.rightT(Source.single(ByteString("this is test content"))))

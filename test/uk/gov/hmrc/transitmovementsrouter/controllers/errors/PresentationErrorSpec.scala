@@ -39,6 +39,8 @@ class PresentationErrorSpec extends AnyFreeSpec with Matchers with MockitoSugar 
 
     "for BadRequest" in testStandard(PresentationError.badRequestError, "bad request", "BAD_REQUEST")
 
+    "for UnsupportedMediaType" in testStandard(PresentationError.unsupportedMediaTypeError, "Unsupported Media Type", "UNSUPPORTED_MEDIA_TYPE")
+
     "for NotFound" in testStandard(PresentationError.notFoundError, "not found", "NOT_FOUND")
 
     "for NotImplemented" in testStandard(PresentationError.notImplemented, "Not Implemented", "NOT_IMPLEMENTED")

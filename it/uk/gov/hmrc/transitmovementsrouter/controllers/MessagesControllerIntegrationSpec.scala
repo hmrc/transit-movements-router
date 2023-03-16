@@ -26,18 +26,18 @@ import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
 import org.scalatestplus.play.guice.GuiceOneAppPerSuite
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
-import play.api.http.{HeaderNames, MimeTypes}
 import play.api.http.Status._
+import play.api.http.{HeaderNames, MimeTypes}
 import play.api.inject.bind
 import play.api.inject.guice.{GuiceApplicationBuilder, GuiceableModule}
 import play.api.libs.json.Json
-import play.api.test.{FakeHeaders, FakeRequest, Helpers}
 import play.api.test.Helpers.{defaultAwaitTimeout, running}
+import play.api.test.{FakeHeaders, FakeRequest, Helpers}
 import uk.gov.hmrc.transitmovementsrouter.it.base.{RegexPatterns, TestMetrics, WiremockSuiteWithGuice}
 import uk.gov.hmrc.transitmovementsrouter.models.{ConversationId, EoriNumber, MessageId, MovementType}
 
-import java.time.{OffsetDateTime, ZoneOffset}
 import java.time.format.DateTimeFormatter
+import java.time.{OffsetDateTime, ZoneOffset}
 import java.util.{Locale, UUID}
 
 class MessagesControllerIntegrationSpec
