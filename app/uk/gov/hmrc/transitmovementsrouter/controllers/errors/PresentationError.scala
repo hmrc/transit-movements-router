@@ -43,6 +43,9 @@ object PresentationError extends CommonFormats {
   def invalidOfficeError(message: String, customsOffice: CustomsOffice, field: String): PresentationError =
     InvalidOfficeError(message, customsOffice.value, field, ErrorCode.InvalidOffice)
 
+  def unsupportedMediaTypeError(message: String): PresentationError =
+    StandardError(message, ErrorCode.UnsupportedMediaType)
+
   def notFoundError(message: String): PresentationError =
     StandardError(message, ErrorCode.NotFound)
 

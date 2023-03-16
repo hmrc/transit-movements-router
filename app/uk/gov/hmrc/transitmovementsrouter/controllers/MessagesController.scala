@@ -64,9 +64,33 @@ class MessagesController @Inject() (
     with ConvertError
     with UpscanResponseParser
     with ObjectStoreURIExtractor
+    with ContentTypeRouting
     with Logging {
 
-  def outgoing(eori: EoriNumber, movementType: MovementType, movementId: MovementId, messageId: MessageId): Action[Source[ByteString, _]] =
+  def outgoing(eori: EoriNumber, movementType: MovementType, movementId: MovementId, messageId: MessageId) =
+    contentTypeRoute {
+      case Some(_) => outgoingSmallMessage(eori, movementType, movementId, messageId)
+      case None    => outgoingLargeMessage(eori, movementType, movementId, messageId)
+    }
+
+  def outgoingLargeMessage(eori: EoriNumber, movementType: MovementType, movementId: MovementId, messageId: MessageId) =
+    Action.async {
+      implicit request =>
+        implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
+        (for {
+          messageType                 <- messageTypeExtractor.extractFromHeaders(request.headers).asPresentation
+          requestMessageType          <- filterRequestMessageType(messageType)
+          objectStoreResourceLocation <- extractObjectStoreURIHeader(request.headers)
+          objectSummary <- objectStoreService
+            .storeOutgoing(objectStoreResourceLocation)
+            .asPresentation
+        } yield objectSummary).fold[Result](
+          error => Status(error.code.statusCode)(Json.toJson(error)),
+          _ => Accepted
+        )
+    }
+
+  def outgoingSmallMessage(eori: EoriNumber, movementType: MovementType, movementId: MovementId, messageId: MessageId): Action[Source[ByteString, _]] =
     DefaultActionBuilder.apply(cc.parsers.anyContent).stream {
       implicit request =>
         implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
@@ -101,9 +125,11 @@ class MessagesController @Inject() (
     implicit request =>
       implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
       (for {
-        upscanResponse              <- parseAndLogUpscanResponse(request.body)
-        downloadUrl                 <- handleUpscanSuccessResponse(upscanResponse)
-        objectSummary               <- objectStoreService.addMessage(downloadUrl, movementId, messageId).asPresentation
+        upscanResponse <- parseAndLogUpscanResponse(request.body)
+        downloadUrl    <- handleUpscanSuccessResponse(upscanResponse)
+        objectSummary <- objectStoreService
+          .storeIncoming(downloadUrl, movementId, messageId)
+          .asPresentation
         objectStoreResourceLocation <- extractObjectStoreResourceLocation(ObjectStoreURI(objectSummary.location.asUri))
         source                      <- objectStoreService.getObjectStoreFile(objectStoreResourceLocation).asPresentation
         messageType                 <- messageTypeExtractor.extractFromBody(source).asPresentation

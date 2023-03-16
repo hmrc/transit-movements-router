@@ -30,6 +30,7 @@ import org.scalatest.matchers.must.Matchers
 import org.scalatestplus.play.guice.GuiceOneAppPerSuite
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 import play.api.http.HeaderNames
+import play.api.http.MimeTypes
 import play.api.http.Status._
 import play.api.inject.bind
 import play.api.inject.guice.GuiceApplicationBuilder
@@ -148,8 +149,9 @@ class MessagesControllerIntegrationSpec
         s"/traders/GB0123456789/movements/departures/${movementId.value}/messages/${messageId.value}",
         FakeHeaders(
           Seq(
-            "x-message-type" -> "IE015",
-            "x-request-id"   -> UUID.randomUUID().toString
+            "x-message-type"         -> "IE015",
+            "x-request-id"           -> UUID.randomUUID().toString,
+            HeaderNames.CONTENT_TYPE -> MimeTypes.XML
           )
         ),
         Source.single(ByteString(sampleOutgoingXml))
@@ -193,9 +195,10 @@ class MessagesControllerIntegrationSpec
         s"/traders/GB0123456789/movements/departures/${movementId.value}/messages/${messageId.value}",
         FakeHeaders(
           Seq(
-            "Date"           -> formatted,
-            "x-message-type" -> "IE015",
-            "x-request-id"   -> UUID.randomUUID().toString
+            "Date"                   -> formatted,
+            "x-message-type"         -> "IE015",
+            "x-request-id"           -> UUID.randomUUID().toString,
+            HeaderNames.CONTENT_TYPE -> MimeTypes.XML
           )
         ),
         Source.single(ByteString(sampleOutgoingXIXml))
@@ -236,8 +239,9 @@ class MessagesControllerIntegrationSpec
         s"/traders/GB0123456789/movements/departures/${movementId.value}/messages/${messageId.value}",
         FakeHeaders(
           Seq(
-            "x-message-type" -> "IE015",
-            "x-request-id"   -> UUID.randomUUID().toString
+            "x-message-type"         -> "IE015",
+            "x-request-id"           -> UUID.randomUUID().toString,
+            HeaderNames.CONTENT_TYPE -> MimeTypes.XML
           )
         ),
         Source.single(ByteString(sampleOutgoingXml))
@@ -267,9 +271,10 @@ class MessagesControllerIntegrationSpec
         s"/traders/GB0123456789/movements/departures/${movementId.value}/messages/${messageId.value}",
         FakeHeaders(
           Seq(
-            "Date"           -> formatted,
-            "x-message-type" -> "IE015",
-            "x-request-id"   -> UUID.randomUUID().toString
+            "Date"                   -> formatted,
+            "x-message-type"         -> "IE015",
+            "x-request-id"           -> UUID.randomUUID().toString,
+            HeaderNames.CONTENT_TYPE -> MimeTypes.XML
           )
         ),
         Source.single(ByteString(sampleIncomingXml)) // note this is the IE029, not the IE015
@@ -299,9 +304,10 @@ class MessagesControllerIntegrationSpec
         s"/traders/GB0123456789/movements/departures/${movementId.value}/messages/${messageId.value}",
         FakeHeaders(
           Seq(
-            "Date"           -> formatted,
-            "x-message-type" -> "IE015",
-            "x-request-id"   -> UUID.randomUUID().toString
+            "Date"                   -> formatted,
+            "x-message-type"         -> "IE015",
+            "x-request-id"           -> UUID.randomUUID().toString,
+            HeaderNames.CONTENT_TYPE -> MimeTypes.XML
           )
         ),
         Source.single(ByteString(brokenXml))

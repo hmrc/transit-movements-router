@@ -18,6 +18,7 @@ package uk.gov.hmrc.transitmovementsrouter.controllers
 
 import play.api.mvc.BaseController
 import play.api.mvc.ControllerComponents
+import play.api.mvc.Headers
 import play.api.test.Helpers.stubControllerComponents
 import org.scalatest.OptionValues
 import org.scalatest.concurrent.ScalaFutures
@@ -55,7 +56,44 @@ class ObjectStoreURIExtractorSpec extends AnyFreeSpec with Matchers with Mockito
       val result = objectStoreURIExtractor.extractObjectStoreResourceLocation(ObjectStoreURI(filePath))
 
       whenReady(result.value) {
-        _ mustBe Right(ObjectStoreResourceLocation("movements/movementId/abc.xml"))
+        _ mustBe Right(ObjectStoreResourceLocation(filePath, "movements/movementId/abc.xml"))
+      }
+    }
+
+  }
+
+  "extractObjectStoreURIHeader" - {
+
+    "if object store uri header is not supplied, return BadRequestError" in {
+      val noObjectStoreURIHeader = Headers("X-Message-Type" -> "IE015")
+
+      val result = objectStoreURIExtractor.extractObjectStoreURIHeader(noObjectStoreURIHeader)
+
+      whenReady(result.value) {
+        _ mustBe Left(PresentationError.badRequestError("Missing X-Object-Store-Uri header value"))
+      }
+    }
+
+    "if object store uri header supplied is invalid, return BadRequestError" in {
+      val invalidObjectStoreURIHeader = Headers("X-Object-Store-Uri" -> "invalid")
+
+      val result = objectStoreURIExtractor.extractObjectStoreURIHeader(invalidObjectStoreURIHeader)
+
+      whenReady(result.value) {
+        _ mustBe Left(
+          PresentationError.badRequestError(s"Object store uri value does not start with common-transit-convention-traders/ (got invalid)")
+        )
+      }
+    }
+
+    "if object store uri header supplied is valid, return Right" in {
+      val filePath                  = "common-transit-convention-traders/movements/movementId/abc.xml"
+      val validObjectStoreURIHeader = Headers("X-Object-Store-Uri" -> filePath)
+
+      val result = objectStoreURIExtractor.extractObjectStoreURIHeader(validObjectStoreURIHeader)
+
+      whenReady(result.value) {
+        _ mustBe Right(ObjectStoreResourceLocation(filePath, "movements/movementId/abc.xml"))
       }
     }
 
