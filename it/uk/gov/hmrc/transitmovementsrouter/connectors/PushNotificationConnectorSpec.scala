@@ -38,6 +38,7 @@ import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.test.HttpClientV2Support
 import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
 import uk.gov.hmrc.transitmovementsrouter.generators.ModelGenerators
+import uk.gov.hmrc.transitmovementsrouter.it.base.TestActorSystem
 import uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuite
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PushNotificationError.MovementNotFound
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PushNotificationError.Unexpected
@@ -54,7 +55,8 @@ class PushNotificationConnectorSpec
     with MockitoSugar
     with IntegrationPatience
     with ScalaCheckPropertyChecks
-    with ModelGenerators {
+    with ModelGenerators
+    with TestActorSystem {
 
   val movementId = arbitraryMovementId.arbitrary.sample.get
   val messageId  = arbitraryMessageId.arbitrary.sample.get
@@ -89,18 +91,18 @@ class PushNotificationConnectorSpec
   )
 
   "post" should {
-    "return unit when post is successful" in {
+    "return unit when post is successful with body" in {
       when(mockAppConfig.pushNotificationsEnabled).thenReturn(true)
 
       stub(OK)
 
-      whenReady(connector.post(movementId, messageId, source).value) {
+      whenReady(connector.post(movementId, messageId, Some(source)).value) {
         x =>
           x mustBe Right(())
       }
     }
 
-    "return a PushNotificationError when unsuccessful" in forAll(errorCodes) {
+    "return a PushNotificationError when unsuccessful with body" in forAll(errorCodes) {
       statusCode =>
         server.resetAll()
 
@@ -108,7 +110,7 @@ class PushNotificationConnectorSpec
 
         stub(statusCode)
 
-        whenReady(connector.post(movementId, messageId, source).value) {
+        whenReady(connector.post(movementId, messageId, Some(source)).value) {
           x =>
             x.isLeft mustBe true
 
@@ -121,7 +123,7 @@ class PushNotificationConnectorSpec
         }
     }
 
-    "return Unexpected(throwable) when NonFatal exception is thrown" in {
+    "return Unexpected(throwable) when NonFatal exception is thrown with body" in {
       server.resetAll()
 
       when(mockAppConfig.pushNotificationsEnabled).thenReturn(true)
@@ -130,7 +132,7 @@ class PushNotificationConnectorSpec
 
       val failingSource = Source.single(ByteString.fromString("{}")).via(new EISMessageTransformersImpl().unwrap)
 
-      whenReady(connector.post(movementId, messageId, failingSource).value) {
+      whenReady(connector.post(movementId, messageId, Some(failingSource)).value) {
         res =>
           res mustBe a[Left[Unexpected, _]]
           res.left.toOption.get.asInstanceOf[Unexpected].exception.isDefined
@@ -142,11 +144,44 @@ class PushNotificationConnectorSpec
 
       stub(INTERNAL_SERVER_ERROR)
 
-      whenReady(connector.post(movementId, messageId, source).value) {
+      whenReady(connector.post(movementId, messageId, Some(source)).value) {
         case Left(_)  => fail("The stub should never have been hit and therefore should always return a right")
         case Right(_) =>
       }
+    }
 
+    "successfully post a push notification with no body" in {
+      when(mockAppConfig.pushNotificationsEnabled).thenReturn(true)
+
+      stub(OK)
+
+      implicit val hc = HeaderCarrier()
+      whenReady(connector.post(movementId, messageId, None).value) {
+        x =>
+          x mustBe Right(())
+      }
+    }
+
+    "return a PushNotificationError when unsuccessful without a body" in forAll(errorCodes) {
+      statusCode =>
+        server.resetAll()
+
+        when(mockAppConfig.pushNotificationsEnabled).thenReturn(true)
+
+        stub(statusCode)
+
+        implicit val hc = HeaderCarrier()
+
+        whenReady(connector.post(movementId, messageId, None).value) {
+          x =>
+            x.isLeft mustBe true
+
+            statusCode match {
+              case NOT_FOUND             => x mustBe a[Left[MovementNotFound, _]]
+              case INTERNAL_SERVER_ERROR => x mustBe a[Left[Unexpected, _]]
+              case _                     => fail()
+            }
+        }
     }
   }
 }

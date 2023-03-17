@@ -57,5 +57,4 @@ trait ModelGenerators extends BaseGenerators {
         millis <- Gen.chooseNum(0, Long.MaxValue / 1000L)
       } yield OffsetDateTime.ofInstant(Instant.ofEpochMilli(millis), ZoneOffset.UTC)
     }
-
 }
