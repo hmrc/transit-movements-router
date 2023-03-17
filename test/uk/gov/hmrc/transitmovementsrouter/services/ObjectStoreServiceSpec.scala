@@ -51,7 +51,7 @@ class ObjectStoreServiceSpec
     with BeforeAndAfterEach {
 
   val baseUrl = s"http://baseUrl-${randomUUID().toString}"
-  val owner   = s"owner-${randomUUID().toString}"
+  val owner   = "transit-movements-router"
   val token   = s"token-${randomUUID().toString}"
   val config  = ObjectStoreClientConfig(baseUrl, owner, token, SevenYears)
 
