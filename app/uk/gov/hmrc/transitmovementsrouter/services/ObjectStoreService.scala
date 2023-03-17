@@ -132,7 +132,7 @@ class ObjectStoreServiceImpl @Inject() (clock: Clock, appConfig: AppConfig, clie
       client
         .getObject[Source[ByteString, NotUsed]](
           Path.File(objectStoreResourceLocation.resourceLocation),
-          "common-transit-conversion-traders"
+          "common-transit-convention-traders"
         )
         .map {
           case Right(Some(source)) => Right(source.content)
