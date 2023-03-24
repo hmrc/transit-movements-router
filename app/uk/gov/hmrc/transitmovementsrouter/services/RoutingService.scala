@@ -16,22 +16,16 @@
 
 package uk.gov.hmrc.transitmovementsrouter.services
 
-import akka.stream._
-import akka.stream.alpakka.xml.ParseEvent
-import akka.stream.alpakka.xml.scaladsl._
-import akka.stream.scaladsl.Flow
-import akka.stream.scaladsl.GraphDSL
-import akka.stream.scaladsl.Sink
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
+import cats.data.EitherT
 import com.google.inject._
 import play.api.Logging
 import uk.gov.hmrc.http.HeaderCarrier
+import uk.gov.hmrc.transitmovementsrouter.connectors.EISConnector
 import uk.gov.hmrc.transitmovementsrouter.connectors.EISConnectorProvider
 import uk.gov.hmrc.transitmovementsrouter.models._
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
-import cats.data.EitherT
-import uk.gov.hmrc.transitmovementsrouter.connectors.EISConnector
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
@@ -43,8 +37,8 @@ trait RoutingService {
     movementType: MovementType,
     movementId: MovementId,
     messageId: MessageId,
-    messageType: RequestMessageType,
-    payload: Source[ByteString, _]
+    payload: Source[ByteString, _],
+    customsOffice: CustomsOffice
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): EitherT[Future, RoutingError, Unit]
 
 }
@@ -53,47 +47,23 @@ trait RoutingService {
 class RoutingServiceImpl @Inject() (
   eisMessageTransformers: EISMessageTransformers,
   messageConnectorProvider: EISConnectorProvider
-)(implicit materializer: Materializer)
-    extends RoutingService
-    with XmlParsingServiceHelpers
+) extends RoutingService
     with Logging {
-
-  private val connectorSinkShape = Sink.head[ParseResult[EISConnector]]
-
-  private def eisConnectorSelector(messageType: RequestMessageType): Sink[ByteString, Future[ParseResult[EISConnector]]] = Sink.fromGraph(
-    GraphDSL.createGraph(connectorSinkShape) {
-      implicit builder => sink =>
-        import GraphDSL.Implicits._
-
-        val xmlParsing: FlowShape[ByteString, ParseEvent] = builder.add(XmlParsing.parser)
-        val customsOfficeSelector: FlowShape[ParseEvent, ParseResult[CustomsOffice]] =
-          builder.add(XmlParser.customsOfficeExtractor(messageType))
-        val eisConnectorSelector: FlowShape[ParseResult[CustomsOffice], ParseResult[EISConnector]] =
-          builder.add(Flow.fromFunction(selectConnector(_, messageType)))
-        xmlParsing ~> customsOfficeSelector ~> eisConnectorSelector ~> sink
-
-        SinkShape(xmlParsing.in)
-    }
-  )
 
   override def submitMessage(
     movementType: MovementType,
     movementId: MovementId,
     messageId: MessageId,
-    messageType: RequestMessageType,
-    payload: Source[ByteString, _]
+    payload: Source[ByteString, _],
+    customsOffice: CustomsOffice
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): EitherT[Future, RoutingError, Unit] =
     for {
-      connector <- EitherT[Future, RoutingError, EISConnector](payload.runWith(eisConnectorSelector(messageType)))
+      connector <- selectConnector(customsOffice)
       _         <- EitherT(connector.post(movementId, messageId, payload.via(eisMessageTransformers.wrap), hc))
     } yield ()
 
-  def selectConnector(maybeOffice: ParseResult[CustomsOffice], messageType: RequestMessageType): ParseResult[EISConnector] =
-    maybeOffice.flatMap {
-      office =>
-        if (office.isGB) Right(messageConnectorProvider.gb)
-        else if (office.isXI) Right(messageConnectorProvider.xi)
-        else Left(RoutingError.UnrecognisedOffice(s"Did not recognise office: ${office.value}", office, messageType.officeNode))
-    }
-
+  private def selectConnector(customsOffice: CustomsOffice): EitherT[Future, RoutingError, EISConnector] = EitherT {
+    if (customsOffice.isGB) Future.successful(Right(messageConnectorProvider.gb))
+    else Future.successful(Right(messageConnectorProvider.xi))
+  }
 }

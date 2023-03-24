@@ -27,12 +27,16 @@ import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 import uk.gov.hmrc.http.UpstreamErrorResponse
 import uk.gov.hmrc.transitmovementsrouter.models.CustomsOffice
 import uk.gov.hmrc.transitmovementsrouter.models.MovementId
+import uk.gov.hmrc.transitmovementsrouter.models.errors.CustomOfficeExtractorError.NoElementFound
+import uk.gov.hmrc.transitmovementsrouter.models.errors.CustomOfficeExtractorError.TooManyElementsFound
+import uk.gov.hmrc.transitmovementsrouter.models.errors.CustomOfficeExtractorError.UnrecognisedOffice
 import uk.gov.hmrc.transitmovementsrouter.models.errors.ErrorCode.BadRequest
 import uk.gov.hmrc.transitmovementsrouter.models.errors.ErrorCode.InternalServerError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.ErrorCode.InvalidOffice
 import uk.gov.hmrc.transitmovementsrouter.models.errors.ErrorCode.NotFound
 import uk.gov.hmrc.transitmovementsrouter.models.errors.MessageTypeExtractionError.InvalidMessageType
 import uk.gov.hmrc.transitmovementsrouter.models.errors.MessageTypeExtractionError.UnableToExtractFromBody
+import uk.gov.hmrc.transitmovementsrouter.models.errors.CustomOfficeExtractorError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.MessageTypeExtractionError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.ObjectStoreError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError
@@ -58,21 +62,6 @@ class ConvertErrorSpec extends AnyFreeSpec with Matchers with OptionValues with 
       }
     }
 
-    "for a failure - handle NoElementFound error" in {
-      val input = Left[RoutingError, Unit](NoElementFound("test")).toEitherT[Future]
-      whenReady(input.asPresentation.value) {
-        _ mustBe Left(StandardError("Element test not found", BadRequest))
-      }
-    }
-
-    "for a validation error return UnrecognisedOffice" in forAll(Gen.alphaNumStr, Gen.alphaStr) {
-      (office, field) =>
-        val input = Left[RoutingError, Unit](UnrecognisedOffice(s"Did not recognise office:$office", CustomsOffice(office), field)).toEitherT[Future]
-        whenReady(input.asPresentation.value) {
-          _ mustBe Left(InvalidOfficeError(s"Did not recognise office:$office", office, field, InvalidOffice))
-        }
-    }
-
     "an Unexpected Error with exception returns an internal service error with an exception" in {
       val exception = new IllegalStateException()
       val input     = Left[RoutingError, Unit](Unexpected("Unexpected error", Some(exception))).toEitherT[Future]
@@ -96,13 +85,6 @@ class ConvertErrorSpec extends AnyFreeSpec with Matchers with OptionValues with 
       }
     }
 
-    "for a failure - handle TooManyElementsFound error" in {
-      val input = Left[RoutingError, Unit](TooManyElementsFound("test")).toEitherT[Future]
-      whenReady(input.asPresentation.value) {
-        _ mustBe Left(StandardError("Found too many elements of type test", BadRequest))
-      }
-    }
-
     "for a failure - handle BadDateTime error" in {
       val input = Left[RoutingError, Unit](BadDateTime("test", new DateTimeParseException("parse error", new StringBuilder("error"), 0))).toEitherT[Future]
       whenReady(input.asPresentation.value) {
@@ -110,6 +92,38 @@ class ConvertErrorSpec extends AnyFreeSpec with Matchers with OptionValues with 
       }
     }
 
+  }
+
+  "CustomOfficeExtractor error" - {
+    "for a success" in {
+      val input = Right[CustomOfficeExtractorError, Unit](()).toEitherT[Future]
+      whenReady(input.asPresentation.value) {
+        _ mustBe Right(())
+      }
+    }
+
+    "for a failure - handle NoElementFound error" in {
+      val input = Left[CustomOfficeExtractorError, Unit](NoElementFound("test")).toEitherT[Future]
+      whenReady(input.asPresentation.value) {
+        _ mustBe Left(StandardError("Element test not found", BadRequest))
+      }
+    }
+
+    "for a validation error return UnrecognisedOffice" in forAll(Gen.alphaNumStr, Gen.alphaStr) {
+      (office, field) =>
+        val input =
+          Left[CustomOfficeExtractorError, Unit](UnrecognisedOffice(s"Did not recognise office:$office", CustomsOffice(office), field)).toEitherT[Future]
+        whenReady(input.asPresentation.value) {
+          _ mustBe Left(InvalidOfficeError(s"Did not recognise office:$office", office, field, InvalidOffice))
+        }
+    }
+
+    "for a failure - handle TooManyElementsFound error" in {
+      val input = Left[CustomOfficeExtractorError, Unit](TooManyElementsFound("test")).toEitherT[Future]
+      whenReady(input.asPresentation.value) {
+        _ mustBe Left(StandardError("Found too many elements of type test", BadRequest))
+      }
+    }
   }
 
   "PersistenceError error" - {

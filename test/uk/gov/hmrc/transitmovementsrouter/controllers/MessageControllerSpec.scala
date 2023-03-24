@@ -57,15 +57,13 @@ import uk.gov.hmrc.transitmovementsrouter.fakes.actions.FakeXmlTransformer
 import uk.gov.hmrc.transitmovementsrouter.generators.TestModelGenerators
 import uk.gov.hmrc.transitmovementsrouter.models.MessageType.RequestOfRelease
 import uk.gov.hmrc.transitmovementsrouter.models._
+import uk.gov.hmrc.transitmovementsrouter.models.errors.CustomOfficeExtractorError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.MessageTypeExtractionError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.ObjectStoreError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.MovementNotFound
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.Unexpected
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.DownloadUrl
-import uk.gov.hmrc.transitmovementsrouter.services.EISMessageTransformers
-import uk.gov.hmrc.transitmovementsrouter.services.MessageTypeExtractor
-import uk.gov.hmrc.transitmovementsrouter.services.ObjectStoreService
-import uk.gov.hmrc.transitmovementsrouter.services.RoutingService
+import uk.gov.hmrc.transitmovementsrouter.services._
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -98,12 +96,13 @@ class MessageControllerSpec
     <TraderChannelResponse><ncts:CC013C PhaseID="NCTS5.0" xmlns:ncts="http://ncts.dgtaxud.ec">text</ncts:CC013C></TraderChannelResponse>
   val trimmedXml: NodeSeq = <ncts:CC013C PhaseID="NCTS5.0" xmlns:ncts="http://ncts.dgtaxud.ec">text</ncts:CC013C>
 
-  val mockRoutingService             = mock[RoutingService]
-  val mockPersistenceConnector       = mock[PersistenceConnector]
-  val mockPushNotificationsConnector = mock[PushNotificationsConnector]
-  val mockUpscanResponseParser       = mock[UpscanResponseParser]
-  val mockObjectStoreService         = mock[ObjectStoreService]
-  val mockObjectStoreURIExtractor    = mock[ObjectStoreURIExtractor]
+  val mockRoutingService               = mock[RoutingService]
+  val mockPersistenceConnector         = mock[PersistenceConnector]
+  val mockPushNotificationsConnector   = mock[PushNotificationsConnector]
+  val mockUpscanResponseParser         = mock[UpscanResponseParser]
+  val mockObjectStoreService           = mock[ObjectStoreService]
+  val mockObjectStoreURIExtractor      = mock[ObjectStoreURIExtractor]
+  val mockCustomOfficeExtractorService = mock[CustomOfficeExtractorService]
 
   implicit val temporaryFileCreator = SingletonTemporaryFileCreator
 
@@ -129,7 +128,8 @@ class MessageControllerSpec
       mockMessageTypeExtractor,
       FakeAuthenticateEISToken,
       eisMessageTransformer,
-      mockObjectStoreService
+      mockObjectStoreService,
+      mockCustomOfficeExtractorService
     )
 
   def source = createStream(cc015cOfficeOfDepartureGB)
@@ -166,6 +166,7 @@ class MessageControllerSpec
     reset(mockMessageTypeExtractor)
     reset(mockPersistenceConnector)
     reset(mockObjectStoreService)
+    reset(mockCustomOfficeExtractorService)
     super.afterEach()
   }
 
@@ -182,8 +183,8 @@ class MessageControllerSpec
           any[String].asInstanceOf[MovementType],
           any[String].asInstanceOf[MovementId],
           any[String].asInstanceOf[MessageId],
-          any[RequestMessageType],
-          any[Source[ByteString, _]]
+          any[Source[ByteString, _]],
+          any[String].asInstanceOf[CustomsOffice]
         )(any[HeaderCarrier], any[ExecutionContext])
       ).thenReturn(submitDeclarationEither)
 
@@ -197,6 +198,9 @@ class MessageControllerSpec
 
       when(mockMessageTypeExtractor.extractFromHeaders(any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](MessageType.DeclarationData))
 
+      when(mockCustomOfficeExtractorService.extractCustomOffice(any(), any()))
+        .thenReturn(EitherT.rightT[Future, CustomOfficeExtractorError](CustomsOffice("GB1234567")))
+
       val result = controller().outgoing(eori, movementType, movementId, messageId)(fakeRequest(cc015cOfficeOfDepartureGB, outgoing, messageTypeHeader))
 
       status(result) mustBe ACCEPTED
@@ -206,15 +210,13 @@ class MessageControllerSpec
 
       "returns message to indicate invalid office" in forAll(Gen.alphaNumStr, Gen.alphaStr) {
         (office, field) =>
-          when(
-            mockRoutingService.submitMessage(
-              any[String].asInstanceOf[MovementType],
-              any[String].asInstanceOf[MovementId],
-              any[String].asInstanceOf[MessageId],
-              any[RequestMessageType],
-              any[Source[ByteString, _]]
-            )(any[HeaderCarrier], any[ExecutionContext])
-          ).thenReturn(EitherT[Future, RoutingError, Unit](Future.successful(Left(RoutingError.UnrecognisedOffice("office", CustomsOffice(office), field)))))
+          when(mockCustomOfficeExtractorService.extractCustomOffice(any(), any()))
+            .thenReturn(
+              EitherT[Future, CustomOfficeExtractorError, CustomsOffice](
+                Future.successful(Left(CustomOfficeExtractorError.UnrecognisedOffice("office", CustomsOffice(office), field)))
+              )
+            )
+
           when(mockMessageTypeExtractor.extractFromHeaders(any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](MessageType.DeclarationData))
 
           val result = controller().outgoing(eori, movementType, movementId, messageId)(fakeRequest(cc015cOfficeOfDepartureGB, outgoing, messageTypeHeader))
@@ -234,15 +236,11 @@ class MessageControllerSpec
 
       "returns message to indicate element not found" in {
 
-        when(
-          mockRoutingService.submitMessage(
-            any[String].asInstanceOf[MovementType],
-            any[String].asInstanceOf[MovementId],
-            any[String].asInstanceOf[MessageId],
-            any[RequestMessageType],
-            any[Source[ByteString, _]]
-          )(any[HeaderCarrier], any[ExecutionContext])
-        ).thenReturn(EitherT[Future, RoutingError, Unit](Future.successful(Left(RoutingError.NoElementFound("messageSender")))))
+        when(mockCustomOfficeExtractorService.extractCustomOffice(any(), any()))
+          .thenReturn(
+            EitherT[Future, CustomOfficeExtractorError, CustomsOffice](Future.successful(Left(CustomOfficeExtractorError.NoElementFound("messageSender"))))
+          )
+
         when(mockMessageTypeExtractor.extractFromHeaders(any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](MessageType.DeclarationData))
 
         val result = controller().outgoing(eori, movementType, movementId, messageId)(fakeRequest(cc015cOfficeOfDepartureGB, outgoing, messageTypeHeader))
@@ -256,15 +254,11 @@ class MessageControllerSpec
 
       "returns message to indicate too many elements" in {
 
-        when(
-          mockRoutingService.submitMessage(
-            any[String].asInstanceOf[MovementType],
-            any[String].asInstanceOf[MovementId],
-            any[String].asInstanceOf[MessageId],
-            any[RequestMessageType],
-            any[Source[ByteString, _]]
-          )(any[HeaderCarrier], any[ExecutionContext])
-        ).thenReturn(EitherT[Future, RoutingError, Unit](Future.successful(Left(RoutingError.TooManyElementsFound("eori")))))
+        when(mockCustomOfficeExtractorService.extractCustomOffice(any(), any()))
+          .thenReturn(
+            EitherT[Future, CustomOfficeExtractorError, CustomsOffice](Future.successful(Left(CustomOfficeExtractorError.TooManyElementsFound("eori"))))
+          )
+
         when(mockMessageTypeExtractor.extractFromHeaders(any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](MessageType.DeclarationData))
 
         val result = controller().outgoing(eori, movementType, movementId, messageId)(fakeRequest(cc015cOfficeOfDepartureGB, outgoing, messageTypeHeader))
@@ -278,15 +272,6 @@ class MessageControllerSpec
 
       "returns message to inform that the X-Message-Type header is not present" in {
 
-        when(
-          mockRoutingService.submitMessage(
-            any[String].asInstanceOf[MovementType],
-            any[String].asInstanceOf[MovementId],
-            any[String].asInstanceOf[MessageId],
-            any[RequestMessageType],
-            any[Source[ByteString, _]]
-          )(any[HeaderCarrier], any[ExecutionContext])
-        ).thenReturn(EitherT[Future, RoutingError, Unit](Future.successful(Left(RoutingError.NoElementFound("messageSender")))))
         when(mockMessageTypeExtractor.extractFromHeaders(any()))
           .thenReturn(EitherT.leftT[Future, MessageType](MessageTypeExtractionError.UnableToExtractFromHeader))
 
@@ -301,26 +286,17 @@ class MessageControllerSpec
 
       "returns message to inform that the X-Message-Type header value is invalid" in {
 
-        when(
-          mockRoutingService.submitMessage(
-            any[String].asInstanceOf[MovementType],
-            any[String].asInstanceOf[MovementId],
-            any[String].asInstanceOf[MessageId],
-            any[RequestMessageType],
-            any[Source[ByteString, _]]
-          )(any[HeaderCarrier], any[ExecutionContext])
-        ).thenReturn(EitherT[Future, RoutingError, Unit](Future.successful(Left(RoutingError.NoElementFound("messageSender")))))
         when(mockMessageTypeExtractor.extractFromHeaders(any()))
-          .thenReturn(EitherT.leftT[Future, MessageType](MessageTypeExtractionError.InvalidMessageType("EEinvalid")))
+          .thenReturn(EitherT.leftT[Future, MessageType](MessageTypeExtractionError.InvalidMessageType("invalid")))
 
         val result = controller().outgoing(eori, movementType, movementId, messageId)(
-          fakeRequest(cc015cOfficeOfDepartureGB, outgoing, FakeHeaders(Seq(("X-Message-Type", "EEinvalid"))))
+          fakeRequest(cc015cOfficeOfDepartureGB, outgoing, FakeHeaders(Seq(("X-Message-Type", "invalid"))))
         )
 
         status(result) mustBe BAD_REQUEST
         contentAsJson(result) mustBe Json.obj(
           "code"    -> "BAD_REQUEST",
-          "message" -> "Invalid message type: EEinvalid"
+          "message" -> "Invalid message type: invalid"
         )
       }
     }
@@ -332,14 +308,18 @@ class MessageControllerSpec
           any[String].asInstanceOf[MovementType],
           any[String].asInstanceOf[MovementId],
           any[String].asInstanceOf[MessageId],
-          any[RequestMessageType],
-          any[Source[ByteString, _]]
+          any[Source[ByteString, _]],
+          any[String].asInstanceOf[CustomsOffice]
         )(any[HeaderCarrier], any[ExecutionContext])
       ).thenReturn(
         EitherT[Future, RoutingError, Unit](
           Future.successful(Left(RoutingError.Unexpected("unexpected error", Some(new Exception("An unexpected error occurred")))))
         )
       )
+
+      when(mockCustomOfficeExtractorService.extractCustomOffice(any(), any()))
+        .thenReturn(EitherT.rightT[Future, CustomOfficeExtractorError](CustomsOffice("GB1234567")))
+
       when(mockMessageTypeExtractor.extractFromHeaders(any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](MessageType.DeclarationData))
 
       val result = controller().outgoing(eori, movementType, movementId, messageId)(fakeRequest(cc015cOfficeOfDepartureGB, outgoing, messageTypeHeader))
@@ -378,6 +358,12 @@ class MessageControllerSpec
 
         when(mockObjectStoreURIExtractor.extractObjectStoreURIHeader(any[Headers]))
           .thenReturn(EitherT.rightT(objectStoreResourceLocation))
+
+        when(mockObjectStoreService.getObjectStoreFile(any[String].asInstanceOf[ObjectStoreResourceLocation])(any[HeaderCarrier], any[ExecutionContext]))
+          .thenReturn(EitherT.rightT(source))
+
+        when(mockCustomOfficeExtractorService.extractCustomOffice(any(), any()))
+          .thenReturn(EitherT.rightT[Future, CustomOfficeExtractorError](CustomsOffice("GB1234567")))
 
         when(
           mockObjectStoreService.storeOutgoing(
@@ -502,6 +488,13 @@ class MessageControllerSpec
         when(mockMessageTypeExtractor.extractFromHeaders(any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](MessageType.DeclarationData))
         when(mockObjectStoreURIExtractor.extractObjectStoreURIHeader(any[Headers]))
           .thenReturn(EitherT.rightT(objectStoreResourceLocation))
+
+        when(mockObjectStoreService.getObjectStoreFile(any[String].asInstanceOf[ObjectStoreResourceLocation])(any[HeaderCarrier], any[ExecutionContext]))
+          .thenReturn(EitherT.rightT(source))
+
+        when(mockCustomOfficeExtractorService.extractCustomOffice(any(), any()))
+          .thenReturn(EitherT.rightT[Future, CustomOfficeExtractorError](CustomsOffice("GB1234567")))
+
         when(
           mockObjectStoreService.storeOutgoing(
             any[String].asInstanceOf[ObjectStoreResourceLocation]

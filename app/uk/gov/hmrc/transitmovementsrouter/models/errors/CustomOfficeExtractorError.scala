@@ -14,16 +14,15 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovementsrouter.services.error
+package uk.gov.hmrc.transitmovementsrouter.models.errors
 
-import uk.gov.hmrc.http.UpstreamErrorResponse
+import uk.gov.hmrc.transitmovementsrouter.models.CustomsOffice
 
-import java.time.format.DateTimeParseException
+sealed trait CustomOfficeExtractorError
 
-object RoutingError {
-  case class Upstream(upstreamErrorResponse: UpstreamErrorResponse)          extends RoutingError
-  case class Unexpected(message: String, cause: Option[Throwable])           extends RoutingError
-  case class BadDateTime(element: String, exception: DateTimeParseException) extends RoutingError
+object CustomOfficeExtractorError {
+  case class NoElementFound(element: String) extends CustomOfficeExtractorError
+
+  case class TooManyElementsFound(element: String)                                     extends CustomOfficeExtractorError
+  case class UnrecognisedOffice(message: String, office: CustomsOffice, field: String) extends CustomOfficeExtractorError
 }
-
-sealed trait RoutingError
