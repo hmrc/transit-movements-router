@@ -206,9 +206,9 @@ class MessageControllerSpec
       status(result) mustBe ACCEPTED
     }
 
-    "must return INVALID_OFFICE when the routing cannot determine where to send a message to" - {
+    "must return BAD_REQUEST when declaration submission fails" - {
 
-      "returns message to indicate invalid office" in forAll(Gen.alphaNumStr, Gen.alphaStr) {
+      "returns INVALID_OFFICE when an invalid custom office supplied in payload" in forAll(Gen.alphaNumStr, Gen.alphaStr) {
         (office, field) =>
           when(mockCustomOfficeExtractorService.extractCustomOffice(any(), any()))
             .thenReturn(
@@ -229,10 +229,6 @@ class MessageControllerSpec
             "field"   -> field
           )
       }
-
-    }
-
-    "must return BAD_REQUEST when declaration submission fails" - {
 
       "returns message to indicate element not found" in {
 
@@ -299,6 +295,19 @@ class MessageControllerSpec
           "message" -> "Invalid message type: invalid"
         )
       }
+
+      "returns message is not a request message" in {
+
+        when(mockMessageTypeExtractor.extractFromHeaders(any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](MessageType.Discrepancies))
+        lazy val messageTypeHeader = FakeHeaders(Seq(("X-Message-Type", MessageType.Discrepancies.code)))
+        val result                 = controller().outgoing(eori, movementType, movementId, messageId)(fakeRequest(cc015cOfficeOfDepartureGB, outgoing, messageTypeHeader))
+
+        status(result) mustBe BAD_REQUEST
+        contentAsJson(result) mustBe Json.obj(
+          "code"    -> "BAD_REQUEST",
+          "message" -> s"${MessageType.Discrepancies.code} is not valid for requests"
+        )
+      }
     }
 
     "must return INTERNAL_SERVER_ERROR when declaration submission fails due to unexpected error" in {
@@ -328,19 +337,6 @@ class MessageControllerSpec
       contentAsJson(result) mustBe Json.obj(
         "code"    -> "INTERNAL_SERVER_ERROR",
         "message" -> "Internal server error"
-      )
-    }
-
-    "must return BAD_REQUEST when a message is not a request message" in {
-
-      when(mockMessageTypeExtractor.extractFromHeaders(any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](MessageType.Discrepancies))
-      lazy val messageTypeHeader = FakeHeaders(Seq(("X-Message-Type", MessageType.Discrepancies.code)))
-      val result                 = controller().outgoing(eori, movementType, movementId, messageId)(fakeRequest(cc015cOfficeOfDepartureGB, outgoing, messageTypeHeader))
-
-      status(result) mustBe BAD_REQUEST
-      contentAsJson(result) mustBe Json.obj(
-        "code"    -> "BAD_REQUEST",
-        "message" -> s"${MessageType.Discrepancies.code} is not valid for requests"
       )
     }
 
@@ -476,6 +472,142 @@ class MessageControllerSpec
         contentAsJson(result) mustBe Json.obj(
           "code"    -> "BAD_REQUEST",
           "message" -> "Missing X-Object-Store-Uri header value"
+        )
+    }
+
+    "must return BAD_REQUEST when file not found on object store resource location" in forAll(
+      arbitraryMovementId.arbitrary,
+      arbitraryMessageId.arbitrary,
+      arbitraryObjectStoreResourceLocation.arbitrary
+    ) {
+      (movementId, messageId, objectStoreResourceLocation) =>
+        when(mockMessageTypeExtractor.extractFromHeaders(any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](MessageType.DeclarationData))
+
+        when(mockObjectStoreURIExtractor.extractObjectStoreURIHeader(any[Headers]))
+          .thenReturn(EitherT.rightT(objectStoreResourceLocation))
+
+        when(mockObjectStoreService.getObjectStoreFile(any[String].asInstanceOf[ObjectStoreResourceLocation])(any[HeaderCarrier], any[ExecutionContext]))
+          .thenReturn(EitherT.leftT(ObjectStoreError.FileNotFound(objectStoreResourceLocation.contextPath)))
+
+        val request = FakeRequest(
+          method = "POST",
+          uri = outgoing,
+          headers = FakeHeaders(Seq("X-Message-Type" -> MessageType.DeclarationData.code, "X-Object-Store-Uri" -> objectStoreResourceLocation.contextPath)),
+          body = AnyContentAsEmpty
+        )
+        val result = controller().outgoing(eori, movementType, movementId, messageId)(request)
+
+        status(result) mustBe BAD_REQUEST
+        contentAsJson(result) mustBe Json.obj(
+          "code"    -> "BAD_REQUEST",
+          "message" -> s"file not found at location: ${objectStoreResourceLocation.contextPath}"
+        )
+    }
+
+    "must return INVALID_OFFICE when an invalid custom office supplied in payload" in forAll(
+      arbitraryMovementId.arbitrary,
+      arbitraryMessageId.arbitrary,
+      arbitraryObjectStoreResourceLocation.arbitrary,
+      Gen.alphaNumStr,
+      Gen.alphaStr
+    ) {
+      (movementId, messageId, objectStoreResourceLocation, office, field) =>
+        when(mockMessageTypeExtractor.extractFromHeaders(any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](MessageType.DeclarationData))
+
+        when(mockObjectStoreURIExtractor.extractObjectStoreURIHeader(any[Headers]))
+          .thenReturn(EitherT.rightT(objectStoreResourceLocation))
+
+        when(mockObjectStoreService.getObjectStoreFile(any[String].asInstanceOf[ObjectStoreResourceLocation])(any[HeaderCarrier], any[ExecutionContext]))
+          .thenReturn(EitherT.rightT(source))
+
+        when(mockCustomOfficeExtractorService.extractCustomOffice(any(), any()))
+          .thenReturn(
+            EitherT[Future, CustomOfficeExtractorError, CustomsOffice](
+              Future.successful(Left(CustomOfficeExtractorError.UnrecognisedOffice("office", CustomsOffice(office), field)))
+            )
+          )
+
+        val request = FakeRequest(
+          method = "POST",
+          uri = outgoing,
+          headers = FakeHeaders(Seq("X-Message-Type" -> MessageType.DeclarationData.code, "X-Object-Store-Uri" -> objectStoreResourceLocation.contextPath)),
+          body = AnyContentAsEmpty
+        )
+        val result = controller().outgoing(eori, movementType, movementId, messageId)(request)
+
+        status(result) mustBe BAD_REQUEST
+        contentAsJson(result) mustBe Json.obj(
+          "code"    -> "INVALID_OFFICE",
+          "message" -> "office",
+          "office"  -> office,
+          "field"   -> field
+        )
+    }
+
+    "must return message to indicate element not found" in forAll(
+      arbitraryMovementId.arbitrary,
+      arbitraryMessageId.arbitrary,
+      arbitraryObjectStoreResourceLocation.arbitrary
+    ) {
+      (movementId, messageId, objectStoreResourceLocation) =>
+        when(mockMessageTypeExtractor.extractFromHeaders(any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](MessageType.DeclarationData))
+
+        when(mockObjectStoreURIExtractor.extractObjectStoreURIHeader(any[Headers]))
+          .thenReturn(EitherT.rightT(objectStoreResourceLocation))
+
+        when(mockObjectStoreService.getObjectStoreFile(any[String].asInstanceOf[ObjectStoreResourceLocation])(any[HeaderCarrier], any[ExecutionContext]))
+          .thenReturn(EitherT.rightT(source))
+
+        when(mockCustomOfficeExtractorService.extractCustomOffice(any(), any()))
+          .thenReturn(
+            EitherT[Future, CustomOfficeExtractorError, CustomsOffice](Future.successful(Left(CustomOfficeExtractorError.NoElementFound("messageSender"))))
+          )
+
+        val request = FakeRequest(
+          method = "POST",
+          uri = outgoing,
+          headers = FakeHeaders(Seq("X-Message-Type" -> MessageType.DeclarationData.code, "X-Object-Store-Uri" -> objectStoreResourceLocation.contextPath)),
+          body = AnyContentAsEmpty
+        )
+        val result = controller().outgoing(eori, movementType, movementId, messageId)(request)
+
+        status(result) mustBe BAD_REQUEST
+        contentAsJson(result) mustBe Json.obj(
+          "code"    -> "BAD_REQUEST",
+          "message" -> "Element messageSender not found"
+        )
+    }
+
+    "must return message to indicate too many elements" in forAll(
+      arbitraryMovementId.arbitrary,
+      arbitraryMessageId.arbitrary,
+      arbitraryObjectStoreResourceLocation.arbitrary
+    ) {
+      (movementId, messageId, objectStoreResourceLocation) =>
+        when(mockMessageTypeExtractor.extractFromHeaders(any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](MessageType.DeclarationData))
+
+        when(mockObjectStoreURIExtractor.extractObjectStoreURIHeader(any[Headers]))
+          .thenReturn(EitherT.rightT(objectStoreResourceLocation))
+
+        when(mockObjectStoreService.getObjectStoreFile(any[String].asInstanceOf[ObjectStoreResourceLocation])(any[HeaderCarrier], any[ExecutionContext]))
+          .thenReturn(EitherT.rightT(source))
+
+        when(mockCustomOfficeExtractorService.extractCustomOffice(any(), any()))
+          .thenReturn(
+            EitherT[Future, CustomOfficeExtractorError, CustomsOffice](Future.successful(Left(CustomOfficeExtractorError.TooManyElementsFound("eori"))))
+          )
+        val request = FakeRequest(
+          method = "POST",
+          uri = outgoing,
+          headers = FakeHeaders(Seq("X-Message-Type" -> MessageType.DeclarationData.code, "X-Object-Store-Uri" -> objectStoreResourceLocation.contextPath)),
+          body = AnyContentAsEmpty
+        )
+        val result = controller().outgoing(eori, movementType, movementId, messageId)(request)
+
+        status(result) mustBe BAD_REQUEST
+        contentAsJson(result) mustBe Json.obj(
+          "code"    -> "BAD_REQUEST",
+          "message" -> "Found too many elements of type eori"
         )
     }
 
