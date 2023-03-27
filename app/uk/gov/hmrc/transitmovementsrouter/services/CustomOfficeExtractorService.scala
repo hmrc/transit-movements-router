@@ -60,9 +60,9 @@ class CustomOfficeExtractorServiceImpl @Inject() (implicit ec: ExecutionContext,
         val xmlParsing: FlowShape[ByteString, ParseEvent] = builder.add(XmlParsing.parser)
         val customsOfficeSelector: FlowShape[ParseEvent, ParseResult[CustomsOffice]] =
           builder.add(XmlParser.customsOfficeExtractor(messageType))
-        val selectCustomOfficeType: FlowShape[ParseResult[CustomsOffice], ParseResult[CustomsOffice]] =
+        val validCustomOfficeType: FlowShape[ParseResult[CustomsOffice], ParseResult[CustomsOffice]] =
           builder.add(Flow.fromFunction(validCustomOfficeCheck(_, messageType)))
-        xmlParsing ~> customsOfficeSelector ~> selectCustomOfficeType ~> sink
+        xmlParsing ~> customsOfficeSelector ~> validCustomOfficeType ~> sink
 
         SinkShape(xmlParsing.in)
     })

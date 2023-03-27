@@ -58,11 +58,11 @@ class RoutingServiceImpl @Inject() (
     customsOffice: CustomsOffice
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): EitherT[Future, RoutingError, Unit] =
     for {
-      connector <- selectConnector(customsOffice)
+      connector <- eisConnectorSelector(customsOffice)
       _         <- EitherT(connector.post(movementId, messageId, payload.via(eisMessageTransformers.wrap), hc))
     } yield ()
 
-  private def selectConnector(customsOffice: CustomsOffice): EitherT[Future, RoutingError, EISConnector] = EitherT {
+  private def eisConnectorSelector(customsOffice: CustomsOffice): EitherT[Future, RoutingError, EISConnector] = EitherT {
     if (customsOffice.isGB) Future.successful(Right(messageConnectorProvider.gb))
     else Future.successful(Right(messageConnectorProvider.xi))
   }
