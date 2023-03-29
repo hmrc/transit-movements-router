@@ -24,8 +24,8 @@ import com.github.tomakehurst.wiremock.matching.StringValuePattern
 import com.github.tomakehurst.wiremock.stubbing.Scenario
 import org.mockito.ArgumentMatchers
 import org.mockito.Mockito.when
-import org.scalacheck.Gen
 import org.scalacheck.Arbitrary.arbitrary
+import org.scalacheck.Gen
 import org.scalatest.concurrent.IntegrationPatience
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.matchers.must.Matchers
@@ -36,7 +36,6 @@ import org.scalatestplus.mockito.MockitoSugar
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import play.api.http.HeaderNames
 import play.api.test.Helpers._
-import retry.RetryDetails
 import retry.RetryPolicies
 import retry.RetryPolicy
 import uk.gov.hmrc.http.HeaderCarrier
@@ -57,8 +56,8 @@ import uk.gov.hmrc.transitmovementsrouter.models.MovementId
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
 
 import java.net.URL
-import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 
 class EISConnectorSpec
@@ -340,25 +339,6 @@ class EISConnectorSpec
         case Left(x) if x.isInstanceOf[RoutingError.Unexpected] => x.asInstanceOf[RoutingError.Unexpected].cause.get mustBe a[RuntimeException]
         case _                                                  => fail("Left was not a RoutingError.Unexpected")
       }
-  }
-
-  "when retrying with an error that should occur, fail the future with an IllegalStateException" in {
-    val httpClientV2 = mock[HttpClientV2]
-
-    val connector = new EISConnectorImpl("Failure", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, NoRetries)
-
-    val result = connector
-      .onFailure(Left(RoutingError.NoElementFound("error")), mock[RetryDetails])
-      .map(
-        _ => fail("No error was thrown when it should be")
-      )
-      .recover {
-        case _: IllegalStateException => ()
-      }
-
-    whenReady(result) {
-      _ => // we can only get here if it was successful and a unit
-    }
   }
 
 }

@@ -24,7 +24,7 @@ import uk.gov.hmrc.transitmovementsrouter.base.StreamTestHelpers._
 import uk.gov.hmrc.transitmovementsrouter.base.TestActorSystem
 import uk.gov.hmrc.transitmovementsrouter.generators.TestModelGenerators
 import uk.gov.hmrc.transitmovementsrouter.models._
-import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError.NoElementFound
+import uk.gov.hmrc.transitmovementsrouter.models.errors.CustomOfficeExtractorError.NoElementFound
 
 import java.time.format.DateTimeFormatter
 import scala.xml._

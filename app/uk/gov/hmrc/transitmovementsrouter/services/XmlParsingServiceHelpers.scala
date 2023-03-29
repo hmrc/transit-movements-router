@@ -19,20 +19,20 @@ package uk.gov.hmrc.transitmovementsrouter.services
 import akka.NotUsed
 import akka.stream.alpakka.xml.ParseEvent
 import akka.stream.scaladsl.Flow
-import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
+import uk.gov.hmrc.transitmovementsrouter.models.errors.CustomOfficeExtractorError
 
 trait XmlParsingServiceHelpers {
 
-  type ParseResult[A] = Either[RoutingError, A]
+  type ParseResult[A] = Either[CustomOfficeExtractorError, A]
 
   implicit class FlowOps[A](value: Flow[ParseEvent, A, NotUsed]) {
 
     def single(element: String): Flow[ParseEvent, ParseResult[A], NotUsed] =
-      value.fold[Either[RoutingError, A]](Left(RoutingError.NoElementFound(element)))(
+      value.fold[Either[CustomOfficeExtractorError, A]](Left(CustomOfficeExtractorError.NoElementFound(element)))(
         (current, next) =>
           current match {
-            case Left(RoutingError.NoElementFound(_)) => Right(next)
-            case _                                    => Left(RoutingError.TooManyElementsFound(element))
+            case Left(CustomOfficeExtractorError.NoElementFound(_)) => Right(next)
+            case _                                                  => Left(CustomOfficeExtractorError.TooManyElementsFound(element))
           }
       )
 

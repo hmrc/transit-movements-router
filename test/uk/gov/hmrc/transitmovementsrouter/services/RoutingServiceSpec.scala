@@ -33,14 +33,14 @@ import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
 import org.scalatestplus.mockito.MockitoSugar
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
+import play.api.http.Status.INTERNAL_SERVER_ERROR
 import uk.gov.hmrc.http.HeaderCarrier
+import uk.gov.hmrc.http.UpstreamErrorResponse
 import uk.gov.hmrc.transitmovementsrouter.base.StreamTestHelpers.createStream
 import uk.gov.hmrc.transitmovementsrouter.base._
 import uk.gov.hmrc.transitmovementsrouter.connectors._
 import uk.gov.hmrc.transitmovementsrouter.generators.TestModelGenerators
 import uk.gov.hmrc.transitmovementsrouter.models._
-import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
-import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError.NoElementFound
 
 import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
@@ -61,265 +61,163 @@ class RoutingServiceSpec
 
   implicit val hc: HeaderCarrier = HeaderCarrier()
 
-  "Submitting a payload" - new Setup {
+  val mockMessageConnectorProvider = mock[EISConnectorProvider]
+  val mockMessageConnector         = mock[EISConnector]
 
-    MessageType.departureRequestValues.foreach {
-      messageType =>
-        s"${messageType.code} should generate a valid departure office and updated payload for a GB payload" in forAll(
-          arbitrary[MessageId],
-          arbitrary[MovementId],
-          messageWithDepartureOfficeNode(messageType, "GB")
-        ) {
-          (messageId, movementId, officeOfDepartureXML) =>
-            val mockEISMessageTransformer = mock[EISMessageTransformers]
-            when(mockEISMessageTransformer.wrap).thenAnswer(
-              _ => Flow[ByteString]
-            )
+  "Submitting a payload" - {
 
-            val serviceUnderTest = new RoutingServiceImpl(mockEISMessageTransformer, mockMessageConnectorProvider)
-            val payload          = createStream(officeOfDepartureXML._1)
-            val response = serviceUnderTest.submitMessage(
-              MovementType("departures"),
-              movementId,
-              messageId,
-              messageType,
-              payload
-            )
+    "given a valid response from connector" - {
+      when(mockMessageConnectorProvider.gb) thenReturn mockMessageConnector
+      when(mockMessageConnectorProvider.xi) thenReturn mockMessageConnector
 
-            whenReady(response.value, Timeout(2.seconds)) {
-              r =>
-                r.mustBe(Right(()))
-                verify(mockEISMessageTransformer, times(1)).wrap
-            }
-        }
-
-        s"${messageType.code} should generate a valid departure office and updated payload for a Xi payload" in forAll(
-          arbitrary[MessageId],
-          arbitrary[MovementId],
-          messageWithDepartureOfficeNode(messageType, "XI")
-        ) {
-          (messageId, movementId, officeOfDepartureXML) =>
-            val mockEISMessageTransformer = mock[EISMessageTransformers]
-            when(mockEISMessageTransformer.wrap).thenAnswer(
-              _ => Flow[ByteString]
-            )
-
-            val serviceUnderTest = new RoutingServiceImpl(mockEISMessageTransformer, mockMessageConnectorProvider)
-            val payload          = createStream(officeOfDepartureXML._1)
-            val response = serviceUnderTest.submitMessage(
-              MovementType("departures"),
-              movementId,
-              messageId,
-              messageType,
-              payload
-            )
-
-            whenReady(response.value, Timeout(2.seconds)) {
-              r =>
-                r.mustBe(Right(()))
-                verify(mockEISMessageTransformer, times(1)).wrap
-            }
-        }
-
-        s"${messageType.code} should generate an invalid office of destination for a non GB/XI payload" in forAll(
-          arbitrary[MessageId],
-          arbitrary[MovementId],
-          messageWithDepartureOfficeNode(messageType, "FR")
-        ) {
-          (messageId, movementId, officeOfDeparture) =>
-            val mockEISMessageTransformer = mock[EISMessageTransformers]
-            when(mockEISMessageTransformer.wrap).thenAnswer(
-              _ => Flow[ByteString]
-            )
-
-            val serviceUnderTest = new RoutingServiceImpl(mockEISMessageTransformer, mockMessageConnectorProvider)
-            val referenceNumber  = officeOfDeparture._2
-            val payload          = createStream(officeOfDeparture._1)
-            val response = serviceUnderTest.submitMessage(
-              MovementType("departures"),
-              movementId,
-              messageId,
-              messageType,
-              payload
-            )
-
-            whenReady(response.value, Timeout(2.seconds)) {
-              r =>
-                r.mustBe(
-                  Left(RoutingError.UnrecognisedOffice(s"Did not recognise office: $referenceNumber", CustomsOffice(referenceNumber), messageType.officeNode))
+      MessageType.departureRequestValues.foreach {
+        messageType =>
+          s"${messageType.code} should return valid response for a GB payload" in forAll(
+            arbitrary[MessageId],
+            arbitrary[MovementId],
+            messageWithDepartureOfficeNode(messageType, "GB")
+          ) {
+            (messageId, movementId, officeOfDepartureXML) =>
+              when(
+                mockMessageConnector.post(
+                  MovementId(anyString()),
+                  MessageId(anyString()),
+                  any[Source[ByteString, _]],
+                  any[HeaderCarrier]
                 )
-                verify(mockEISMessageTransformer, times(0)).wrap
-            }
-        }
+              )
+                .thenReturn(Future.successful(Right(())))
+              val mockEISMessageTransformer = mock[EISMessageTransformers]
+              when(mockEISMessageTransformer.wrap).thenAnswer(
+                _ => Flow[ByteString]
+              )
 
-        s"${messageType.code} returns NoElementFound(referenceNumber) when it does not find an office of departure element" in forAll(
-          arbitrary[MessageId],
-          arbitrary[MovementId]
-        ) {
-          (messageId, movementId) =>
-            val mockEISMessageTransformer = mock[EISMessageTransformers]
-            when(mockEISMessageTransformer.wrap).thenAnswer(
-              _ => Flow[ByteString]
-            )
+              val serviceUnderTest = new RoutingServiceImpl(mockEISMessageTransformer, mockMessageConnectorProvider)
+              val payload          = createStream(officeOfDepartureXML._1)
+              val response = serviceUnderTest.submitMessage(
+                MovementType("departures"),
+                movementId,
+                messageId,
+                payload,
+                CustomsOffice(officeOfDepartureXML._2)
+              )
 
-            val serviceUnderTest = new RoutingServiceImpl(mockEISMessageTransformer, mockMessageConnectorProvider)
-            val payload          = createStream(emptyMessage(messageType.rootNode))
-            val response = serviceUnderTest.submitMessage(
-              MovementType("departures"),
-              movementId,
-              messageId,
-              messageType,
-              payload
-            )
+              whenReady(response.value, Timeout(2.seconds)) {
+                r =>
+                  r.mustBe(Right(()))
+                  verify(mockEISMessageTransformer, times(1)).wrap
+              }
+          }
 
-            whenReady(response.value, Timeout(2.seconds)) {
-              r =>
-                r.mustBe(Left(NoElementFound("referenceNumber")))
-                verify(mockEISMessageTransformer, times(0)).wrap
-            }
-        }
+          s"${messageType.code} should return valid response for a Xi payload" in forAll(
+            arbitrary[MessageId],
+            arbitrary[MovementId],
+            messageWithDepartureOfficeNode(messageType, "XI")
+          ) {
+            (messageId, movementId, officeOfDepartureXML) =>
+              val mockEISMessageTransformer = mock[EISMessageTransformers]
+              when(mockEISMessageTransformer.wrap).thenAnswer(
+                _ => Flow[ByteString]
+              )
+
+              val serviceUnderTest = new RoutingServiceImpl(mockEISMessageTransformer, mockMessageConnectorProvider)
+              val payload          = createStream(officeOfDepartureXML._1)
+              val response = serviceUnderTest.submitMessage(
+                MovementType("departures"),
+                movementId,
+                messageId,
+                payload,
+                CustomsOffice(officeOfDepartureXML._2)
+              )
+
+              whenReady(response.value, Timeout(2.seconds)) {
+                r =>
+                  r.mustBe(Right(()))
+                  verify(mockEISMessageTransformer, times(1)).wrap
+              }
+          }
+
+      }
     }
 
-    MessageType.arrivalRequestValues.foreach {
-      messageType =>
-        s"${messageType.code} should generate a valid office of destination and updated payload for a GB payload" in forAll(
-          arbitrary[MessageId],
-          arbitrary[MovementId],
-          messageWithDestinationOfficeNode(messageType, "GB")
-        ) {
-          (messageId, movementId, officeOfDestinationXML) =>
-            val mockEISMessageTransformer = mock[EISMessageTransformers]
-            when(mockEISMessageTransformer.wrap).thenAnswer(
-              _ => Flow[ByteString]
+    "given an error from connector" - {
+
+      when(mockMessageConnectorProvider.gb) thenReturn mockMessageConnector
+      when(mockMessageConnectorProvider.xi) thenReturn mockMessageConnector
+
+      s"should return error response for a GB payload" in forAll(
+        arbitrary[MessageId],
+        arbitrary[MovementId],
+        messageWithDepartureOfficeNode(MessageType.DeclarationData, "GB")
+      ) {
+        (messageId, movementId, officeOfDepartureXML) =>
+          val upstreamErrorResponse: Throwable = UpstreamErrorResponse("Internal service error", INTERNAL_SERVER_ERROR)
+          when(
+            mockMessageConnector.post(
+              MovementId(anyString()),
+              MessageId(anyString()),
+              any[Source[ByteString, _]],
+              any[HeaderCarrier]
             )
+          )
+            .thenReturn(Future.failed(upstreamErrorResponse))
+          val mockEISMessageTransformer = mock[EISMessageTransformers]
+          when(mockEISMessageTransformer.wrap).thenAnswer(
+            _ => Flow[ByteString]
+          )
 
-            val serviceUnderTest = new RoutingServiceImpl(mockEISMessageTransformer, mockMessageConnectorProvider)
-            val payload          = createStream(officeOfDestinationXML._1)
-            val response = serviceUnderTest.submitMessage(
-              MovementType("arrivals"),
-              movementId,
-              messageId,
-              messageType,
-              payload
-            )
+          val serviceUnderTest = new RoutingServiceImpl(mockEISMessageTransformer, mockMessageConnectorProvider)
+          val payload          = createStream(officeOfDepartureXML._1)
+          val response = serviceUnderTest.submitMessage(
+            MovementType("departures"),
+            movementId,
+            messageId,
+            payload,
+            CustomsOffice(officeOfDepartureXML._2)
+          )
 
-            whenReady(response.value, Timeout(2.seconds)) {
-              r =>
-                r.mustBe(Right(()))
-                verify(mockEISMessageTransformer, times(1)).wrap
-            }
-        }
+          whenReady(response.value.failed, Timeout(2.seconds)) {
+            r => r.mustBe(upstreamErrorResponse)
 
-        s"${messageType.code} should generate a valid office of destination and updated payload for a XI payload" in forAll(
-          arbitrary[MessageId],
-          arbitrary[MovementId],
-          messageWithDestinationOfficeNode(messageType, "XI")
-        ) {
-          (messageId, movementId, officeOfDestinationXML) =>
-            val mockEISMessageTransformer = mock[EISMessageTransformers]
-            when(mockEISMessageTransformer.wrap).thenAnswer(
-              _ => Flow[ByteString]
-            )
-
-            val serviceUnderTest = new RoutingServiceImpl(mockEISMessageTransformer, mockMessageConnectorProvider)
-            val payload          = createStream(officeOfDestinationXML._1)
-            val response = serviceUnderTest.submitMessage(
-              MovementType("arrivals"),
-              movementId,
-              messageId,
-              messageType,
-              payload
-            )
-
-            whenReady(response.value, Timeout(2.seconds)) {
-              r =>
-                r.mustBe(Right(()))
-                verify(mockEISMessageTransformer, times(1)).wrap
-            }
-        }
-
-        val officeOfDestinationXML = messageWithDestinationOfficeNode(messageType, "FR").sample.value
-
-        s"${messageType.code} should generate an invalid office of destination for a non GB/XI payload" in forAll(
-          arbitrary[MessageId],
-          arbitrary[MovementId]
-        ) {
-          (messageId, movementId) =>
-            val mockEISMessageTransformer = mock[EISMessageTransformers]
-            when(mockEISMessageTransformer.wrap).thenAnswer(
-              _ => Flow[ByteString]
-            )
-
-            val serviceUnderTest = new RoutingServiceImpl(mockEISMessageTransformer, mockMessageConnectorProvider)
-            val payload          = createStream(officeOfDestinationXML._1)
-
-            val response = serviceUnderTest.submitMessage(
-              MovementType("arrivals"),
-              movementId,
-              messageId,
-              messageType,
-              payload
-            )
-
-            whenReady(response.value, Timeout(2.seconds)) {
-              r =>
-                r.mustBe(
-                  Left(
-                    RoutingError.UnrecognisedOffice(
-                      s"Did not recognise office: ${officeOfDestinationXML._2}",
-                      CustomsOffice(officeOfDestinationXML._2),
-                      messageType.officeNode
-                    )
-                  )
-                )
-                verify(mockEISMessageTransformer, times(0)).wrap
-            }
-        }
-
-    }
-  }
-
-  "selectConnector" - {
-
-    val mockEISMessageTransformer = mock[EISMessageTransformers]
-    when(mockEISMessageTransformer.wrap).thenAnswer(
-      _ => Flow[ByteString]
-    )
-    val mockGbEISConnector = mock[EISConnector]
-    when(mockGbEISConnector.toString).thenReturn("GB")
-    val mockXiEISConnector = mock[EISConnector]
-    when(mockXiEISConnector.toString).thenReturn("XI")
-
-    val provider = new EISConnectorProvider {
-      override def gb: EISConnector = mockGbEISConnector
-      override def xi: EISConnector = mockXiEISConnector
+          }
+      }
     }
 
-    val sut = new RoutingServiceImpl(mockEISMessageTransformer, provider)
-
-    val requestMessageTypes = Gen.oneOf(MessageType.departureRequestValues ++ MessageType.arrivalRequestValues)
-
-    "GB returns the GB EIS connector" in forAll(createReferenceNumberWithPrefix("GB"), requestMessageTypes) {
-      (office, messageType) =>
-        sut.selectConnector(Right(CustomsOffice(office)), messageType) mustBe Right(mockGbEISConnector)
-    }
-
-    "XI returns the XI EIS connector" in forAll(createReferenceNumberWithPrefix("XI"), requestMessageTypes) {
-      (office, messageType) =>
-        sut.selectConnector(Right(CustomsOffice(office)), messageType) mustBe Right(mockXiEISConnector)
-    }
-
-    "Other offices returns a RoutingError" in forAll(createReferenceNumberWithPrefix("FR"), requestMessageTypes) {
-      (office, messageType) =>
-        sut.selectConnector(Right(CustomsOffice(office)), messageType) mustBe Left(
-          RoutingError.UnrecognisedOffice(s"Did not recognise office: $office", CustomsOffice(office), messageType.officeNode)
+    s"should return error response for a XI payload" in forAll(
+      arbitrary[MessageId],
+      arbitrary[MovementId],
+      messageWithDepartureOfficeNode(MessageType.DeclarationData, "XI")
+    ) {
+      (messageId, movementId, officeOfDepartureXML) =>
+        val upstreamErrorResponse: Throwable = UpstreamErrorResponse("Internal service error", INTERNAL_SERVER_ERROR)
+        when(
+          mockMessageConnector.post(
+            MovementId(anyString()),
+            MessageId(anyString()),
+            any[Source[ByteString, _]],
+            any[HeaderCarrier]
+          )
         )
-    }
+          .thenReturn(Future.failed(upstreamErrorResponse))
+        val mockEISMessageTransformer = mock[EISMessageTransformers]
+        when(mockEISMessageTransformer.wrap).thenAnswer(
+          _ => Flow[ByteString]
+        )
 
-    "Pre-existing error must be preserved" in forAll(requestMessageTypes) {
-      messageType =>
-        val error = RoutingError.Unexpected("error", Some(new IllegalStateException()))
-        sut.selectConnector(Left(error), messageType) mustBe Left(error)
+        val serviceUnderTest = new RoutingServiceImpl(mockEISMessageTransformer, mockMessageConnectorProvider)
+        val payload          = createStream(officeOfDepartureXML._1)
+        val response = serviceUnderTest.submitMessage(
+          MovementType("departures"),
+          movementId,
+          messageId,
+          payload,
+          CustomsOffice(officeOfDepartureXML._2)
+        )
+
+        whenReady(response.value.failed, Timeout(2.seconds)) {
+          r => r.mustBe(upstreamErrorResponse)
+
+        }
     }
 
   }
@@ -328,45 +226,28 @@ class RoutingServiceSpec
     n => s"$prefix$n"
   )
 
-  trait Setup {
-
-    val mockMessageConnectorProvider = mock[EISConnectorProvider]
-    val mockMessageConnector         = mock[EISConnector]
-
-    when(mockMessageConnectorProvider.gb) thenReturn mockMessageConnector
-    when(mockMessageConnectorProvider.xi) thenReturn mockMessageConnector
-    when(
-      mockMessageConnector.post(
-        MovementId(anyString()),
-        MessageId(anyString()),
-        any[Source[ByteString, _]],
-        any[HeaderCarrier]
-      )
+  def messageWithDepartureOfficeNode(messageType: RequestMessageType, referenceType: String): Gen[(String, String)] =
+    for {
+      dateTime        <- arbitrary[OffsetDateTime].map(_.toLocalDateTime.truncatedTo(ChronoUnit.SECONDS).format(DateTimeFormatter.ISO_LOCAL_DATE))
+      referenceNumber <- createReferenceNumberWithPrefix(referenceType)
+    } yield (
+      s"<${messageType.rootNode}><preparationDateAndTime>$dateTime</preparationDateAndTime><${messageType.officeNode}><referenceNumber>$referenceNumber</referenceNumber></${messageType.officeNode}></${messageType.rootNode}>",
+      referenceNumber
     )
-      .thenReturn(Future.successful(Right(())))
 
-    def messageWithDepartureOfficeNode(messageType: RequestMessageType, referenceType: String): Gen[(String, String)] =
-      for {
-        dateTime        <- arbitrary[OffsetDateTime].map(_.toLocalDateTime.truncatedTo(ChronoUnit.SECONDS).format(DateTimeFormatter.ISO_LOCAL_DATE))
-        referenceNumber <- createReferenceNumberWithPrefix(referenceType)
-      } yield (
-        s"<${messageType.rootNode}><preparationDateAndTime>$dateTime</preparationDateAndTime><${messageType.officeNode}><referenceNumber>$referenceNumber</referenceNumber></${messageType.officeNode}></${messageType.rootNode}>",
-        referenceNumber
-      )
-
-    def messageWithDestinationOfficeNode(messageType: RequestMessageType, referenceType: String): Gen[(String, String)] =
-      for {
-        referenceNumber <- createReferenceNumberWithPrefix(referenceType)
-      } yield (
-        s"""<${messageType.rootNode}>
+  def messageWithDestinationOfficeNode(messageType: RequestMessageType, referenceType: String): Gen[(String, String)] =
+    for {
+      referenceNumber <- createReferenceNumberWithPrefix(referenceType)
+    } yield (
+      s"""<${messageType.rootNode}>
                            |<messageType>${messageType.code}</messageType>
                            |<${messageType.officeNode}>
                            |  <referenceNumber>$referenceNumber</referenceNumber>
                            |</${messageType.officeNode}>
                            |</${messageType.rootNode}>""".stripMargin,
-        referenceNumber
-      )
+      referenceNumber
+    )
 
-    def emptyMessage(messageTypeNode: String): String = s"<$messageTypeNode/>"
-  }
+  def emptyMessage(messageTypeNode: String): String = s"<$messageTypeNode/>"
+
 }

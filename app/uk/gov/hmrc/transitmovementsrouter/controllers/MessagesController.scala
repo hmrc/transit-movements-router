@@ -39,6 +39,7 @@ import uk.gov.hmrc.transitmovementsrouter.controllers.stream.StreamingParsers
 import uk.gov.hmrc.transitmovementsrouter.models._
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.DownloadUrl
+import uk.gov.hmrc.transitmovementsrouter.services.CustomOfficeExtractorService
 import uk.gov.hmrc.transitmovementsrouter.services.EISMessageTransformers
 import uk.gov.hmrc.transitmovementsrouter.services.MessageTypeExtractor
 import uk.gov.hmrc.transitmovementsrouter.services.ObjectStoreService
@@ -55,7 +56,8 @@ class MessagesController @Inject() (
   messageTypeExtractor: MessageTypeExtractor,
   authenticateEISToken: AuthenticateEISToken,
   eisMessageTransformers: EISMessageTransformers,
-  objectStoreService: ObjectStoreService
+  objectStoreService: ObjectStoreService,
+  customOfficeExtractorService: CustomOfficeExtractorService
 )(implicit
   val materializer: Materializer,
   val temporaryFileCreator: TemporaryFileCreator
@@ -73,7 +75,7 @@ class MessagesController @Inject() (
       case None    => outgoingLargeMessage(eori, movementType, movementId, messageId)
     }
 
-  def outgoingLargeMessage(eori: EoriNumber, movementType: MovementType, movementId: MovementId, messageId: MessageId) =
+  private def outgoingLargeMessage(eori: EoriNumber, movementType: MovementType, movementId: MovementId, messageId: MessageId) =
     Action.async {
       implicit request =>
         implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
@@ -81,6 +83,8 @@ class MessagesController @Inject() (
           messageType                 <- messageTypeExtractor.extractFromHeaders(request.headers).asPresentation
           requestMessageType          <- filterRequestMessageType(messageType)
           objectStoreResourceLocation <- extractObjectStoreURIHeader(request.headers)
+          source                      <- objectStoreService.getObjectStoreFile(objectStoreResourceLocation).asPresentation
+          customOffice                <- customOfficeExtractorService.extractCustomOffice(source, requestMessageType).asPresentation
           objectSummary <- objectStoreService
             .storeOutgoing(objectStoreResourceLocation)
             .asPresentation
@@ -90,14 +94,15 @@ class MessagesController @Inject() (
         )
     }
 
-  def outgoingSmallMessage(eori: EoriNumber, movementType: MovementType, movementId: MovementId, messageId: MessageId): Action[Source[ByteString, _]] =
+  private def outgoingSmallMessage(eori: EoriNumber, movementType: MovementType, movementId: MovementId, messageId: MessageId): Action[Source[ByteString, _]] =
     DefaultActionBuilder.apply(cc.parsers.anyContent).stream {
       implicit request =>
         implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
         (for {
           messageType        <- messageTypeExtractor.extractFromHeaders(request.headers).asPresentation
           requestMessageType <- filterRequestMessageType(messageType)
-          submitted          <- routingService.submitMessage(movementType, movementId, messageId, requestMessageType, request.body).asPresentation
+          customOffice       <- customOfficeExtractorService.extractCustomOffice(request.body, requestMessageType).asPresentation
+          submitted          <- routingService.submitMessage(movementType, movementId, messageId, request.body, customOffice).asPresentation
         } yield submitted).fold[Result](
           error => Status(error.code.statusCode)(Json.toJson(error)),
           _ => Accepted
