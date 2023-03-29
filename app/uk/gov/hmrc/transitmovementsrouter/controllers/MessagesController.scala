@@ -44,6 +44,7 @@ import uk.gov.hmrc.transitmovementsrouter.services.EISMessageTransformers
 import uk.gov.hmrc.transitmovementsrouter.services.MessageTypeExtractor
 import uk.gov.hmrc.transitmovementsrouter.services.ObjectStoreService
 import uk.gov.hmrc.transitmovementsrouter.services.RoutingService
+import uk.gov.hmrc.transitmovementsrouter.services.SDESService
 
 import javax.inject.Inject
 import scala.concurrent.Future
@@ -57,7 +58,8 @@ class MessagesController @Inject() (
   authenticateEISToken: AuthenticateEISToken,
   eisMessageTransformers: EISMessageTransformers,
   objectStoreService: ObjectStoreService,
-  customOfficeExtractorService: CustomOfficeExtractorService
+  customOfficeExtractorService: CustomOfficeExtractorService,
+  sdesService: SDESService
 )(implicit
   val materializer: Materializer,
   val temporaryFileCreator: TemporaryFileCreator
@@ -88,7 +90,8 @@ class MessagesController @Inject() (
           objectSummary <- objectStoreService
             .storeOutgoing(objectStoreResourceLocation)
             .asPresentation
-        } yield objectSummary).fold[Result](
+          result <- sdesService.send(movementId, messageId, objectSummary).asPresentation
+        } yield result).fold[Result](
           error => Status(error.code.statusCode)(Json.toJson(error)),
           _ => Accepted
         )
