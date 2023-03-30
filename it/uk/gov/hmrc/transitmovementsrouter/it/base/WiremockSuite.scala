@@ -67,7 +67,6 @@ trait WiremockSuiteWithGuice extends WiremockSuite {
         "microservice.services.eis.gb.port"                     -> server.port().toString,
         "microservice.services.eis.xi.port"                     -> server.port().toString,
         "microservice.services.ncts-monitoring.port"            -> server.port().toString,
-        "microservice.services.sdes-stub.port"                  -> server.port().toString,
         "microservice.services.secure-data-exchange-proxy.port" -> server.port().toString
       )
       .overrides(bindings: _*)

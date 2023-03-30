@@ -48,7 +48,7 @@ trait SDESConnector {
 class SDESConnectorImpl @Inject() (httpClientV2: HttpClientV2, appConfig: AppConfig) extends SDESConnector with Logging {
 
   private lazy val sdesFileReadyUrl =
-    appConfig.sdesUrl.withPath(appConfig.sdesFileReadyUri)
+    appConfig.sdesServiceBaseUrl.withPath(appConfig.sdesFileReadyUri)
   private lazy val clientId = appConfig.sdesClientId
 
   def send(request: SdesFilereadyRequest)(implicit

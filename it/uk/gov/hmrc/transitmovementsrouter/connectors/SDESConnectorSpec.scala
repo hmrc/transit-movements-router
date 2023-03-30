@@ -66,7 +66,7 @@ class SDESConnectorSpec
 
   lazy val sdesConnector: SDESConnector = new SDESConnectorImpl(httpClientV2, appConfig)
 
-  lazy val url = if (appConfig.useProxy) "/notification/fileready" else "/sdes-stub/notification/fileready"
+  lazy val url = "/sdes-stub/notification/fileready"
 
   "POST /notification/fileready" - {
 

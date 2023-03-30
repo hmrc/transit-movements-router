@@ -49,22 +49,16 @@ class AppConfig @Inject() (config: Configuration, servicesConfig: CTCServicesCon
     config.get[String]("microservice.services.object-store.sdes-host")
 
   // SDES configuration
-  lazy val useProxy: Boolean = config.get[Boolean]("sdes.use-proxy") // set true for sdes proxy and false for sdes stub
-  lazy val service: String   = if (useProxy) "secure-data-exchange-proxy" else "sdes-stub"
-
+  lazy val sdesServiceBaseUrl          = Url.parse(servicesConfig.baseUrl("secure-data-exchange-proxy"))
   lazy val sdesInformationType: String = config.get[String]("sdes.information-type")
   lazy val sdesSrn: String             = config.get[String]("sdes.srn")
   lazy val sdesClientId: String        = config.get[String]("sdes.client-id")
 
-  lazy val sdesUrl: AbsoluteUrl =
-    AbsoluteUrl.parse(servicesConfig.baseUrl(service))
-
   lazy val sdesFileReadyUri: UrlPath =
     UrlPath(
       config
-        .get[String](s"microservice.services.$service.file-ready-uri")
+        .get[String]("microservice.services.secure-data-exchange-proxy.file-ready-uri")
         .split("/")
         .filter(_.nonEmpty)
     )
-
 }
