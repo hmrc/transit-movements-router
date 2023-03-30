@@ -100,8 +100,8 @@ trait TestModelGenerators extends BaseGenerators {
       messageId  <- arbitraryMessageId.arbitrary
       lastModified      = Instant.now()
       formattedDateTime = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").withZone(ZoneOffset.UTC).format(lastModified)
-      contentLen <- Gen.long
-      hash       <- Gen.alphaNumStr.map(Md5Hash)
+      contentLen <- Gen.chooseNum(100, 500)
+      hash       <- Gen.stringOfN(4, Gen.alphaChar).map(Md5Hash)
     } yield ObjectSummaryWithMd5(
       Path.Directory("common-transit-convention-traders").file(s"${movementId.value}-${messageId.value}-$formattedDateTime.xml"),
       contentLen,

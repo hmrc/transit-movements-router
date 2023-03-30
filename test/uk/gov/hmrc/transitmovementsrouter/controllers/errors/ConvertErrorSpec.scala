@@ -41,6 +41,7 @@ import uk.gov.hmrc.transitmovementsrouter.models.errors.MessageTypeExtractionErr
 import uk.gov.hmrc.transitmovementsrouter.models.errors.ObjectStoreError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PushNotificationError
+import uk.gov.hmrc.transitmovementsrouter.models.errors.SDESError
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError._
 
@@ -208,6 +209,25 @@ class ConvertErrorSpec extends AnyFreeSpec with Matchers with OptionValues with 
 
     "an UnexpectedError Error with no exception returns an internal service error with no exception" in {
       val input = Left[ObjectStoreError, Unit](ObjectStoreError.UnexpectedError(None)).toEitherT[Future]
+      whenReady(input.asPresentation.value) {
+        _ mustBe Left(InternalServiceError("Internal server error", InternalServerError, None))
+
+      }
+    }
+  }
+
+  "SDESError" - {
+
+    "an UnexpectedError Error with exception returns an internal service error with an exception" in {
+      val exception = new IllegalStateException()
+      val input     = Left[SDESError, Unit](SDESError.UnexpectedError(Some(exception))).toEitherT[Future]
+      whenReady(input.asPresentation.value) {
+        _ mustBe Left(InternalServiceError("Internal server error", InternalServerError, Some(exception)))
+      }
+    }
+
+    "an UnexpectedError Error with no exception returns an internal service error with no exception" in {
+      val input = Left[SDESError, Unit](SDESError.UnexpectedError(None)).toEitherT[Future]
       whenReady(input.asPresentation.value) {
         _ mustBe Left(InternalServiceError("Internal server error", InternalServerError, None))
 

@@ -16,7 +16,9 @@
 
 package uk.gov.hmrc.transitmovementsrouter.config
 
+import io.lemonlabs.uri.AbsoluteUrl
 import io.lemonlabs.uri.Url
+import io.lemonlabs.uri.UrlPath
 
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -46,4 +48,17 @@ class AppConfig @Inject() (config: Configuration, servicesConfig: CTCServicesCon
   lazy val objectStoreUrl: String =
     config.get[String]("microservice.services.object-store.sdes-host")
 
+  // SDES configuration
+  lazy val sdesServiceBaseUrl          = Url.parse(servicesConfig.baseUrl("secure-data-exchange-proxy"))
+  lazy val sdesInformationType: String = config.get[String]("sdes.information-type")
+  lazy val sdesSrn: String             = config.get[String]("sdes.srn")
+  lazy val sdesClientId: String        = config.get[String]("sdes.client-id")
+
+  lazy val sdesFileReadyUri: UrlPath =
+    UrlPath(
+      config
+        .get[String]("microservice.services.secure-data-exchange-proxy.file-ready-uri")
+        .split("/")
+        .filter(_.nonEmpty)
+    )
 }

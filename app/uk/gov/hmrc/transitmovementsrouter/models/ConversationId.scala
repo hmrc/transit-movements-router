@@ -16,9 +16,13 @@
 
 package uk.gov.hmrc.transitmovementsrouter.models
 
+import play.api.libs.json.Format
+import play.api.libs.json.Json
+
 import java.util.UUID
 
 object ConversationId {
+  implicit val conversationIdFormat: Format[ConversationId] = Json.format
 
   def apply(movementId: MovementId, messageId: MessageId): ConversationId = {
     val movementPart = s"${movementId.value.substring(0, 8)}-${movementId.value.substring(8, 12)}-${movementId.value.substring(12)}"

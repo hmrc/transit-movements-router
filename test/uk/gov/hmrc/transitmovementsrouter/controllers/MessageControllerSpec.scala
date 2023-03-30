@@ -20,6 +20,7 @@ import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import cats.data.EitherT
 import org.mockito.ArgumentMatchers.any
+import org.mockito.ArgumentMatchersSugar.eqTo
 import org.mockito.MockitoSugar.reset
 import org.mockito.MockitoSugar.when
 import org.scalacheck.Gen
@@ -47,6 +48,7 @@ import play.api.test.Helpers.status
 import play.api.test.Helpers.stubControllerComponents
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.HttpVerbs.POST
+import uk.gov.hmrc.objectstore.client.ObjectSummaryWithMd5
 import uk.gov.hmrc.transitmovementsrouter.base.StreamTestHelpers.createStream
 import uk.gov.hmrc.transitmovementsrouter.base.TestActorSystem
 import uk.gov.hmrc.transitmovementsrouter.connectors.PersistenceConnector
@@ -60,6 +62,7 @@ import uk.gov.hmrc.transitmovementsrouter.models._
 import uk.gov.hmrc.transitmovementsrouter.models.errors.CustomOfficeExtractorError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.MessageTypeExtractionError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.ObjectStoreError
+import uk.gov.hmrc.transitmovementsrouter.models.errors.SDESError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.MovementNotFound
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.Unexpected
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.DownloadUrl
@@ -103,6 +106,7 @@ class MessageControllerSpec
   val mockObjectStoreService           = mock[ObjectStoreService]
   val mockObjectStoreURIExtractor      = mock[ObjectStoreURIExtractor]
   val mockCustomOfficeExtractorService = mock[CustomOfficeExtractorService]
+  val mockSDESService                  = mock[SDESService]
 
   implicit val temporaryFileCreator = SingletonTemporaryFileCreator
 
@@ -129,7 +133,8 @@ class MessageControllerSpec
       FakeAuthenticateEISToken,
       eisMessageTransformer,
       mockObjectStoreService,
-      mockCustomOfficeExtractorService
+      mockCustomOfficeExtractorService,
+      mockSDESService
     )
 
   def source = createStream(cc015cOfficeOfDepartureGB)
@@ -167,6 +172,7 @@ class MessageControllerSpec
     reset(mockPersistenceConnector)
     reset(mockObjectStoreService)
     reset(mockCustomOfficeExtractorService)
+    reset(mockSDESService)
     super.afterEach()
   }
 
@@ -369,6 +375,14 @@ class MessageControllerSpec
             any()
           )
         ).thenReturn(EitherT.rightT(objectSummary))
+
+        when(
+          mockSDESService.send(
+            eqTo(MovementId(movementId.value)),
+            eqTo(MessageId(messageId.value)),
+            eqTo(ObjectSummaryWithMd5(objectSummary.location, objectSummary.contentLength, objectSummary.contentMd5, objectSummary.lastModified))
+          )(any[ExecutionContext], any[HeaderCarrier])
+        ).thenReturn(EitherT.rightT(()))
 
         lazy val request = FakeRequest(
           method = "POST",
@@ -635,6 +649,75 @@ class MessageControllerSpec
             any()
           )
         ).thenReturn(EitherT.leftT(ObjectStoreError.UnexpectedError(None)))
+
+        val request = FakeRequest(
+          method = "POST",
+          uri = outgoing,
+          headers = FakeHeaders(Seq("X-Message-Type" -> MessageType.DeclarationData.code, "X-Object-Store-Uri" -> objectStoreResourceLocation.contextPath)),
+          body = AnyContentAsEmpty
+        )
+
+        val result = controller().outgoing(eori, movementType, movementId, messageId)(request)
+
+        status(result) mustBe INTERNAL_SERVER_ERROR
+        contentAsJson(result) mustBe Json.obj(
+          "code"    -> "INTERNAL_SERVER_ERROR",
+          "message" -> "Internal server error"
+        )
+    }
+
+    "must return INTERNAL_SERVER_ERROR when submission fails to SDES due to unexpected error" in forAll(
+      arbitraryMovementId.arbitrary,
+      arbitraryMessageId.arbitrary,
+      arbitraryObjectSummaryWithMd5.arbitrary,
+      arbitraryObjectStoreResourceLocation.arbitrary
+    ) {
+      (movementId, messageId, objectSummary, objectStoreResourceLocation) =>
+        when(
+          mockMessageTypeExtractor.extractFromHeaders(
+            eqTo(FakeHeaders(Seq("X-Message-Type" -> MessageType.DeclarationData.code, "X-Object-Store-Uri" -> objectStoreResourceLocation.contextPath)))
+          )
+        ).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](MessageType.DeclarationData))
+        when(
+          mockObjectStoreURIExtractor.extractObjectStoreURIHeader(
+            eqTo(FakeHeaders(Seq("X-Message-Type" -> MessageType.DeclarationData.code, "X-Object-Store-Uri" -> objectStoreResourceLocation.contextPath)))
+          )
+        )
+          .thenReturn(EitherT.rightT(objectStoreResourceLocation))
+
+        when(
+          mockObjectStoreService.getObjectStoreFile(
+            eqTo(
+              ObjectStoreResourceLocation(
+                objectStoreResourceLocation.contextPath,
+                objectStoreResourceLocation.resourceLocation
+              )
+            )
+          )(any[HeaderCarrier], any[ExecutionContext])
+        )
+          .thenReturn(EitherT.rightT(source))
+
+        when(mockCustomOfficeExtractorService.extractCustomOffice(any(), eqTo(MessageType.DeclarationData)))
+          .thenReturn(EitherT.rightT[Future, CustomOfficeExtractorError](CustomsOffice("GB1234567")))
+
+        when(
+          mockObjectStoreService.storeOutgoing(
+            eqTo(ObjectStoreResourceLocation(objectStoreResourceLocation.contextPath, objectStoreResourceLocation.resourceLocation))
+          )(
+            any(),
+            any()
+          )
+        ).thenReturn(EitherT.rightT(objectSummary))
+
+        when(
+          mockSDESService.send(
+            eqTo(MovementId(movementId.value)),
+            eqTo(MessageId(messageId.value)),
+            eqTo(ObjectSummaryWithMd5(objectSummary.location, objectSummary.contentLength, objectSummary.contentMd5, objectSummary.lastModified))
+          )(any[ExecutionContext], any[HeaderCarrier])
+        ).thenReturn(
+          EitherT.leftT(SDESError.UnexpectedError(None))
+        )
 
         val request = FakeRequest(
           method = "POST",
