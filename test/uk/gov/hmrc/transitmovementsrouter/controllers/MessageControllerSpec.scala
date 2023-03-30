@@ -20,6 +20,7 @@ import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import cats.data.EitherT
 import org.mockito.ArgumentMatchers.any
+import org.mockito.ArgumentMatchersSugar.eqTo
 import org.mockito.MockitoSugar.reset
 import org.mockito.MockitoSugar.when
 import org.scalacheck.Gen
@@ -377,9 +378,9 @@ class MessageControllerSpec
 
         when(
           mockSDESService.send(
-            any[String].asInstanceOf[MovementId],
-            any[String].asInstanceOf[MessageId],
-            any[String].asInstanceOf[ObjectSummaryWithMd5]
+            eqTo(MovementId(movementId.value)),
+            eqTo(MessageId(messageId.value)),
+            eqTo(ObjectSummaryWithMd5(objectSummary.location, objectSummary.contentLength, objectSummary.contentMd5, objectSummary.lastModified))
           )(any[ExecutionContext], any[HeaderCarrier])
         ).thenReturn(EitherT.rightT(()))
 
@@ -672,19 +673,36 @@ class MessageControllerSpec
       arbitraryObjectStoreResourceLocation.arbitrary
     ) {
       (movementId, messageId, objectSummary, objectStoreResourceLocation) =>
-        when(mockMessageTypeExtractor.extractFromHeaders(any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](MessageType.DeclarationData))
-        when(mockObjectStoreURIExtractor.extractObjectStoreURIHeader(any[Headers]))
+        when(
+          mockMessageTypeExtractor.extractFromHeaders(
+            eqTo(FakeHeaders(Seq("X-Message-Type" -> MessageType.DeclarationData.code, "X-Object-Store-Uri" -> objectStoreResourceLocation.contextPath)))
+          )
+        ).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](MessageType.DeclarationData))
+        when(
+          mockObjectStoreURIExtractor.extractObjectStoreURIHeader(
+            eqTo(FakeHeaders(Seq("X-Message-Type" -> MessageType.DeclarationData.code, "X-Object-Store-Uri" -> objectStoreResourceLocation.contextPath)))
+          )
+        )
           .thenReturn(EitherT.rightT(objectStoreResourceLocation))
 
-        when(mockObjectStoreService.getObjectStoreFile(any[String].asInstanceOf[ObjectStoreResourceLocation])(any[HeaderCarrier], any[ExecutionContext]))
+        when(
+          mockObjectStoreService.getObjectStoreFile(
+            eqTo(
+              ObjectStoreResourceLocation(
+                objectStoreResourceLocation.contextPath,
+                objectStoreResourceLocation.resourceLocation
+              )
+            )
+          )(any[HeaderCarrier], any[ExecutionContext])
+        )
           .thenReturn(EitherT.rightT(source))
 
-        when(mockCustomOfficeExtractorService.extractCustomOffice(any(), any()))
+        when(mockCustomOfficeExtractorService.extractCustomOffice(any(), eqTo(MessageType.DeclarationData)))
           .thenReturn(EitherT.rightT[Future, CustomOfficeExtractorError](CustomsOffice("GB1234567")))
 
         when(
           mockObjectStoreService.storeOutgoing(
-            any[String].asInstanceOf[ObjectStoreResourceLocation]
+            eqTo(ObjectStoreResourceLocation(objectStoreResourceLocation.contextPath, objectStoreResourceLocation.resourceLocation))
           )(
             any(),
             any()
@@ -693,9 +711,9 @@ class MessageControllerSpec
 
         when(
           mockSDESService.send(
-            any[String].asInstanceOf[MovementId],
-            any[String].asInstanceOf[MessageId],
-            any[String].asInstanceOf[ObjectSummaryWithMd5]
+            eqTo(MovementId(movementId.value)),
+            eqTo(MessageId(messageId.value)),
+            eqTo(ObjectSummaryWithMd5(objectSummary.location, objectSummary.contentLength, objectSummary.contentMd5, objectSummary.lastModified))
           )(any[ExecutionContext], any[HeaderCarrier])
         ).thenReturn(
           EitherT.leftT(SDESError.UnexpectedError(None))
