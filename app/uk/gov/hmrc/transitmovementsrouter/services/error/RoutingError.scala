@@ -21,9 +21,9 @@ import uk.gov.hmrc.http.UpstreamErrorResponse
 import java.time.format.DateTimeParseException
 
 object RoutingError {
-  case class Upstream(upstreamErrorResponse: UpstreamErrorResponse)          extends RoutingError
-  case class Unexpected(message: String, cause: Option[Throwable])           extends RoutingError
-  case class BadDateTime(element: String, exception: DateTimeParseException) extends RoutingError
+  case object InvalidGRN                                           extends RoutingError
+  case object InvalidAccessCode                                    extends RoutingError
+  case class Unexpected(message: String, cause: Option[Throwable]) extends RoutingError
 }
 
 sealed trait RoutingError

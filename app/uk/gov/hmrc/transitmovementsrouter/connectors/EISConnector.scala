@@ -22,6 +22,7 @@ import akka.util.ByteString
 import play.api.Logging
 import play.api.http.HeaderNames
 import play.api.http.MimeTypes
+import play.api.libs.json.Json
 import retry.RetryDetails
 import retry.alleycats.instances._
 import retry.retryingOnFailures
@@ -36,6 +37,7 @@ import uk.gov.hmrc.transitmovementsrouter.config.EISInstanceConfig
 import uk.gov.hmrc.transitmovementsrouter.models.ConversationId
 import uk.gov.hmrc.transitmovementsrouter.models.MessageId
 import uk.gov.hmrc.transitmovementsrouter.models.MovementId
+import uk.gov.hmrc.transitmovementsrouter.models.responses.EISResponse
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
 import uk.gov.hmrc.transitmovementsrouter.utils.RouterHeaderNames
 
@@ -86,8 +88,7 @@ class EISConnectorImpl(
 
   def onFailure(response: Either[RoutingError, Unit], retryDetails: RetryDetails): Future[Unit] =
     response.left.toOption.get match {
-      case RoutingError.Upstream(upstreamErrorResponse) => attemptRetry(s"with status code ${upstreamErrorResponse.statusCode}", retryDetails)
-      case RoutingError.Unexpected(message, _)          => attemptRetry(s"with error $message", retryDetails)
+      case RoutingError.Unexpected(message, _) => attemptRetry(s"with error $message", retryDetails)
       case x: RoutingError =>
         logger.error(s"An unexpected error occurred - got a ${x.getClass}")
         Future.failed(new IllegalStateException(s"An unexpected error occurred - got a ${x.getClass}"))
@@ -153,7 +154,7 @@ class EISConnectorImpl(
               Right(())
             case Left(error) =>
               logger.warn(logMessage + s"Response status: ${error.statusCode}")
-              Left(RoutingError.Upstream(UpstreamErrorResponse(s"Request Error: Routing to $code returned status code ${error.statusCode}", error.statusCode)))
+              Left(deriveErrorFromResponseMessage(error.message))
           }
           .recover {
             case NonFatal(e) =>
@@ -163,6 +164,23 @@ class EISConnectorImpl(
           }
       }
     }
+
+  private def deriveErrorFromResponseMessage(message: String): RoutingError = {
+    val maybeEisResponse = Json.parse(message).asOpt[EISResponse]
+
+    maybeEisResponse
+      .map {
+        errorResponse =>
+          (errorResponse.invalidGRN, errorResponse.invalidAccessCode) match {
+            case (true, _) =>
+              RoutingError.InvalidGRN
+            case (_, true) =>
+              RoutingError.InvalidAccessCode
+            case _ => RoutingError.Unexpected("Unexpected response from EIS", None)
+          }
+      }
+      .getOrElse(RoutingError.Unexpected("Unexpected response from EIS", None))
+  }
 
   private def attemptRetry(message: String, retryDetails: RetryDetails): Future[Unit] = {
     val attemptNumber = retryDetails.retriesSoFar + 1

@@ -91,7 +91,6 @@ class PersistenceConnectorImpl @Inject() (httpClientV2: HttpClientV2, appConfig:
         .transform(_.addHttpHeaders(HeaderNames.CONTENT_TYPE -> MimeTypes.XML, RouterHeaderNames.MESSAGE_TYPE -> messageType.code))
         .withBody(source)
       execute(request, movementId)
-
     }
 
   override def postObjectStoreUri(movementId: MovementId, messageId: MessageId, messageType: MessageType, objectStoreURI: ObjectStoreURI)(implicit

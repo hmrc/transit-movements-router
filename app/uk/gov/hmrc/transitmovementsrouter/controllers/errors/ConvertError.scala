@@ -46,12 +46,10 @@ trait ConvertError {
   implicit val routingErrorConverter = new Converter[RoutingError] {
 
     def convert(routingError: RoutingError): PresentationError = routingError match {
-      case Upstream(upstreamErrorResponse) => PresentationError.internalServiceError(cause = Some(upstreamErrorResponse.getCause))
-      case Unexpected(_, cause)            => PresentationError.internalServiceError(cause = cause)
-      case BadDateTime(element, ex)        => PresentationError.badRequestError(s"Could not parse datetime for $element: ${ex.getMessage}")
-
+      case InvalidGRN           => PresentationError.notFoundError("GRN not found")
+      case InvalidAccessCode    => PresentationError.forbiddenError("Invalid access code")
+      case Unexpected(_, cause) => PresentationError.internalServiceError(cause = cause)
     }
-
   }
 
   implicit val customOfficeErrorConverter = new Converter[CustomOfficeExtractorError] {
