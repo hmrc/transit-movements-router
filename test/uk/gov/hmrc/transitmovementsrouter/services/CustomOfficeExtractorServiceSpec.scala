@@ -35,7 +35,6 @@ import uk.gov.hmrc.transitmovementsrouter.models.errors.CustomOfficeExtractorErr
 import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.DurationInt
 
 class CustomOfficeExtractorServiceSpec

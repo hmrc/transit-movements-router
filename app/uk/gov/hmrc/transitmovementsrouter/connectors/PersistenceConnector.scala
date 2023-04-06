@@ -108,7 +108,7 @@ class PersistenceConnectorImpl @Inject() (httpClientV2: HttpClientV2, appConfig:
       execute(request, movementId)
     }
 
-  private def execute(requestBuilder: RequestBuilder, movementId: MovementId)(implicit hc: HeaderCarrier, ec: ExecutionContext) =
+  private def execute(requestBuilder: RequestBuilder, movementId: MovementId)(implicit ec: ExecutionContext) =
     requestBuilder
       .execute[Either[UpstreamErrorResponse, HttpResponse]]
       .map {
@@ -129,7 +129,7 @@ class PersistenceConnectorImpl @Inject() (httpClientV2: HttpClientV2, appConfig:
         case NonFatal(ex) => Left(Unexpected(Some(ex)))
       }
 
-  private def createRequest(movementId: MovementId, messageId: MessageId)(implicit hc: HeaderCarrier, ec: ExecutionContext) = {
+  private def createRequest(movementId: MovementId, messageId: MessageId)(implicit hc: HeaderCarrier) = {
     val url = baseUrl.withPath(persistenceSendMessage(movementId)).withQueryString(QueryString.fromPairs("triggerId" -> messageId.value))
     httpClientV2.post(url"$url")
   }
