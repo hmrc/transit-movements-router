@@ -71,7 +71,7 @@ trait WiremockSuiteWithGuice extends WiremockSuite {
       )
       .overrides(bindings: _*)
 
-  protected lazy val injector: Injector = fakeApplication.injector
+  protected lazy val injector: Injector = fakeApplication().injector
 
   protected def bindings: Seq[GuiceableModule] = Seq(
     bind[Metrics].toInstance(new TestMetrics),
@@ -80,13 +80,13 @@ trait WiremockSuiteWithGuice extends WiremockSuite {
 
   override def beforeAll(): Unit = {
     server.start()
-    fakeApplication
+    fakeApplication()
     super.beforeAll()
   }
 
   override def beforeEach(): Unit = {
     server.resetAll()
-    fakeApplication
+    fakeApplication()
     super.beforeEach()
   }
 

@@ -39,6 +39,7 @@ import play.api.test.Helpers._
 import retry.RetryPolicies
 import retry.RetryPolicy
 import uk.gov.hmrc.http.HeaderCarrier
+import uk.gov.hmrc.http.RequestId
 import uk.gov.hmrc.http.client.HttpClientV2
 import uk.gov.hmrc.http.test.HttpClientV2Support
 import uk.gov.hmrc.transitmovementsrouter.config.CircuitBreakerConfig
@@ -56,8 +57,9 @@ import uk.gov.hmrc.transitmovementsrouter.models.MovementId
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
 
 import java.net.URL
-import scala.concurrent.ExecutionContext.Implicits.global
+import java.util.UUID
 import scala.concurrent.ExecutionContext
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 class EISConnectorSpec
@@ -124,7 +126,7 @@ class EISConnectorSpec
 
   "post" should {
 
-    "add CustomProcessHost, X-Correlation-Id and X-Conversation-Id and Date headers to messages for GB" in forAll(
+    "add X-Correlation-Id and X-Conversation-Id and Date headers to messages for GB" in forAll(
       connectorGen,
       arbitrary[MovementId],
       arbitrary[MessageId]
@@ -150,10 +152,10 @@ class EISConnectorSpec
             )
               .inScenario("Standard Call")
               .whenScenarioStateIs(currentState)
+              .withHeader(HeaderNames.AUTHORIZATION, equalTo("Bearer bearertokenhereGB"))
               .withHeader("Date", anything)
               .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
               .withHeader("X-Conversation-Id", equalTo(expectedConversationId.value.toString))
-              .withHeader("CustomProcessHost", equalTo("Digital"))
               .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
               .withHeader(HeaderNames.CONTENT_TYPE, equalTo("application/xml"))
               .willReturn(aResponse().withStatus(codeToReturn))
@@ -165,14 +167,18 @@ class EISConnectorSpec
         stub(Scenario.STARTED, secondState, OK)
         stub(secondState, secondState, INTERNAL_SERVER_ERROR)
 
-        val hc = HeaderCarrier()
+        // allows us to ensure the logs are correctly grabbing the request ID and message ID, by eye for the moment
+        val hc = HeaderCarrier(
+          requestId = Some(RequestId(UUID.randomUUID().toString)),
+          extraHeaders = Seq("X-Message-Type" -> "IE015")
+        )
 
         whenReady(connector().post(movementId, messageId, source, hc)) {
           _.isRight mustBe true
         }
     }
 
-    "add CustomProcessHost, X-Correlation-Id and X-Conversation-Id headers, but retain the Date header, to messages for GB" in forAll(
+    "add X-Correlation-Id and X-Conversation-Id headers, but retain the Date header, to messages for GB" in forAll(
       connectorGen,
       arbitrary[MovementId],
       arbitrary[MessageId]
@@ -201,7 +207,6 @@ class EISConnectorSpec
               .withHeader("Date", anything)
               .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
               .withHeader("X-Conversation-Id", equalTo(expectedConversationId.value.toString))
-              .withHeader("CustomProcessHost", equalTo("Digital"))
               .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
               .withHeader(HeaderNames.CONTENT_TYPE, equalTo("application/xml"))
               .willReturn(aResponse().withStatus(codeToReturn))

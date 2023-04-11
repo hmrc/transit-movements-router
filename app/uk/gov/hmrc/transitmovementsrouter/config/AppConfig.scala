@@ -16,14 +16,13 @@
 
 package uk.gov.hmrc.transitmovementsrouter.config
 
-import io.lemonlabs.uri.AbsoluteUrl
 import io.lemonlabs.uri.Url
 import io.lemonlabs.uri.UrlPath
+import play.api.Configuration
+import uk.gov.hmrc.http.HeaderCarrier
 
 import javax.inject.Inject
 import javax.inject.Singleton
-import play.api.Configuration
-import uk.gov.hmrc.http.HeaderCarrier
 
 @Singleton
 class AppConfig @Inject() (config: Configuration, servicesConfig: CTCServicesConfig) {
