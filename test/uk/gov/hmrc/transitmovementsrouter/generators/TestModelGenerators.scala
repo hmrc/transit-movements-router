@@ -28,6 +28,9 @@ import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.DownloadUrl
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.FileStatus
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.Reference
+import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesNotification
+import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesNotificationItem
+import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesProperties
 
 import java.time.Instant
 import java.time.OffsetDateTime
@@ -35,6 +38,11 @@ import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
 trait TestModelGenerators extends BaseGenerators {
+
+  lazy val genShortUUID: Gen[String] = Gen.long.map {
+    l: Long =>
+      f"${BigInt(l)}%016x"
+  }.toString
 
   implicit lazy val arbitraryCustomsOffice: Arbitrary[CustomsOffice] =
     Arbitrary {
@@ -120,6 +128,51 @@ trait TestModelGenerators extends BaseGenerators {
     } yield ObjectStoreResourceLocation(
       Path.Directory("common-transit-convention-traders").file(s"${movementId.value}-${messageId.value}-$formattedDateTime.xml").asUri,
       Path.File(s"${movementId.value}-${messageId.value}-$formattedDateTime.xml").asUri
+    )
+  }
+
+  implicit def arbitrarySdesResponse(): Arbitrary[SdesNotificationItem] = Arbitrary {
+    for {
+      filename          <- Gen.alphaNumStr
+      correlationId     <- Gen.alphaNumStr
+      checksum          <- Gen.stringOfN(4, Gen.alphaChar)
+      checksumAlgorithm <- Gen.alphaNumStr
+      notification = SdesNotification.FileProcessed
+      received     = Instant.now()
+      properties   = Seq(SdesProperties("x-conversation-id", "123e4567-e89b-12d3-a456-426614174000"))
+    } yield SdesNotificationItem(
+      notification,
+      filename,
+      correlationId,
+      checksum,
+      checksumAlgorithm,
+      received,
+      None,
+      received,
+      properties
+    )
+  }
+
+  implicit def arbitrarySdesFailureResponse(): Arbitrary[SdesNotificationItem] = Arbitrary {
+    for {
+      filename          <- Gen.alphaNumStr
+      correlationId     <- Gen.alphaNumStr
+      checksum          <- Gen.stringOfN(4, Gen.alphaChar)
+      checksumAlgorithm <- Gen.alphaNumStr
+      notification = SdesNotification.FileProcessingFailure
+      received     = Instant.now()
+      failureReason <- Gen.alphaNumStr
+      properties = Seq(SdesProperties("x-conversation-id", "123e4567-e89b-12d3-a456-426614174000"))
+    } yield SdesNotificationItem(
+      notification,
+      filename,
+      correlationId,
+      checksum,
+      checksumAlgorithm,
+      received,
+      Some(failureReason),
+      received,
+      properties
     )
   }
 

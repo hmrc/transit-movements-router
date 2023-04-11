@@ -30,6 +30,7 @@ import play.api.http.MimeTypes
 import play.api.http.Status.BAD_REQUEST
 import play.api.http.Status.INTERNAL_SERVER_ERROR
 import play.api.http.Status.NOT_FOUND
+import play.api.http.Status.OK
 import play.api.libs.json.Json
 import uk.gov.hmrc.http.HttpReads.Implicits._
 import uk.gov.hmrc.http.HeaderCarrier
@@ -43,6 +44,7 @@ import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.MovementNotFound
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.Unexpected
 import uk.gov.hmrc.transitmovementsrouter.models._
+import uk.gov.hmrc.transitmovementsrouter.models.requests.MessageUpdate
 import uk.gov.hmrc.transitmovementsrouter.utils.RouterHeaderNames
 
 import scala.concurrent.ExecutionContext
@@ -71,6 +73,17 @@ trait PersistenceConnector {
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): EitherT[Future, PersistenceError, PersistenceResponse]
+
+  def patchMessageStatus(
+    movementId: MovementId,
+    messageId: MessageId,
+    body: MessageUpdate
+  )(implicit
+    hc: HeaderCarrier,
+    ec: ExecutionContext
+  ): EitherT[Future, PersistenceError, Unit]
+
+  def updateStatusRequest(movementId: MovementId, messageId: MessageId)(implicit hc: HeaderCarrier, ec: ExecutionContext): RequestBuilder
 }
 
 @Singleton
@@ -81,6 +94,9 @@ class PersistenceConnectorImpl @Inject() (httpClientV2: HttpClientV2, appConfig:
 
   private def persistenceSendMessage(movementId: MovementId): UrlPath =
     Url(path = s"$baseRoute/traders/movements/${movementId.value}/messages").path
+
+  private def persistenceUpdateStatus(movementId: MovementId, messageId: MessageId): UrlPath =
+    Url(path = s"$baseRoute/traders/movements/${movementId.value}/messages/${messageId.value}").path
 
   override def postBody(movementId: MovementId, messageId: MessageId, messageType: MessageType, source: Source[ByteString, _])(implicit
     hc: HeaderCarrier,
@@ -108,6 +124,24 @@ class PersistenceConnectorImpl @Inject() (httpClientV2: HttpClientV2, appConfig:
       execute(request, movementId)
     }
 
+  override def patchMessageStatus(movementId: MovementId, messageId: MessageId, body: MessageUpdate)(implicit
+    hc: HeaderCarrier,
+    ec: ExecutionContext
+  ): EitherT[Future, PersistenceError, Unit] =
+    EitherT(
+      executeAndExpect(
+        updateStatusRequest(movementId, messageId)
+          .transform(_.addHttpHeaders(HeaderNames.CONTENT_TYPE -> MimeTypes.JSON))
+          .withBody(Json.toJson(body)),
+        OK
+      )
+        .map(Right(_))
+        .recover {
+          case UpstreamErrorResponse(_, NOT_FOUND, _, _) => Left(MovementNotFound(movementId))
+          case NonFatal(thr)                             => Left(Unexpected(Some(thr)))
+        }
+    )
+
   private def execute(requestBuilder: RequestBuilder, movementId: MovementId)(implicit hc: HeaderCarrier, ec: ExecutionContext) =
     requestBuilder
       .execute[Either[UpstreamErrorResponse, HttpResponse]]
@@ -126,12 +160,29 @@ class PersistenceConnectorImpl @Inject() (httpClientV2: HttpClientV2, appConfig:
           }
       }
       .recover {
-        case NonFatal(ex) => Left(Unexpected(Some(ex)))
+        case NonFatal(ex) =>
+          Left(Unexpected(Some(ex)))
+      }
+
+  def executeAndExpect(requestBuilder: RequestBuilder, expected: Int)(implicit ec: ExecutionContext) =
+    requestBuilder
+      .execute[HttpResponse]
+      .flatMap {
+        response =>
+          response.status match {
+            case `expected` => Future.successful(())
+            case _          => Future.failed(UpstreamErrorResponse(response.body, response.status))
+          }
       }
 
   private def createRequest(movementId: MovementId, messageId: MessageId)(implicit hc: HeaderCarrier, ec: ExecutionContext) = {
     val url = baseUrl.withPath(persistenceSendMessage(movementId)).withQueryString(QueryString.fromPairs("triggerId" -> messageId.value))
     httpClientV2.post(url"$url")
+  }
+
+  def updateStatusRequest(movementId: MovementId, messageId: MessageId)(implicit hc: HeaderCarrier, ec: ExecutionContext) = {
+    val url = baseUrl.withPath(persistenceUpdateStatus(movementId, messageId))
+    httpClientV2.patch(url"$url")
   }
 
 }

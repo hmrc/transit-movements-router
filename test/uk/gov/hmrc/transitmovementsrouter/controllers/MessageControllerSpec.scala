@@ -65,6 +65,7 @@ import uk.gov.hmrc.transitmovementsrouter.models.errors.ObjectStoreError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.SDESError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.MovementNotFound
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.Unexpected
+import uk.gov.hmrc.transitmovementsrouter.models.requests.MessageUpdate
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.DownloadUrl
 import uk.gov.hmrc.transitmovementsrouter.services._
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
@@ -142,6 +143,7 @@ class MessageControllerSpec
   val outgoing             = routes.MessagesController.outgoing(eori, movementType, movementId, messageId).url
   val incoming             = routes.MessagesController.incoming(ConversationId(movementId, messageId)).url
   val incomingLargeMessage = routes.MessagesController.incomingLargeMessage(movementId, messageId).url
+  val sdesCallback         = routes.MessagesController.handleSdesResponse().url
 
   def fakeRequest[A](
     body: NodeSeq,
@@ -1084,6 +1086,60 @@ class MessageControllerSpec
         val result  = controller().incomingLargeMessage(movementId, messageId)(request)
 
         status(result) mustBe INTERNAL_SERVER_ERROR
+    }
+  }
+
+  "POST SDES callback" - {
+
+    lazy val movementId = MovementId("123e4567e89b12d3")
+    lazy val messageId  = MessageId("a456426614174000")
+
+    "must return OK when status is successfully updated for SDES success callback" in forAll(
+      arbitrarySdesResponse().arbitrary
+    ) {
+      successSdesResponse =>
+        when(
+          mockPersistenceConnector.patchMessageStatus(
+            eqTo(movementId),
+            eqTo(messageId),
+            eqTo(MessageUpdate(MessageStatus.Success))
+          )(any[HeaderCarrier], any[ExecutionContext])
+        )
+          .thenReturn(EitherT.rightT(()))
+
+        val request = fakeRequestLargeMessage(Json.toJson(successSdesResponse), sdesCallback)
+
+        val result = controller().handleSdesResponse()(request)
+
+        status(result) mustBe OK
+    }
+
+    "must return OK when status is successfully updated for SDES failure callback" in forAll(
+      arbitrarySdesFailureResponse().arbitrary
+    ) {
+      failureSdesResponse =>
+        when(
+          mockPersistenceConnector.patchMessageStatus(
+            eqTo(movementId),
+            eqTo(messageId),
+            eqTo(MessageUpdate(MessageStatus.Failed))
+          )(any(), any())
+        )
+          .thenReturn(EitherT.fromEither(Right(())))
+
+        val request = fakeRequestLargeMessage(Json.toJson(failureSdesResponse), sdesCallback)
+
+        val result = controller().handleSdesResponse()(request)
+
+        status(result) mustBe OK
+    }
+
+    "must return BAD_REQUEST for SDES malformed callback" - {
+      val request = fakeRequestLargeMessage(Json.toJson("reference" -> "abc"), sdesCallback)
+
+      val result = controller().handleSdesResponse()(request)
+
+      status(result) mustBe BAD_REQUEST
     }
   }
 }
