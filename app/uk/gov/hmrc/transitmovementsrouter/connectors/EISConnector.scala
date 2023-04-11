@@ -27,11 +27,9 @@ import play.api.libs.ws.SourceBody
 import retry.RetryDetails
 import retry.alleycats.instances._
 import retry.retryingOnFailures
-import uk.gov.hmrc.http.Authorization
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.HttpReads.Implicits._
 import uk.gov.hmrc.http.HttpResponse
-import uk.gov.hmrc.http.RequestId
 import uk.gov.hmrc.http.StringContextOps
 import uk.gov.hmrc.http.UpstreamErrorResponse
 import uk.gov.hmrc.http.client.HttpClientV2
@@ -108,25 +106,18 @@ class EISConnectorImpl(
       case x     => x
     }
 
-    val requestHeaders: Seq[(String, String)] = dateHeader ++ Seq(
+    val extraHeaders: Seq[(String, String)] = dateHeader ++ Seq(
+      HeaderNames.AUTHORIZATION         -> s"Bearer ${eisInstanceConfig.headers.bearerToken}",
       RouterHeaderNames.CORRELATION_ID  -> UUID.randomUUID().toString,
       HeaderNames.ACCEPT                -> MimeTypes.XML,
       RouterHeaderNames.CONVERSATION_ID -> ConversationId(movementId, messageId).value.toString
-    )
-
-    val extraHeaders = (hc
-      .headersForUrl(headerCarrierConfig)(eisInstanceConfig.url))
-      .filterNot(
-        x =>
-          requestHeaders.exists(
-            y => y._1 equalsIgnoreCase x._1
-          )
-      ) ++ requestHeaders
+    ) ++ requestId
+      .map(
+        r => Seq(HMRCHeaderNames.xRequestId -> r)
+      )
+      .getOrElse(Seq.empty)
 
     HeaderCarrier(
-      authorization = Some(Authorization(s"Bearer ${eisInstanceConfig.headers.bearerToken}")),
-      requestId = requestId.map(RequestId.apply),
-      requestChain = hc.requestChain,
       otherHeaders = Seq.empty,
       extraHeaders = extraHeaders
     )
