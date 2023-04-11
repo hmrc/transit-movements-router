@@ -196,7 +196,7 @@ class MessageControllerSpec
 
       when(
         mockPushNotificationsConnector
-          .post(any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId], Some(any[Source[ByteString, _]]))(
+          .post(any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId], Some(any[Source[ByteString, _]]), any())(
             any[HeaderCarrier],
             any[ExecutionContext]
           )
@@ -843,7 +843,7 @@ class MessageControllerSpec
 
         when(
           mockPushNotificationsConnector
-            .post(any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId], Some(any[Source[ByteString, _]]))(
+            .post(any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId], Some(any[Source[ByteString, _]]), any())(
               any(),
               any()
             )

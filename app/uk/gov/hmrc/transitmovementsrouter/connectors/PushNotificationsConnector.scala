@@ -27,6 +27,7 @@ import play.api.http.HeaderNames
 import play.api.http.MimeTypes
 import play.api.http.Status.INTERNAL_SERVER_ERROR
 import play.api.http.Status.NOT_FOUND
+import play.api.libs.json.JsValue
 import uk.gov.hmrc.http.HttpReads.Implicits._
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.HttpResponse
@@ -46,7 +47,7 @@ import scala.util.control.NonFatal
 @ImplementedBy(classOf[PushNotificationsConnectorImpl])
 trait PushNotificationsConnector {
 
-  def post(movementId: MovementId, messageId: MessageId, source: Option[Source[ByteString, _]])(implicit
+  def post(movementId: MovementId, messageId: MessageId, sourceXml: Option[Source[ByteString, _]], sourceJson: Option[JsValue])(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): EitherT[Future, PushNotificationError, Unit]
@@ -61,7 +62,7 @@ class PushNotificationsConnectorImpl @Inject() (httpClientV2: HttpClientV2, appC
   private def pushNotificationMessageUpdate(movementId: MovementId, messageId: MessageId): UrlPath =
     UrlPath.parse(s"$baseRoute/traders/movements/${movementId.value}/messages/${messageId.value}")
 
-  override def post(movementId: MovementId, messageId: MessageId, source: Option[Source[ByteString, _]])(implicit
+  override def post(movementId: MovementId, messageId: MessageId, sourceXml: Option[Source[ByteString, _]], sourceJson: Option[JsValue])(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): EitherT[Future, PushNotificationError, Unit] =
@@ -73,9 +74,10 @@ class PushNotificationsConnectorImpl @Inject() (httpClientV2: HttpClientV2, appC
 
         val requestBuilder = httpClientV2.post(url"$url")
 
-        val requestBuilderWithSource = source match {
-          case Some(src) => requestBuilder.setHeader(HeaderNames.CONTENT_TYPE -> MimeTypes.XML).withBody(src)
-          case None      => requestBuilder
+        val requestBuilderWithSource = (sourceXml, sourceJson) match {
+          case (Some(xml), _)  => requestBuilder.setHeader(HeaderNames.CONTENT_TYPE -> MimeTypes.XML).withBody(xml)
+          case (_, Some(json)) => requestBuilder.setHeader(HeaderNames.CONTENT_TYPE -> MimeTypes.JSON).withBody(json)
+          case (_, _)          => requestBuilder
         }
 
         requestBuilderWithSource
