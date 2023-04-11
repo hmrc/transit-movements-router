@@ -27,11 +27,9 @@ import play.api.libs.ws.SourceBody
 import retry.RetryDetails
 import retry.alleycats.instances._
 import retry.retryingOnFailures
-import uk.gov.hmrc.http.Authorization
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.HttpReads.Implicits._
 import uk.gov.hmrc.http.HttpResponse
-import uk.gov.hmrc.http.RequestId
 import uk.gov.hmrc.http.StringContextOps
 import uk.gov.hmrc.http.UpstreamErrorResponse
 import uk.gov.hmrc.http.client.HttpClientV2
@@ -72,21 +70,12 @@ class EISConnectorImpl(
     with Logging
     with CircuitBreakers {
 
+  private lazy val authorization = s"Bearer ${eisInstanceConfig.headers.bearerToken}"
+
   // Used when setting a stream body -- forces the correct content type (default chooses application/octet-stream)
   implicit private val xmlSourceWriter: BodyWritable[Source[ByteString, _]] = BodyWritable(SourceBody, MimeTypes.XML)
 
   private val HTTP_DATE_FORMATTER = DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss z", Locale.ENGLISH).withZone(ZoneOffset.UTC)
-
-  def getHeader(header: String, url: String)(implicit hc: HeaderCarrier): String =
-    hc
-      .headersForUrl(headerCarrierConfig)(url)
-      .find {
-        case (name, _) => name.toLowerCase == header.toLowerCase
-      }
-      .map {
-        case (_, value) => value
-      }
-      .getOrElse("undefined")
 
   def shouldCauseCircuitBreakerStrike(result: Try[Either[RoutingError, Unit]]): Boolean =
     result.map(_.isLeft).getOrElse(true)
@@ -100,56 +89,31 @@ class EISConnectorImpl(
         Future.failed(new IllegalStateException(s"An unexpected error occurred - got a ${x.getClass}"))
     }
 
-  private def extractHeaders(movementId: MovementId, messageId: MessageId, hc: HeaderCarrier): HeaderCarrier = {
-    val requestId = hc.requestId.map(_.value)
-
-    val dateHeader: Seq[(String, String)] = hc.headers(Seq(HeaderNames.DATE)) match {
-      case Seq() => Seq(HeaderNames.DATE -> HTTP_DATE_FORMATTER.format(OffsetDateTime.now()))
-      case x     => x
-    }
-
-    val requestHeaders: Seq[(String, String)] = dateHeader ++ Seq(
-      RouterHeaderNames.CORRELATION_ID  -> UUID.randomUUID().toString,
-      HeaderNames.ACCEPT                -> MimeTypes.XML,
-      RouterHeaderNames.CONVERSATION_ID -> ConversationId(movementId, messageId).value.toString
-    )
-
-    val extraHeaders = (hc
-      .headersForUrl(headerCarrierConfig)(eisInstanceConfig.url))
-      .filterNot(
-        x =>
-          requestHeaders.exists(
-            y => y._1 equalsIgnoreCase x._1
-          )
-      ) ++ requestHeaders
-
-    HeaderCarrier(
-      authorization = Some(Authorization(s"Bearer ${eisInstanceConfig.headers.bearerToken}")),
-      requestId = requestId.map(RequestId.apply),
-      requestChain = hc.requestChain,
-      otherHeaders = Seq.empty,
-      extraHeaders = extraHeaders
-    )
-  }
-
   override def post(movementId: MovementId, messageId: MessageId, body: Source[ByteString, _], hc: HeaderCarrier): Future[Either[RoutingError, Unit]] =
     retryingOnFailures(
       retries.createRetryPolicy(eisInstanceConfig.retryConfig),
       (t: Either[RoutingError, Unit]) => Future.successful(t.isRight),
       onFailure
     ) {
-      implicit val headerCarrier = extractHeaders(movementId, messageId, hc)
-      val requestId              = headerCarrier.requestId.map(_.value).getOrElse("undefined")
+      // blank-ish carrier so that we control what we're sending to EIS, and let the carrier/platform do the rest
+      implicit val headerCarrier: HeaderCarrier = HeaderCarrier(requestChain = hc.requestChain)
+
+      val requestId      = hc.requestId.map(_.value)
+      val correlationId  = UUID.randomUUID().toString
+      val accept         = MimeTypes.XML
+      val conversationId = ConversationId(movementId, messageId)
+      val date           = HTTP_DATE_FORMATTER.format(OffsetDateTime.now())
+
       val messageType =
         hc.headersForUrl(headerCarrierConfig)(eisInstanceConfig.url).find(_._1 equalsIgnoreCase RouterHeaderNames.MESSAGE_TYPE).map(_._2).getOrElse("undefined")
       lazy val logMessage =
         s"""|Posting NCTS message, routing to $code
-            |${HMRCHeaderNames.xRequestId}: $requestId
-            |${RouterHeaderNames.CORRELATION_ID}: ${getHeader(RouterHeaderNames.CORRELATION_ID, eisInstanceConfig.url)(headerCarrier)}
-            |${RouterHeaderNames.CONVERSATION_ID}: ${getHeader(RouterHeaderNames.CONVERSATION_ID, eisInstanceConfig.url)(headerCarrier)}
-            |${HeaderNames.ACCEPT}: ${getHeader(HeaderNames.ACCEPT, eisInstanceConfig.url)(headerCarrier)}
+            |${HMRCHeaderNames.xRequestId}: ${requestId.getOrElse("undefined")}
+            |${RouterHeaderNames.CORRELATION_ID}: $correlationId
+            |${RouterHeaderNames.CONVERSATION_ID}: ${conversationId.value.toString}
+            |${HeaderNames.ACCEPT}: $accept
             |${HeaderNames.CONTENT_TYPE}: ${xmlSourceWriter.contentType}
-            |${HeaderNames.DATE}: ${getHeader(HeaderNames.DATE, eisInstanceConfig.url)(headerCarrier)}
+            |${HeaderNames.DATE}: $date
             |${RouterHeaderNames.MESSAGE_TYPE} (not submitted to EIS): $messageType
             |""".stripMargin
 
@@ -157,6 +121,14 @@ class EISConnectorImpl(
         httpClientV2
           .post(url"${eisInstanceConfig.url}")
           .withBody(body)
+          .setHeader(
+            HMRCHeaderNames.xRequestId        -> requestId.getOrElse(""),
+            HeaderNames.AUTHORIZATION         -> authorization,
+            RouterHeaderNames.CORRELATION_ID  -> correlationId,
+            HeaderNames.ACCEPT                -> MimeTypes.XML,
+            RouterHeaderNames.CONVERSATION_ID -> ConversationId(movementId, messageId).value.toString,
+            HeaderNames.DATE                  -> HTTP_DATE_FORMATTER.format(OffsetDateTime.now())
+          )
           .execute[Either[UpstreamErrorResponse, HttpResponse]]
           .map {
             case Right(result) =>

@@ -144,6 +144,7 @@ class EISConnectorSpec
         // should be the code the determines if a result is successful.
 
         val expectedConversationId = ConversationId(movementId, messageId)
+        val requestId              = UUID.randomUUID().toString
 
         def stub(currentState: String, targetState: String, codeToReturn: Int) =
           server.stubFor(
@@ -154,6 +155,7 @@ class EISConnectorSpec
               .whenScenarioStateIs(currentState)
               .withHeader(HeaderNames.AUTHORIZATION, equalTo("Bearer bearertokenhereGB"))
               .withHeader("Date", anything)
+              .withHeader("X-Request-Id", equalTo(requestId))
               .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
               .withHeader("X-Conversation-Id", equalTo(expectedConversationId.value.toString))
               .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
@@ -169,7 +171,7 @@ class EISConnectorSpec
 
         // allows us to ensure the logs are correctly grabbing the request ID and message ID, by eye for the moment
         val hc = HeaderCarrier(
-          requestId = Some(RequestId(UUID.randomUUID().toString)),
+          requestId = Some(RequestId(requestId)),
           extraHeaders = Seq("X-Message-Type" -> "IE015")
         )
 
