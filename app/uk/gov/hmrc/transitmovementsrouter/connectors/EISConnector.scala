@@ -22,12 +22,16 @@ import akka.util.ByteString
 import play.api.Logging
 import play.api.http.HeaderNames
 import play.api.http.MimeTypes
+import play.api.libs.ws.BodyWritable
+import play.api.libs.ws.SourceBody
 import retry.RetryDetails
 import retry.alleycats.instances._
 import retry.retryingOnFailures
+import uk.gov.hmrc.http.Authorization
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.HttpReads.Implicits._
 import uk.gov.hmrc.http.HttpResponse
+import uk.gov.hmrc.http.RequestId
 import uk.gov.hmrc.http.StringContextOps
 import uk.gov.hmrc.http.UpstreamErrorResponse
 import uk.gov.hmrc.http.client.HttpClientV2
@@ -68,6 +72,9 @@ class EISConnectorImpl(
     with Logging
     with CircuitBreakers {
 
+  // Used when setting a stream body -- forces the correct content type (default chooses application/octet-stream)
+  implicit private val xmlSourceWriter: BodyWritable[Source[ByteString, _]] = BodyWritable(SourceBody, MimeTypes.XML)
+
   private val HTTP_DATE_FORMATTER = DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss z", Locale.ENGLISH).withZone(ZoneOffset.UTC)
 
   def getHeader(header: String, url: String)(implicit hc: HeaderCarrier): String =
@@ -93,22 +100,21 @@ class EISConnectorImpl(
         Future.failed(new IllegalStateException(s"An unexpected error occurred - got a ${x.getClass}"))
     }
 
-  private def extractHeaders(movementId: MovementId, messageId: MessageId, hc: HeaderCarrier): Seq[(String, String)] = {
+  private def extractHeaders(movementId: MovementId, messageId: MessageId, hc: HeaderCarrier): HeaderCarrier = {
+    val requestId = hc.requestId.map(_.value)
+
     val dateHeader: Seq[(String, String)] = hc.headers(Seq(HeaderNames.DATE)) match {
       case Seq() => Seq(HeaderNames.DATE -> HTTP_DATE_FORMATTER.format(OffsetDateTime.now()))
       case x     => x
     }
 
-    val requestHeaders: Seq[(String, String)] = hc.headers(Seq(RouterHeaderNames.MESSAGE_TYPE)) ++ dateHeader ++ Seq(
-      RouterHeaderNames.CORRELATION_ID      -> UUID.randomUUID().toString,
-      RouterHeaderNames.CUSTOM_PROCESS_HOST -> "Digital",
-      HeaderNames.CONTENT_TYPE              -> MimeTypes.XML,
-      HeaderNames.ACCEPT                    -> MimeTypes.XML,
-      HeaderNames.AUTHORIZATION             -> s"Bearer ${eisInstanceConfig.headers.bearerToken}",
-      RouterHeaderNames.CONVERSATION_ID     -> ConversationId(movementId, messageId).value.toString
+    val requestHeaders: Seq[(String, String)] = dateHeader ++ Seq(
+      RouterHeaderNames.CORRELATION_ID  -> UUID.randomUUID().toString,
+      HeaderNames.ACCEPT                -> MimeTypes.XML,
+      RouterHeaderNames.CONVERSATION_ID -> ConversationId(movementId, messageId).value.toString
     )
 
-    (hc
+    val extraHeaders = (hc
       .headersForUrl(headerCarrierConfig)(eisInstanceConfig.url))
       .filterNot(
         x =>
@@ -116,6 +122,14 @@ class EISConnectorImpl(
             y => y._1 equalsIgnoreCase x._1
           )
       ) ++ requestHeaders
+
+    HeaderCarrier(
+      authorization = Some(Authorization(s"Bearer ${eisInstanceConfig.headers.bearerToken}")),
+      requestId = requestId.map(RequestId.apply),
+      requestChain = hc.requestChain,
+      otherHeaders = Seq.empty,
+      extraHeaders = extraHeaders
+    )
   }
 
   override def post(movementId: MovementId, messageId: MessageId, body: Source[ByteString, _], hc: HeaderCarrier): Future[Either[RoutingError, Unit]] =
@@ -124,23 +138,20 @@ class EISConnectorImpl(
       (t: Either[RoutingError, Unit]) => Future.successful(t.isRight),
       onFailure
     ) {
-
-      val updatedHeader = hc.copy(authorization = None, extraHeaders = Seq.empty)
-
-      implicit val headerCarrier: HeaderCarrier = updatedHeader
-        .withExtraHeaders(extractHeaders(movementId, messageId, updatedHeader): _*)
-
-      val requestId = getHeader(HMRCHeaderNames.xRequestId, eisInstanceConfig.url)(headerCarrier)
+      implicit val headerCarrier = extractHeaders(movementId, messageId, hc)
+      val requestId              = headerCarrier.requestId.map(_.value).getOrElse("undefined")
+      val messageType =
+        hc.headersForUrl(headerCarrierConfig)(eisInstanceConfig.url).find(_._1 equalsIgnoreCase RouterHeaderNames.MESSAGE_TYPE).map(_._2).getOrElse("undefined")
       lazy val logMessage =
         s"""|Posting NCTS message, routing to $code
-                |${RouterHeaderNames.CORRELATION_ID}: ${getHeader(RouterHeaderNames.CORRELATION_ID, eisInstanceConfig.url)(headerCarrier)}
-                |${HMRCHeaderNames.xRequestId}: $requestId
-                |${RouterHeaderNames.MESSAGE_TYPE}: ${getHeader(RouterHeaderNames.MESSAGE_TYPE, eisInstanceConfig.url)(headerCarrier)}
-                |${RouterHeaderNames.CONVERSATION_ID}: ${getHeader(RouterHeaderNames.CONVERSATION_ID, eisInstanceConfig.url)(headerCarrier)}
-                |${HeaderNames.ACCEPT}: ${getHeader(HeaderNames.ACCEPT, eisInstanceConfig.url)(headerCarrier)}
-                |${HeaderNames.CONTENT_TYPE}: ${getHeader(HeaderNames.CONTENT_TYPE, eisInstanceConfig.url)(headerCarrier)}
-                |${RouterHeaderNames.CUSTOM_PROCESS_HOST}: ${getHeader(RouterHeaderNames.CUSTOM_PROCESS_HOST, eisInstanceConfig.url)(headerCarrier)}
-                |""".stripMargin
+            |${HMRCHeaderNames.xRequestId}: $requestId
+            |${RouterHeaderNames.CORRELATION_ID}: ${getHeader(RouterHeaderNames.CORRELATION_ID, eisInstanceConfig.url)(headerCarrier)}
+            |${RouterHeaderNames.CONVERSATION_ID}: ${getHeader(RouterHeaderNames.CONVERSATION_ID, eisInstanceConfig.url)(headerCarrier)}
+            |${HeaderNames.ACCEPT}: ${getHeader(HeaderNames.ACCEPT, eisInstanceConfig.url)(headerCarrier)}
+            |${HeaderNames.CONTENT_TYPE}: ${xmlSourceWriter.contentType}
+            |${HeaderNames.DATE}: ${getHeader(HeaderNames.DATE, eisInstanceConfig.url)(headerCarrier)}
+            |${RouterHeaderNames.MESSAGE_TYPE} (not submitted to EIS): $messageType
+            |""".stripMargin
 
       withCircuitBreaker[Either[RoutingError, Unit]](shouldCauseCircuitBreakerStrike) {
         httpClientV2
