@@ -34,7 +34,7 @@ object SdesNotification {
   val values = Seq(FileProcessed, FileProcessingFailure)
 
   implicit val writes = new Writes[SdesNotification] {
-    def writes(status: SdesNotification) = Json.toJson(status.toString())
+    def writes(sdesNotification: SdesNotification) = Json.toJson(sdesNotification.toString())
   }
 
   implicit val reads: Reads[SdesNotification] = Reads {

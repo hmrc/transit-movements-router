@@ -170,24 +170,6 @@ class MessagesController @Inject() (
     case _                     => EitherT.leftT(PresentationError.badRequestError(s"${messageType.code} is not valid for requests"))
   }
 
-  private def updateMessageStatus(
-    sdesResponse: SdesNotificationItem,
-    messageStatus: MessageStatus
-  )(implicit
-    hc: HeaderCarrier
-  ) = {
-    val (movementId, messageId) = extractMovementMessageId(sdesResponse)
-    (for {
-      persistenceResponse <- persistenceConnector
-        .patchMessageStatus(movementId, messageId, MessageUpdate(messageStatus))
-        .asPresentation
-
-    } yield persistenceResponse).fold[Result](
-      _ => Ok,
-      _ => Ok
-    )
-  }
-
   private def extractMovementMessageId(sdesResponse: SdesNotificationItem): (MovementId, MessageId) =
     ConversationId(
       UUID.fromString(
@@ -199,16 +181,19 @@ class MessagesController @Inject() (
     Action.async(parse.json) {
       implicit request =>
         implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
-        parseAndLogSdesResponse(request.body) match {
-          case Left(presentationError: PresentationError) => Future.successful(Status(presentationError.code.statusCode)(Json.toJson(presentationError)))
-          case Right(sdesResponse) =>
-            sdesResponse.notification match {
-              case SdesNotification.FileProcessed =>
-                updateMessageStatus(sdesResponse, MessageStatus.Success)
-              case SdesNotification.FileProcessingFailure =>
-                updateMessageStatus(sdesResponse, MessageStatus.Failed)
-              case _ => Future(Accepted)
-            }
-        }
+        (for {
+          sdesResponse <- parseAndLogSdesResponse(request.body)
+          (movementId, messageId) = extractMovementMessageId(sdesResponse)
+          messageStatus = sdesResponse.notification match {
+            case SdesNotification.FileProcessed         => MessageStatus.Success
+            case SdesNotification.FileProcessingFailure => MessageStatus.Failed
+          }
+          persistenceResponse <- persistenceConnector
+            .patchMessageStatus(movementId, messageId, MessageUpdate(messageStatus))
+            .asPresentation
+        } yield persistenceResponse).fold[Result](
+          error => Status(error.code.statusCode)(Json.toJson(error)),
+          _ => Ok
+        )
     }
 }

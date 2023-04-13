@@ -32,6 +32,7 @@ import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesChecksum
 import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesFile
 import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesFilereadyRequest
 import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesProperties
+import uk.gov.hmrc.transitmovementsrouter.utils.RouterHeaderNames
 
 import java.util.Base64
 import java.util.UUID
@@ -65,7 +66,7 @@ class SDESServiceImpl @Inject() (appConfig: AppConfig, sDESConnector: SDESConnec
       SdesChecksum(value = Base64.getDecoder.decode(objectStoreSummary.contentMd5.value).map("%02x".format(_)).mkString),
       objectStoreSummary.contentLength,
       Seq(
-        SdesProperties("x-conversation-id", ConversationId(movementId, messageId).value.toString)
+        SdesProperties(RouterHeaderNames.CONVERSATION_ID, ConversationId(movementId, messageId).value.toString)
       )
     )
 

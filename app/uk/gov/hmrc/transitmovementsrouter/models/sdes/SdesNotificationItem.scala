@@ -35,7 +35,7 @@ case class SdesNotificationItem(
 
   val conversationId = properties
     .find(
-      p => p.name.toLowerCase() == RouterHeaderNames.CONVERSATION_ID.toLowerCase()
+      p => p.name == RouterHeaderNames.CONVERSATION_ID
     )
 }
 

@@ -27,7 +27,9 @@ import play.api.mvc.ControllerComponents
 import play.api.test.Helpers.stubControllerComponents
 import uk.gov.hmrc.transitmovementsrouter.controllers.errors.PresentationError
 import uk.gov.hmrc.transitmovementsrouter.generators.TestModelGenerators
-import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesNotification
+import uk.gov.hmrc.transitmovementsrouter.models.ConversationId
+
+import java.util.UUID
 
 class SdesResponseParserSpec extends AnyFreeSpec with ScalaFutures with Matchers with ScalaCheckPropertyChecks with TestModelGenerators {
 
@@ -39,33 +41,26 @@ class SdesResponseParserSpec extends AnyFreeSpec with ScalaFutures with Matchers
 
   "parseSdesResponse" - {
 
+    val conversationId = ConversationId(UUID.randomUUID())
+
     "given a response in the callback that cannot be deserialized, returns left" in {
-      val either = testController.parseAndLogSdesResponse(Json.obj("reference" -> "abc"))
-
-      either mustBe Left(PresentationError.badRequestError("Unexpected SDES callback response"))
-
+      whenReady(testController.parseAndLogSdesResponse(Json.obj("reference" -> "abc")).value) {
+        either =>
+          either mustBe Left(PresentationError.badRequestError("Unexpected SDES callback response"))
+      }
     }
 
     "given a successful response in the callback, returns right" in forAll(
-      arbitrarySdesResponse().arbitrary
+      arbitrarySdesResponse(conversationId).arbitrary
     ) {
-      successSdesResponse =>
-        val json   = Json.toJson(successSdesResponse)
-        val either = testController.parseAndLogSdesResponse(json)
+      sdesResponse =>
+        val json = Json.toJson(sdesResponse)
+        whenReady(testController.parseAndLogSdesResponse(json).value) {
 
-        either mustBe Right(successSdesResponse)
-        either.toOption.get.notification mustBe SdesNotification.FileProcessed
-    }
-
-    "given a failure response in the callback, returns right with value of failureReason" in forAll(
-      arbitrarySdesFailureResponse().arbitrary
-    ) {
-      failureSdesResponse =>
-        val json   = Json.toJson(failureSdesResponse)
-        val either = testController.parseAndLogSdesResponse(json)
-
-        either mustBe Right(failureSdesResponse)
-        either.toOption.get.failureReason.isDefined mustBe true
+          either =>
+            either mustBe Right(sdesResponse)
+            either.toOption.get mustBe sdesResponse
+        }
     }
 
   }

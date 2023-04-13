@@ -82,8 +82,6 @@ trait PersistenceConnector {
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): EitherT[Future, PersistenceError, Unit]
-
-  def updateStatusRequest(movementId: MovementId, messageId: MessageId)(implicit hc: HeaderCarrier, ec: ExecutionContext): RequestBuilder
 }
 
 @Singleton
@@ -180,7 +178,7 @@ class PersistenceConnectorImpl @Inject() (httpClientV2: HttpClientV2, appConfig:
     httpClientV2.post(url"$url")
   }
 
-  def updateStatusRequest(movementId: MovementId, messageId: MessageId)(implicit hc: HeaderCarrier, ec: ExecutionContext) = {
+  private def updateStatusRequest(movementId: MovementId, messageId: MessageId)(implicit hc: HeaderCarrier, ec: ExecutionContext) = {
     val url = baseUrl.withPath(persistenceUpdateStatus(movementId, messageId))
     httpClientV2.patch(url"$url")
   }

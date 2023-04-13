@@ -48,6 +48,7 @@ import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.Unexpec
 import uk.gov.hmrc.transitmovementsrouter.models.requests.MessageUpdate
 import uk.gov.hmrc.transitmovementsrouter.services.EISMessageTransformersImpl
 
+import java.util.UUID
 import scala.concurrent.ExecutionContext.Implicits.global
 
 class PersistenceConnectorSpec
@@ -117,13 +118,22 @@ class PersistenceConnectorSpec
       )
   )
 
-  def stubForPatchMessageStatus(codeToReturn: Int, body: Option[String] = None) = server.stubFor(
+  def stubForPatchMessageStatus(codeToReturn: Int) = server.stubFor(
     patch(
       urlEqualTo(uriStatus)
-    ).willReturn(
-      if (body.isEmpty) aResponse().withStatus(codeToReturn)
-      else aResponse().withStatus(codeToReturn)
-    )
+    ).withHeader(HeaderNames.CONTENT_TYPE, equalTo(MimeTypes.JSON))
+      .withRequestBody(
+        equalToJson(
+          Json
+            .obj(
+              "status" -> MessageStatus.Success.toString
+            )
+            .toString()
+        )
+      )
+      .willReturn(
+        aResponse().withStatus(codeToReturn)
+      )
   )
 
   "post" should {
@@ -223,9 +233,7 @@ class PersistenceConnectorSpec
   "patch for update message status" should {
     "return 200 when it is successful" in {
 
-      val body = Json.obj("status" -> MessageStatus.Success.toString).toString()
-
-      stubForPatchMessageStatus(OK, Some(body))
+      stubForPatchMessageStatus(OK)
 
       whenReady(connector.patchMessageStatus(movementId, messageId, MessageUpdate(MessageStatus.Success)).value) {
         x =>

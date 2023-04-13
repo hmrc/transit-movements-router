@@ -30,6 +30,8 @@ import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesAudit
 import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesChecksum
 import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesFile
 import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesFilereadyRequest
+import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesNotification
+import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesNotificationItem
 import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesProperties
 
 import java.time.Instant
@@ -106,9 +108,31 @@ trait ModelGenerators extends BaseGenerators {
         objectSummary.location.asUri,
         SdesChecksum(value = objectSummary.contentMd5.value),
         objectSummary.contentLength,
-        Seq(SdesProperties("x-conversation-id", ConversationId(movementId, messageId).value.toString))
+        Seq(SdesProperties("X-Conversation-Id", ConversationId(movementId, messageId).value.toString))
       ),
       SdesAudit(uuid.toString)
+    )
+  }
+
+  implicit def arbitrarySdesResponse(conversationId: ConversationId): Arbitrary[SdesNotificationItem] = Arbitrary {
+    for {
+      filename          <- Gen.alphaNumStr
+      correlationId     <- Gen.alphaNumStr
+      checksum          <- Gen.stringOfN(4, Gen.alphaChar)
+      checksumAlgorithm <- Gen.alphaNumStr
+      notification      <- Gen.oneOf(SdesNotification.values)
+      received   = Instant.now()
+      properties = Seq(SdesProperties("X-Conversation-Id", conversationId.value.toString))
+    } yield SdesNotificationItem(
+      notification,
+      filename,
+      correlationId,
+      checksum,
+      checksumAlgorithm,
+      received,
+      None,
+      received,
+      properties
     )
   }
 
