@@ -16,12 +16,18 @@
 
 package uk.gov.hmrc.transitmovementsrouter.utils
 
-object RouterHeaderNames {
+import com.google.inject.ImplementedBy
+import com.google.inject.Singleton
 
-  val CLIENT_ID        = "X-Client-Id"
-  val CORRELATION_ID   = "X-Correlation-Id"
-  val CONVERSATION_ID  = "X-Conversation-Id"
-  val MESSAGE_TYPE     = "X-Message-Type"
-  val OBJECT_STORE_URI = "X-Object-Store-Uri"
+import java.util.UUID
 
+// Enables testing by allowing for a static UUID to be generated instead.
+@ImplementedBy(classOf[UUIDGeneratorImpl])
+trait UUIDGenerator {
+  def generateUUID(): UUID
+}
+
+@Singleton
+class UUIDGeneratorImpl extends UUIDGenerator {
+  override def generateUUID(): UUID = UUID.randomUUID()
 }
