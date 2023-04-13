@@ -19,8 +19,6 @@ package uk.gov.hmrc.transitmovementsrouter.connectors
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import com.github.tomakehurst.wiremock.client.WireMock._
-import com.github.tomakehurst.wiremock.matching.AnythingPattern
-import com.github.tomakehurst.wiremock.matching.StringValuePattern
 import com.github.tomakehurst.wiremock.stubbing.Scenario
 import org.mockito.ArgumentMatchers
 import org.mockito.Mockito.when
@@ -57,6 +55,9 @@ import uk.gov.hmrc.transitmovementsrouter.models.MovementId
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
 
 import java.net.URL
+import java.time.Clock
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
 import java.util.UUID
 import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -74,8 +75,6 @@ class EISConnectorSpec
     with TableDrivenPropertyChecks
     with TestActorSystem
     with ModelGenerators {
-
-  lazy val anything: StringValuePattern = new AnythingPattern()
 
   private object NoRetries extends Retries {
 
@@ -103,22 +102,24 @@ class EISConnectorSpec
     Headers("bearertokenhereGB"),
     CircuitBreakerConfig(
       3,
-      2.seconds,
-      2.seconds,
-      3.seconds,
+      5.seconds,
+      5.seconds,
+      10.seconds,
       1,
       0
     ),
     RetryConfig(
       1,
       1.second,
-      2.seconds
+      5.seconds
     )
   )
 
+  private val clock = Clock.fixed(OffsetDateTime.of(2023, 4, 13, 10, 34, 41, 500, ZoneOffset.UTC).toInstant, ZoneOffset.UTC)
+
   // We construct the connector each time to avoid issues with the circuit breaker
-  def noRetriesConnector = new EISConnectorImpl("NoRetry", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, NoRetries)
-  def oneRetryConnector  = new EISConnectorImpl("OneRetry", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, OneRetry)
+  def noRetriesConnector = new EISConnectorImpl("NoRetry", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, NoRetries, clock)
+  def oneRetryConnector  = new EISConnectorImpl("OneRetry", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, OneRetry, clock)
 
   lazy val connectorGen: Gen[() => EISConnector] = Gen.oneOf(() => noRetriesConnector, () => oneRetryConnector)
 
@@ -154,7 +155,7 @@ class EISConnectorSpec
               .inScenario("Standard Call")
               .whenScenarioStateIs(currentState)
               .withHeader(HeaderNames.AUTHORIZATION, equalTo("Bearer bearertokenhereGB"))
-              .withHeader("Date", anything)
+              .withHeader("Date", equalTo("Thu, 13 Apr 2023 10:34:41 UTC"))
               .withHeader("X-Request-Id", equalTo(requestId))
               .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
               .withHeader("X-Conversation-Id", equalTo(expectedConversationId.value.toString))
@@ -206,7 +207,7 @@ class EISConnectorSpec
             )
               .inScenario("Standard Call")
               .whenScenarioStateIs(currentState)
-              .withHeader("Date", anything)
+              .withHeader("Date", equalTo("Thu, 13 Apr 2023 10:34:41 UTC"))
               .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
               .withHeader("X-Conversation-Id", equalTo(expectedConversationId.value.toString))
               .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
@@ -238,7 +239,7 @@ class EISConnectorSpec
             post(
               urlEqualTo(uriStub)
             ).withHeader("Authorization", equalTo("Bearer bearertokenhereGB"))
-              .withHeader("Date", anything)
+              .withHeader("Date", equalTo("Thu, 13 Apr 2023 10:34:41 UTC"))
               .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
               .withHeader(HeaderNames.CONTENT_TYPE, equalTo("application/xml"))
               .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
@@ -273,7 +274,7 @@ class EISConnectorSpec
               .inScenario("Flaky Call")
               .whenScenarioStateIs(currentState)
               .willSetStateTo(targetState)
-              .withHeader("Date", anything)
+              .withHeader("Date", equalTo("Thu, 13 Apr 2023 10:34:41 UTC"))
               .withHeader("Authorization", equalTo("Bearer bearertokenhereGB"))
               .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
               .withHeader(HeaderNames.CONTENT_TYPE, equalTo("application/xml"))
@@ -315,7 +316,7 @@ class EISConnectorSpec
             urlEqualTo(uriStub)
           ).withHeader("Authorization", equalTo("Bearer bearertokenhereGB"))
             .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
-            .withHeader("Date", anything)
+            .withHeader("Date", equalTo("Thu, 13 Apr 2023 10:34:41 UTC"))
             .withHeader(HeaderNames.CONTENT_TYPE, equalTo("application/xml"))
             .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
             .withHeader("X-Conversation-Id", equalTo(expectedConversationId.value.toString))
@@ -338,7 +339,7 @@ class EISConnectorSpec
       val httpClientV2 = mock[HttpClientV2]
 
       val hc        = HeaderCarrier()
-      val connector = new EISConnectorImpl("Failure", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, NoRetries)
+      val connector = new EISConnectorImpl("Failure", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, NoRetries, clock)
 
       when(httpClientV2.post(ArgumentMatchers.any[URL])(ArgumentMatchers.any[HeaderCarrier])).thenReturn(new FakeRequestBuilder)
 
