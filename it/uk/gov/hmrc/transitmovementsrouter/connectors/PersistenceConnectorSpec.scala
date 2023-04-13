@@ -48,7 +48,6 @@ import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.Unexpec
 import uk.gov.hmrc.transitmovementsrouter.models.requests.MessageUpdate
 import uk.gov.hmrc.transitmovementsrouter.services.EISMessageTransformersImpl
 
-import java.util.UUID
 import scala.concurrent.ExecutionContext.Implicits.global
 
 class PersistenceConnectorSpec

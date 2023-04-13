@@ -114,26 +114,4 @@ trait ModelGenerators extends BaseGenerators {
     )
   }
 
-  implicit def arbitrarySdesResponse(conversationId: ConversationId): Arbitrary[SdesNotificationItem] = Arbitrary {
-    for {
-      filename          <- Gen.alphaNumStr
-      correlationId     <- Gen.alphaNumStr
-      checksum          <- Gen.stringOfN(4, Gen.alphaChar)
-      checksumAlgorithm <- Gen.alphaNumStr
-      notification      <- Gen.oneOf(SdesNotification.values)
-      received   = Instant.now()
-      properties = Seq(SdesProperties("X-Conversation-Id", conversationId.value.toString))
-    } yield SdesNotificationItem(
-      notification,
-      filename,
-      correlationId,
-      checksum,
-      checksumAlgorithm,
-      received,
-      None,
-      received,
-      properties
-    )
-  }
-
 }
