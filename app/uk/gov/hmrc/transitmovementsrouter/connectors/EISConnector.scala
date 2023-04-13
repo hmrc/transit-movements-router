@@ -41,6 +41,7 @@ import uk.gov.hmrc.transitmovementsrouter.models.MovementId
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
 import uk.gov.hmrc.transitmovementsrouter.utils.RouterHeaderNames
 
+import java.time.Clock
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
@@ -62,7 +63,8 @@ class EISConnectorImpl(
   val eisInstanceConfig: EISInstanceConfig,
   headerCarrierConfig: HeaderCarrier.Config,
   httpClientV2: HttpClientV2,
-  retries: Retries
+  retries: Retries,
+  clock: Clock
 )(implicit
   ec: ExecutionContext,
   val materializer: Materializer
@@ -75,7 +77,10 @@ class EISConnectorImpl(
   // Used when setting a stream body -- forces the correct content type (default chooses application/octet-stream)
   implicit private val xmlSourceWriter: BodyWritable[Source[ByteString, _]] = BodyWritable(SourceBody, MimeTypes.XML)
 
-  private val HTTP_DATE_FORMATTER = DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss z", Locale.ENGLISH).withZone(ZoneOffset.UTC)
+  private val HTTP_DATE_FORMATTER = DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss", Locale.ENGLISH).withZone(ZoneOffset.UTC)
+
+  private def nowFormatted(): String =
+    s"${HTTP_DATE_FORMATTER.format(OffsetDateTime.now(clock.withZone(ZoneOffset.UTC)))} UTC"
 
   def shouldCauseCircuitBreakerStrike(result: Try[Either[RoutingError, Unit]]): Boolean =
     result.map(_.isLeft).getOrElse(true)
@@ -127,7 +132,7 @@ class EISConnectorImpl(
             RouterHeaderNames.CORRELATION_ID  -> correlationId,
             HeaderNames.ACCEPT                -> MimeTypes.XML,
             RouterHeaderNames.CONVERSATION_ID -> ConversationId(movementId, messageId).value.toString,
-            HeaderNames.DATE                  -> HTTP_DATE_FORMATTER.format(OffsetDateTime.now())
+            HeaderNames.DATE                  -> nowFormatted()
           )
           .execute[Either[UpstreamErrorResponse, HttpResponse]]
           .map {
