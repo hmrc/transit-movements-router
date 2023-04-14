@@ -16,18 +16,22 @@
 
 package uk.gov.hmrc.transitmovementsrouter.models.sdes
 
-import play.api.libs.json.Format
-import play.api.libs.json.Json
+import org.scalacheck.Arbitrary.arbitrary
+import org.scalatest.freespec.AnyFreeSpec
+import org.scalatest.matchers.must.Matchers
+import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
+import uk.gov.hmrc.objectstore.client.ObjectSummaryWithMd5
+import uk.gov.hmrc.transitmovementsrouter.generators.TestModelGenerators
 
-final case class SdesFile(
-  recipientOrSender: String, // SRN
-  name: FileName,
-  location: FileURL,
-  checksum: SdesChecksum,
-  size: FileSize,
-  properties: Seq[SdesProperties] // x-conversation-id
-)
+class FileNameSpec extends AnyFreeSpec with Matchers with ScalaCheckDrivenPropertyChecks with TestModelGenerators {
 
-object SdesFile {
-  implicit lazy val format: Format[SdesFile] = Json.format
+  "apply(Path.File)" - {
+
+    "for a file, store only the file name" in forAll(arbitrary[ObjectSummaryWithMd5]) {
+      summary =>
+        FileName(summary.location).value mustBe summary.location.fileName
+    }
+
+  }
+
 }

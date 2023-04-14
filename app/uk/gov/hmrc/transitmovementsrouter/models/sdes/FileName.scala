@@ -14,14 +14,16 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovementsrouter.utils
+package uk.gov.hmrc.transitmovementsrouter.models.sdes
 
-object RouterHeaderNames {
+import play.api.libs.json.Format
+import play.api.libs.json.Json
+import uk.gov.hmrc.objectstore.client.Path
 
-  val CLIENT_ID        = "X-Client-Id"
-  val CORRELATION_ID   = "X-Correlation-Id"
-  val CONVERSATION_ID  = "X-Conversation-Id"
-  val MESSAGE_TYPE     = "X-Message-Type"
-  val OBJECT_STORE_URI = "X-Object-Store-Uri"
+object FileName {
+  implicit val format: Format[FileName] = Json.valueFormat[FileName]
 
+  def apply(fileName: Path.File): FileName = FileName(fileName.fileName)
 }
+
+case class FileName(value: String) extends AnyVal

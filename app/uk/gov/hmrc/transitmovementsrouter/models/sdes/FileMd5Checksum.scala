@@ -14,14 +14,20 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovementsrouter.utils
+package uk.gov.hmrc.transitmovementsrouter.models.sdes
 
-object RouterHeaderNames {
+import play.api.libs.json.Format
+import play.api.libs.json.Json
+import uk.gov.hmrc.objectstore.client.Md5Hash
 
-  val CLIENT_ID        = "X-Client-Id"
-  val CORRELATION_ID   = "X-Correlation-Id"
-  val CONVERSATION_ID  = "X-Conversation-Id"
-  val MESSAGE_TYPE     = "X-Message-Type"
-  val OBJECT_STORE_URI = "X-Object-Store-Uri"
+import java.util.Base64
+
+object FileMd5Checksum {
+  implicit val format: Format[FileMd5Checksum] = Json.valueFormat[FileMd5Checksum]
+
+  // Md5Hash stores a Base64 encoded version of the checksum, when we want hex string encoded
+  def fromBase64(hash: Md5Hash): FileMd5Checksum = FileMd5Checksum(Base64.getDecoder.decode(hash.value).map("%02x".format(_)).mkString)
 
 }
+
+case class FileMd5Checksum(value: String) extends AnyVal

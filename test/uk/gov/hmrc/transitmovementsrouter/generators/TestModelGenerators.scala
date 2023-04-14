@@ -29,10 +29,13 @@ import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.Downlo
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.FileStatus
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.Reference
 
+import java.nio.charset.StandardCharsets
+import java.security.MessageDigest
 import java.time.Instant
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
+import java.util.Base64
 
 trait TestModelGenerators extends BaseGenerators {
 
@@ -94,6 +97,13 @@ trait TestModelGenerators extends BaseGenerators {
     } yield UpscanResponse(Reference(reference), fileStatus, downloadUrl, uploadDetails, failureDetails)
   }
 
+  private def md5hashbase64(string: String): String =
+    Base64.getEncoder.encodeToString(MessageDigest.getInstance("MD5").digest(string.getBytes(StandardCharsets.UTF_8)))
+
+  implicit val arbitraryMd5Hash: Arbitrary[Md5Hash] = Arbitrary {
+    Gen.alphaNumStr.map(md5hashbase64).map(Md5Hash)
+  }
+
   implicit val arbitraryObjectSummaryWithMd5: Arbitrary[ObjectSummaryWithMd5] = Arbitrary {
     for {
       movementId <- arbitraryMovementId.arbitrary
@@ -101,7 +111,7 @@ trait TestModelGenerators extends BaseGenerators {
       lastModified      = Instant.now()
       formattedDateTime = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").withZone(ZoneOffset.UTC).format(lastModified)
       contentLen <- Gen.chooseNum(100, 500)
-      hash       <- Gen.stringOfN(4, Gen.alphaChar).map(Md5Hash)
+      hash       <- arbitraryMd5Hash.arbitrary
     } yield ObjectSummaryWithMd5(
       Path.Directory("common-transit-convention-traders").file(s"${movementId.value}-${messageId.value}-$formattedDateTime.xml"),
       contentLen,
