@@ -14,15 +14,20 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovementsrouter.models.errors
+package uk.gov.hmrc.transitmovementsrouter.utils
 
-import uk.gov.hmrc.transitmovementsrouter.models.MessageId
-import uk.gov.hmrc.transitmovementsrouter.models.MovementId
+import com.google.inject.ImplementedBy
+import com.google.inject.Singleton
 
-sealed trait PersistenceError
+import java.util.UUID
 
-object PersistenceError {
-  final case class MovementNotFound(movementId: MovementId)                      extends PersistenceError
-  final case class MessageNotFound(movementId: MovementId, messageId: MessageId) extends PersistenceError
-  final case class Unexpected(thr: Option[Throwable] = None)                     extends PersistenceError
+// Enables testing by allowing for a static UUID to be generated instead.
+@ImplementedBy(classOf[UUIDGeneratorImpl])
+trait UUIDGenerator {
+  def generateUUID(): UUID
+}
+
+@Singleton
+class UUIDGeneratorImpl extends UUIDGenerator {
+  override def generateUUID(): UUID = UUID.randomUUID()
 }

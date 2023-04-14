@@ -14,15 +14,20 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovementsrouter.models.errors
+package uk.gov.hmrc.transitmovementsrouter.models
 
-import uk.gov.hmrc.transitmovementsrouter.models.MessageId
-import uk.gov.hmrc.transitmovementsrouter.models.MovementId
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
+import play.api.libs.json.JsString
+import play.api.libs.json.Json
 
-sealed trait PersistenceError
+class MessageStatusSpec extends AnyFlatSpec with Matchers {
 
-object PersistenceError {
-  final case class MovementNotFound(movementId: MovementId)                      extends PersistenceError
-  final case class MessageNotFound(movementId: MovementId, messageId: MessageId) extends PersistenceError
-  final case class Unexpected(thr: Option[Throwable] = None)                     extends PersistenceError
+  "MessageStatus" should "serialise correctly" in {
+    Json.toJson[MessageStatus](MessageStatus.Processing) should be(JsString("Processing"))
+  }
+
+  "MessageStatus" should "deserialize correctly" in {
+    JsString("Processing").validate[MessageStatus].get should be(MessageStatus.Processing)
+  }
 }

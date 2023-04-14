@@ -37,6 +37,11 @@ import uk.gov.hmrc.transitmovementsrouter.controllers.errors.ConvertError
 import uk.gov.hmrc.transitmovementsrouter.controllers.errors.PresentationError
 import uk.gov.hmrc.transitmovementsrouter.controllers.stream.StreamingParsers
 import uk.gov.hmrc.transitmovementsrouter.models._
+import uk.gov.hmrc.transitmovementsrouter.models.requests.MessageUpdate
+import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesNotification
+import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesNotificationItem
+
+import java.util.UUID
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.DownloadUrl
 import uk.gov.hmrc.transitmovementsrouter.services.CustomOfficeExtractorService
@@ -69,6 +74,7 @@ class MessagesController @Inject() (
     with UpscanResponseParser
     with ObjectStoreURIExtractor
     with ContentTypeRouting
+    with SdesResponseParser
     with Logging {
 
   def outgoing(eori: EoriNumber, movementType: MovementType, movementId: MovementId, messageId: MessageId) =
@@ -164,4 +170,37 @@ class MessagesController @Inject() (
     case _                     => EitherT.leftT(PresentationError.badRequestError(s"${messageType.code} is not valid for requests"))
   }
 
+  private def extractMovementMessageId(sdesResponse: SdesNotificationItem): (MovementId, MessageId) =
+    ConversationId(
+      UUID.fromString(
+        sdesResponse.conversationId.get.value
+      )
+    ).toMovementAndMessageId
+
+  private def updateStatus(movementId: MovementId, messageId: MessageId, messageStatus: MessageStatus)(implicit
+    hc: HeaderCarrier
+  ): EitherT[Future, PresentationError, Unit] =
+    persistenceConnector
+      .patchMessageStatus(movementId, messageId, MessageUpdate(messageStatus))
+      .asPresentation
+
+  def handleSdesResponse() =
+    Action.async(parse.json) {
+      implicit request =>
+        implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
+        (for {
+          sdesResponse <- parseAndLogSdesResponse(request.body)
+          (movementId, messageId) = extractMovementMessageId(sdesResponse)
+          persistenceResponse <- sdesResponse.notification match {
+            case SdesNotification.FileProcessed =>
+              updateStatus(movementId, messageId, MessageStatus.Success)
+            case SdesNotification.FileProcessingFailure =>
+              updateStatus(movementId, messageId, MessageStatus.Failed)
+            case _ => EitherT.rightT[Future, PresentationError]((): Unit)
+          }
+        } yield persistenceResponse).fold[Result](
+          error => Status(error.code.statusCode)(Json.toJson(error)),
+          _ => Ok
+        )
+    }
 }

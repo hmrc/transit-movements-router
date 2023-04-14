@@ -35,7 +35,6 @@ import uk.gov.hmrc.transitmovementsrouter.models.RequestMessageType
 import uk.gov.hmrc.transitmovementsrouter.models.errors.CustomOfficeExtractorError
 import uk.gov.hmrc.transitmovementsrouter.services.XmlParser.ParseResult
 
-import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 
 @ImplementedBy(classOf[CustomOfficeExtractorServiceImpl])
@@ -45,7 +44,7 @@ trait CustomOfficeExtractorService {
 }
 
 @Singleton
-class CustomOfficeExtractorServiceImpl @Inject() (implicit ec: ExecutionContext, mat: Materializer) extends CustomOfficeExtractorService {
+class CustomOfficeExtractorServiceImpl @Inject() (implicit mat: Materializer) extends CustomOfficeExtractorService {
 
   override def extractCustomOffice(source: Source[ByteString, _], messageType: RequestMessageType): EitherT[Future, CustomOfficeExtractorError, CustomsOffice] =
     EitherT(source.runWith(customOfficeExtractor(messageType)))

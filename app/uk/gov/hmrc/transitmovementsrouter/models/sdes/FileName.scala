@@ -14,15 +14,16 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovementsrouter.models.errors
+package uk.gov.hmrc.transitmovementsrouter.models.sdes
 
-import uk.gov.hmrc.transitmovementsrouter.models.MessageId
-import uk.gov.hmrc.transitmovementsrouter.models.MovementId
+import play.api.libs.json.Format
+import play.api.libs.json.Json
+import uk.gov.hmrc.objectstore.client.Path
 
-sealed trait PersistenceError
+object FileName {
+  implicit val format: Format[FileName] = Json.valueFormat[FileName]
 
-object PersistenceError {
-  final case class MovementNotFound(movementId: MovementId)                      extends PersistenceError
-  final case class MessageNotFound(movementId: MovementId, messageId: MessageId) extends PersistenceError
-  final case class Unexpected(thr: Option[Throwable] = None)                     extends PersistenceError
+  def apply(fileName: Path.File): FileName = FileName(fileName.fileName)
 }
+
+case class FileName(value: String) extends AnyVal

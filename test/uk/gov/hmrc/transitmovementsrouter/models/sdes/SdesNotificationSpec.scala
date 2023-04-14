@@ -16,18 +16,18 @@
 
 package uk.gov.hmrc.transitmovementsrouter.models.sdes
 
-import play.api.libs.json.Format
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
+import play.api.libs.json.JsString
 import play.api.libs.json.Json
 
-final case class SdesFile(
-  recipientOrSender: String, // SRN
-  name: FileName,
-  location: FileURL,
-  checksum: SdesChecksum,
-  size: FileSize,
-  properties: Seq[SdesProperties] // x-conversation-id
-)
+class SdesNotificationSpec extends AnyFlatSpec with Matchers {
 
-object SdesFile {
-  implicit lazy val format: Format[SdesFile] = Json.format
+  "SdesNotification" should "serialise correctly" in {
+    Json.toJson[SdesNotification](SdesNotification.FileProcessed) should be(JsString("FileProcessed"))
+  }
+
+  "SdesNotification" should "deserialize correctly" in {
+    JsString("FileProcessingFailure").validate[SdesNotification].get should be(SdesNotification.FileProcessingFailure)
+  }
 }

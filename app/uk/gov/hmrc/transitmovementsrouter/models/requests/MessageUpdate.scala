@@ -14,15 +14,13 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovementsrouter.models.errors
+package uk.gov.hmrc.transitmovementsrouter.models.requests
 
-import uk.gov.hmrc.transitmovementsrouter.models.MessageId
-import uk.gov.hmrc.transitmovementsrouter.models.MovementId
+import play.api.libs.json.Json
+import uk.gov.hmrc.transitmovementsrouter.models.MessageStatus
 
-sealed trait PersistenceError
+case class MessageUpdate(status: MessageStatus)
 
-object PersistenceError {
-  final case class MovementNotFound(movementId: MovementId)                      extends PersistenceError
-  final case class MessageNotFound(movementId: MovementId, messageId: MessageId) extends PersistenceError
-  final case class Unexpected(thr: Option[Throwable] = None)                     extends PersistenceError
+object MessageUpdate {
+  implicit val format = Json.format[MessageUpdate]
 }

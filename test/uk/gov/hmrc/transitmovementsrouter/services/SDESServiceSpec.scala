@@ -17,8 +17,9 @@
 package uk.gov.hmrc.transitmovementsrouter.services
 
 import org.mockito.ArgumentMatchers.any
-import org.mockito.Mockito.reset
+import org.mockito.ArgumentMatchers.{eq => eqTo}
 import org.mockito.Mockito.when
+import org.scalacheck.Arbitrary.arbitrary
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.OptionValues
 import org.scalatest.concurrent.ScalaFutures
@@ -29,14 +30,20 @@ import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 import play.api.http.Status.INTERNAL_SERVER_ERROR
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.UpstreamErrorResponse
+import uk.gov.hmrc.objectstore.client.ObjectSummaryWithMd5
 import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
 import uk.gov.hmrc.transitmovementsrouter.connectors.SDESConnector
 import uk.gov.hmrc.transitmovementsrouter.generators.TestModelGenerators
+import uk.gov.hmrc.transitmovementsrouter.models.MessageId
+import uk.gov.hmrc.transitmovementsrouter.models.MovementId
 import uk.gov.hmrc.transitmovementsrouter.models.errors.SDESError
-import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesFilereadyRequest
+import uk.gov.hmrc.transitmovementsrouter.models.sdes.FileMd5Checksum
+import uk.gov.hmrc.transitmovementsrouter.models.sdes.FileName
+import uk.gov.hmrc.transitmovementsrouter.models.sdes.FileSize
+import uk.gov.hmrc.transitmovementsrouter.models.sdes.FileURL
 
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.ExecutionContext
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 class SDESServiceSpec
@@ -51,63 +58,69 @@ class SDESServiceSpec
 
   implicit val hc: HeaderCarrier = HeaderCarrier()
 
-  val upstreamErrorResponse: Throwable = UpstreamErrorResponse("Internal service error", INTERNAL_SERVER_ERROR)
-
-  val mockConnector: SDESConnector = mock[SDESConnector]
-
-  val mockAppConfig: AppConfig = mock[AppConfig]
-
-  val sut = new SDESServiceImpl(mockAppConfig, mockConnector)
-
-  override def beforeEach(): Unit = {
-    reset(mockConnector)
-    reset(mockAppConfig)
-  }
-
   "Submitting a large message to SDES" - {
 
-    "on a successful submission to SDES , should return a Right" in forAll(
-      arbitraryMovementId.arbitrary,
-      arbitraryMessageId.arbitrary,
-      arbitraryObjectSummaryWithMd5.arbitrary
+    "on a successful submission to SDES, should return a Right" in forAll(
+      arbitrary[MovementId],
+      arbitrary[MessageId],
+      arbitrary[ObjectSummaryWithMd5]
     ) {
       (movementId, messageId, objectSummary) =>
+        val mockAppConfig = mock[AppConfig]
+        when(mockAppConfig.objectStoreUrl).thenReturn("http://test")
+
+        val mockConnector: SDESConnector = mock[SDESConnector]
+        val sut                          = new SDESServiceImpl(mockAppConfig, mockConnector)
         when(
           mockConnector.send(
-            any[String].asInstanceOf[SdesFilereadyRequest]
+            MovementId(eqTo(movementId.value)),
+            MessageId(eqTo(messageId.value)),
+            FileName(eqTo(objectSummary.location.fileName)),
+            FileURL(eqTo(s"http://test/${objectSummary.location.asUri}")),
+            FileMd5Checksum(eqTo(FileMd5Checksum.fromBase64(objectSummary.contentMd5).value)),
+            FileSize(eqTo(objectSummary.contentLength))
           )(
             any[HeaderCarrier],
             any[ExecutionContext]
           )
         )
-          .thenReturn(Future.successful(()))
+          .thenReturn(Future.successful(Right((): Unit)))
 
-        val result                            = sut.send(movementId, messageId, objectSummary)
-        val expected: Either[SDESError, Unit] = Right(())
+        val result = sut.send(movementId, messageId, objectSummary)
         whenReady(result.value) {
-          _ mustBe expected
+          _ mustBe Right(())
         }
     }
 
-    "on a failed submission to SDES , should return a Left with an UnexpectedError" in forAll(
-      arbitraryMovementId.arbitrary,
-      arbitraryMessageId.arbitrary,
-      arbitraryObjectSummaryWithMd5.arbitrary
+    "on a failed submission to SDES, should return a Left with an UnexpectedError" in forAll(
+      arbitrary[MovementId],
+      arbitrary[MessageId],
+      arbitrary[ObjectSummaryWithMd5]
     ) {
       (movementId, messageId, objectSummary) =>
+        val mockAppConfig = mock[AppConfig]
+        when(mockAppConfig.objectStoreUrl).thenReturn("http://test")
+
+        val mockConnector: SDESConnector     = mock[SDESConnector]
+        val sut                              = new SDESServiceImpl(mockAppConfig, mockConnector)
+        val upstreamErrorResponse: Throwable = UpstreamErrorResponse("Internal service error", INTERNAL_SERVER_ERROR)
         when(
           mockConnector.send(
-            any[String].asInstanceOf[SdesFilereadyRequest]
+            MovementId(eqTo(movementId.value)),
+            MessageId(eqTo(messageId.value)),
+            FileName(eqTo(objectSummary.location.fileName)),
+            FileURL(eqTo(s"http://test/${objectSummary.location.asUri}")),
+            FileMd5Checksum(eqTo(FileMd5Checksum.fromBase64(objectSummary.contentMd5).value)),
+            FileSize(eqTo(objectSummary.contentLength))
           )(
             any[HeaderCarrier],
             any[ExecutionContext]
           )
         )
-          .thenReturn(Future.failed(upstreamErrorResponse))
-        val result                            = sut.send(movementId, messageId, objectSummary)
-        val expected: Either[SDESError, Unit] = Left(SDESError.UnexpectedError(Some(upstreamErrorResponse)))
+          .thenReturn(Future.successful(Left(SDESError.UnexpectedError(Some(upstreamErrorResponse)))))
+        val result = sut.send(movementId, messageId, objectSummary)
         whenReady(result.value) {
-          _ mustBe expected
+          _ mustBe Left(SDESError.UnexpectedError(Some(upstreamErrorResponse)))
         }
     }
 

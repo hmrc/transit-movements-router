@@ -19,9 +19,7 @@ package uk.gov.hmrc.transitmovementsrouter.controllers
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import com.github.tomakehurst.wiremock.client.WireMock._
-import com.github.tomakehurst.wiremock.matching.AnythingPattern
 import com.github.tomakehurst.wiremock.matching.EqualToPattern
-import com.github.tomakehurst.wiremock.matching.StringValuePattern
 import com.github.tomakehurst.wiremock.matching.UrlPathPattern
 import com.kenshoo.play.metrics.Metrics
 import org.scalacheck.Gen
@@ -49,6 +47,7 @@ import uk.gov.hmrc.transitmovementsrouter.models.EoriNumber
 import uk.gov.hmrc.transitmovementsrouter.models.MessageId
 import uk.gov.hmrc.transitmovementsrouter.models.MovementType
 
+import java.time.Clock
 import java.time.format.DateTimeFormatter
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -115,10 +114,11 @@ class MessagesControllerIntegrationSpec
       "microservice.services.eis.gb.retry.max-retries"                  -> 0
     )
 
-  lazy val anything: StringValuePattern = new AnythingPattern()
+  private val clock = Clock.fixed(OffsetDateTime.of(2023, 4, 13, 10, 34, 41, 500, ZoneOffset.UTC).toInstant, ZoneOffset.UTC)
 
   override protected lazy val bindings: Seq[GuiceableModule] = Seq(
-    bind[Metrics].to[TestMetrics]
+    bind[Metrics].to[TestMetrics],
+    bind[Clock].toInstance(clock)
   )
 
   "outgoing" - {
@@ -135,10 +135,9 @@ class MessagesControllerIntegrationSpec
           urlEqualTo("/gb")
         )
           .withHeader(HeaderNames.AUTHORIZATION, equalTo(s"Bearer bearertoken"))
-          .withHeader("Date", anything)
+          .withHeader("Date", equalTo("Thu, 13 Apr 2023 10:34:41 UTC"))
           .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
           .withHeader("X-Conversation-Id", equalTo(conversationId.value.toString))
-          .withHeader("CustomProcessHost", equalTo("Digital"))
           .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
           .withHeader(HeaderNames.CONTENT_TYPE, equalTo("application/xml"))
           .willReturn(aResponse().withStatus(OK))
@@ -181,10 +180,9 @@ class MessagesControllerIntegrationSpec
           urlEqualTo("/xi")
         )
           .withHeader(HeaderNames.AUTHORIZATION, equalTo(s"Bearer bearertoken"))
-          .withHeader("Date", anything)
+          .withHeader("Date", equalTo("Thu, 13 Apr 2023 10:34:41 UTC"))
           .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
           .withHeader("X-Conversation-Id", equalTo(conversationId.value.toString))
-          .withHeader("CustomProcessHost", equalTo("Digital"))
           .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
           .withHeader(HeaderNames.CONTENT_TYPE, equalTo("application/xml"))
           .willReturn(aResponse().withStatus(OK))
@@ -225,10 +223,9 @@ class MessagesControllerIntegrationSpec
           urlEqualTo("/gb")
         )
           .withHeader(HeaderNames.AUTHORIZATION, equalTo(s"Bearer bearertoken"))
-          .withHeader("Date", anything)
+          .withHeader("Date", equalTo("Thu, 13 Apr 2023 10:34:41 UTC"))
           .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
           .withHeader("X-Conversation-Id", equalTo(conversationId.value.toString))
-          .withHeader("CustomProcessHost", equalTo("Digital"))
           .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
           .withHeader(HeaderNames.CONTENT_TYPE, equalTo("application/xml"))
           .willReturn(aResponse().withStatus(FORBIDDEN))

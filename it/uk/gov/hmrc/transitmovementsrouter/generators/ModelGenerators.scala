@@ -26,6 +26,10 @@ import uk.gov.hmrc.transitmovementsrouter.models.CustomsOffice
 import uk.gov.hmrc.transitmovementsrouter.models.MessageId
 import uk.gov.hmrc.transitmovementsrouter.models.MessageType
 import uk.gov.hmrc.transitmovementsrouter.models.MovementId
+import uk.gov.hmrc.transitmovementsrouter.models.sdes.FileMd5Checksum
+import uk.gov.hmrc.transitmovementsrouter.models.sdes.FileName
+import uk.gov.hmrc.transitmovementsrouter.models.sdes.FileSize
+import uk.gov.hmrc.transitmovementsrouter.models.sdes.FileURL
 import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesAudit
 import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesChecksum
 import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesFile
@@ -102,11 +106,11 @@ trait ModelGenerators extends BaseGenerators {
       informationType,
       SdesFile(
         srn,
-        objectSummary.location.fileName,
-        objectSummary.location.asUri,
-        SdesChecksum(value = objectSummary.contentMd5.value),
-        objectSummary.contentLength,
-        Seq(SdesProperties("x-conversation-id", ConversationId(movementId, messageId).value.toString))
+        FileName(objectSummary.location),
+        FileURL(objectSummary.location, "http://localhost"),
+        SdesChecksum(value = FileMd5Checksum.fromBase64(objectSummary.contentMd5)),
+        FileSize(objectSummary.contentLength),
+        Seq(SdesProperties("X-Conversation-Id", ConversationId(movementId, messageId).value.toString))
       ),
       SdesAudit(uuid.toString)
     )

@@ -16,18 +16,29 @@
 
 package uk.gov.hmrc.transitmovementsrouter.models.sdes
 
-import play.api.libs.json.Format
-import play.api.libs.json.Json
+import play.api.libs.json._
+import uk.gov.hmrc.transitmovementsrouter.utils.RouterHeaderNames
 
-final case class SdesFile(
-  recipientOrSender: String, // SRN
-  name: FileName,
-  location: FileURL,
-  checksum: SdesChecksum,
-  size: FileSize,
-  properties: Seq[SdesProperties] // x-conversation-id
-)
+import java.time.Instant
 
-object SdesFile {
-  implicit lazy val format: Format[SdesFile] = Json.format
+case class SdesNotificationItem(
+  notification: SdesNotification,
+  filename: String,
+  correlationID: String,
+  checksumAlgorithm: String,
+  checksum: String,
+  availableUntil: Instant,
+  failureReason: Option[String],
+  dateTime: Instant,
+  properties: Seq[SdesProperties]
+) {
+
+  val conversationId = properties
+    .find(
+      p => p.name == RouterHeaderNames.CONVERSATION_ID
+    )
+}
+
+object SdesNotificationItem {
+  implicit val SdesNotificationItem = Json.format[SdesNotificationItem]
 }
