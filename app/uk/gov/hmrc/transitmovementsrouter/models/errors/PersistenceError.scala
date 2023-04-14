@@ -16,11 +16,13 @@
 
 package uk.gov.hmrc.transitmovementsrouter.models.errors
 
+import uk.gov.hmrc.transitmovementsrouter.models.MessageId
 import uk.gov.hmrc.transitmovementsrouter.models.MovementId
 
 sealed trait PersistenceError
 
 object PersistenceError {
-  final case class MovementNotFound(movementId: MovementId)  extends PersistenceError
-  final case class Unexpected(thr: Option[Throwable] = None) extends PersistenceError
+  final case class MovementNotFound(movementId: MovementId)                      extends PersistenceError
+  final case class MessageNotFound(movementId: MovementId, messageId: MessageId) extends PersistenceError
+  final case class Unexpected(thr: Option[Throwable] = None)                     extends PersistenceError
 }

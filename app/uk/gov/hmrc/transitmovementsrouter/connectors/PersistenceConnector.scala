@@ -41,6 +41,7 @@ import uk.gov.hmrc.http.client.HttpClientV2
 import uk.gov.hmrc.http.client.RequestBuilder
 import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError
+import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.MessageNotFound
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.MovementNotFound
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.Unexpected
 import uk.gov.hmrc.transitmovementsrouter.models._
@@ -135,7 +136,7 @@ class PersistenceConnectorImpl @Inject() (httpClientV2: HttpClientV2, appConfig:
       )
         .map(Right(_))
         .recover {
-          case UpstreamErrorResponse(_, NOT_FOUND, _, _) => Left(MovementNotFound(movementId))
+          case UpstreamErrorResponse(_, NOT_FOUND, _, _) => Left(MessageNotFound(movementId, messageId))
           case NonFatal(thr)                             => Left(Unexpected(Some(thr)))
         }
     )
@@ -162,7 +163,7 @@ class PersistenceConnectorImpl @Inject() (httpClientV2: HttpClientV2, appConfig:
           Left(Unexpected(Some(ex)))
       }
 
-  def executeAndExpect(requestBuilder: RequestBuilder, expected: Int)(implicit ec: ExecutionContext) =
+  private def executeAndExpect(requestBuilder: RequestBuilder, expected: Int)(implicit ec: ExecutionContext) =
     requestBuilder
       .execute[HttpResponse]
       .flatMap {

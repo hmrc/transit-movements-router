@@ -70,7 +70,9 @@ trait ConvertError {
 
     def convert(error: PersistenceError): PresentationError = error match {
       case MovementNotFound(movementId) => PresentationError.notFoundError(s"Movement ${movementId.value} not found")
-      case Unexpected(error)            => PresentationError.internalServiceError(cause = error)
+      case MessageNotFound(movementId, messageId) =>
+        PresentationError.notFoundError(s"Message with ID ${messageId.value} for movement ${movementId.value} was not found")
+      case Unexpected(error) => PresentationError.internalServiceError(cause = error)
     }
   }
 

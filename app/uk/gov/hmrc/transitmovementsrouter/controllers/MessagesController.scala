@@ -177,6 +177,13 @@ class MessagesController @Inject() (
       )
     ).toMovementAndMessageId
 
+  private def updateStatus(movementId: MovementId, messageId: MessageId, messageStatus: MessageStatus)(implicit
+    hc: HeaderCarrier
+  ): EitherT[Future, PresentationError, Unit] =
+    persistenceConnector
+      .patchMessageStatus(movementId, messageId, MessageUpdate(messageStatus))
+      .asPresentation
+
   def handleSdesResponse() =
     Action.async(parse.json) {
       implicit request =>
@@ -184,13 +191,13 @@ class MessagesController @Inject() (
         (for {
           sdesResponse <- parseAndLogSdesResponse(request.body)
           (movementId, messageId) = extractMovementMessageId(sdesResponse)
-          messageStatus = sdesResponse.notification match {
-            case SdesNotification.FileProcessed         => MessageStatus.Success
-            case SdesNotification.FileProcessingFailure => MessageStatus.Failed
+          persistenceResponse <- sdesResponse.notification match {
+            case SdesNotification.FileProcessed =>
+              updateStatus(movementId, messageId, MessageStatus.Success)
+            case SdesNotification.FileProcessingFailure =>
+              updateStatus(movementId, messageId, MessageStatus.Failed)
+            case _ => EitherT.rightT[Future, PresentationError]((): Unit)
           }
-          persistenceResponse <- persistenceConnector
-            .patchMessageStatus(movementId, messageId, MessageUpdate(messageStatus))
-            .asPresentation
         } yield persistenceResponse).fold[Result](
           error => Status(error.code.statusCode)(Json.toJson(error)),
           _ => Ok
