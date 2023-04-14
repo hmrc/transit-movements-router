@@ -16,29 +16,18 @@
 
 package uk.gov.hmrc.transitmovementsrouter.models.sdes
 
-import play.api.libs.json._
-import uk.gov.hmrc.transitmovementsrouter.utils.RouterHeaderNames
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
+import play.api.libs.json.JsString
+import play.api.libs.json.Json
 
-import java.time.Instant
+class SdesNotificationTypeSpec extends AnyFlatSpec with Matchers {
 
-case class SdesNotificationItem(
-  notification: SdesNotification,
-  filename: String,
-  correlationID: String,
-  checksumAlgorithm: String,
-  checksum: String,
-  availableUntil: Instant,
-  failureReason: Option[String],
-  dateTime: Instant,
-  properties: Seq[SdesProperties]
-) {
+  "SdesNotificationType" should "serialise correctly" in {
+    Json.toJson[SdesNotificationType](SdesNotificationType.FileProcessed) should be(JsString("FileProcessed"))
+  }
 
-  val conversationId = properties
-    .find(
-      p => p.name == RouterHeaderNames.CONVERSATION_ID.toLowerCase()
-    )
-}
-
-object SdesNotificationItem {
-  implicit val SdesNotificationItem = Json.format[SdesNotificationItem]
+  "SdesNotificationType" should "deserialize correctly" in {
+    JsString("FileProcessingFailure").validate[SdesNotificationType].get should be(SdesNotificationType.FileProcessingFailure)
+  }
 }

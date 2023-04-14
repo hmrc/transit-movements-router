@@ -16,18 +16,53 @@
 
 package uk.gov.hmrc.transitmovementsrouter.models.sdes
 
-import org.scalatest.flatspec.AnyFlatSpec
-import org.scalatest.matchers.should.Matchers
-import play.api.libs.json.JsString
+import org.scalatest.freespec.AnyFreeSpec
+import org.scalatest.matchers.must.Matchers
+import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
+import play.api.libs.json.JsSuccess
 import play.api.libs.json.Json
 
-class SdesNotificationSpec extends AnyFlatSpec with Matchers {
+import java.time.Instant
 
-  "SdesNotification" should "serialise correctly" in {
-    Json.toJson[SdesNotification](SdesNotification.FileProcessed) should be(JsString("FileProcessed"))
-  }
+class SdesNotificationSpec extends AnyFreeSpec with Matchers with ScalaCheckDrivenPropertyChecks {
 
-  "SdesNotification" should "deserialize correctly" in {
-    JsString("FileProcessingFailure").validate[SdesNotification].get should be(SdesNotification.FileProcessingFailure)
+  "SuccessfulSubmission" - {
+
+    val instant = Instant.now()
+    "when SdesNotificationItem is serialized, return an appropriate JsObject" in {
+      val actual = SdesNotification.sdesNotification.writes(
+        SdesNotification(SdesNotificationType.FileProcessed, "abc.xml", "123", "md5", "123", instant, None, instant, Seq(SdesProperties("name", "value")))
+      )
+      val expected = Json.obj(
+        "notification"      -> SdesNotificationType.FileProcessed.toString,
+        "filename"          -> "abc.xml",
+        "correlationID"     -> "123",
+        "checksumAlgorithm" -> "md5",
+        "checksum"          -> "123",
+        "availableUntil"    -> instant,
+        "dateTime"          -> instant,
+        "properties"        -> Json.arr(Json.obj("name" -> "name", "value" -> "value"))
+      )
+      actual mustBe expected
+    }
+
+    "when an appropriate JsObject is deserialized, return SdesNotificationItem" in {
+      val actual = SdesNotification.sdesNotification.reads(
+        Json.obj(
+          "notification"      -> SdesNotificationType.FileProcessed.toString,
+          "filename"          -> "abc.xml",
+          "correlationID"     -> "123",
+          "checksumAlgorithm" -> "md5",
+          "checksum"          -> "123",
+          "availableUntil"    -> instant,
+          "dateTime"          -> instant,
+          "properties"        -> Json.arr(Json.obj("name" -> "name", "value" -> "value"))
+        )
+      )
+      val expected =
+        SdesNotification(SdesNotificationType.FileProcessed, "abc.xml", "123", "md5", "123", instant, None, instant, Seq(SdesProperties("name", "value")))
+      actual mustBe JsSuccess(expected)
+    }
+
   }
 }

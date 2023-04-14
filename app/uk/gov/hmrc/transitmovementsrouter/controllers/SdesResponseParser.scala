@@ -21,17 +21,17 @@ import play.api.Logging
 import play.api.libs.json.JsValue
 import play.api.mvc.BaseController
 import uk.gov.hmrc.transitmovementsrouter.controllers.errors.PresentationError
-import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesNotificationItem
+import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesNotification
 
 import scala.concurrent.Future
 
 trait SdesResponseParser {
   self: BaseController with Logging =>
 
-  def parseAndLogSdesResponse(responseBody: JsValue): EitherT[Future, PresentationError, SdesNotificationItem] =
+  def parseAndLogSdesResponse(responseBody: JsValue): EitherT[Future, PresentationError, SdesNotification] =
     EitherT(
       responseBody
-        .validate[SdesNotificationItem]
+        .validate[SdesNotification]
         .filter(_.conversationId.isDefined)
         .map(evaluate)
         .getOrElse {
@@ -40,16 +40,16 @@ trait SdesResponseParser {
         }
     )
 
-  private def evaluate(sdesResponse: SdesNotificationItem) =
+  private def evaluate(sdesResponse: SdesNotification) =
     sdesResponse match {
-      case SdesNotificationItem(_, _, _, _, _, _, None, _, _) =>
+      case SdesNotification(notification, _, _, _, _, _, None, _, _) =>
         logger.info(
-          s"Received a successful response from SDES callback for the following x-conversation-id: ${sdesResponse.conversationId.get.value}"
+          s"Received a successful response from SDES callback for the following x-conversation-id: ${sdesResponse.conversationId.get.value}. Notification Type: $notification"
         )
         Future.successful(Right(sdesResponse))
-      case SdesNotificationItem(_, _, _, _, _, _, Some(failureReason), _, _) =>
+      case SdesNotification(notification, _, _, _, _, _, Some(failureReason), _, _) =>
         logger.warn(
-          s"Received a failure response from SDES callback for the following x-conversation-id: ${sdesResponse.conversationId.get.value}. Failure reason: $failureReason."
+          s"Received a failure response from SDES callback for the following x-conversation-id: ${sdesResponse.conversationId.get.value}. Notification Type: $notification. Failure reason: $failureReason."
         )
         Future.successful(Right(sdesResponse))
       case _ =>

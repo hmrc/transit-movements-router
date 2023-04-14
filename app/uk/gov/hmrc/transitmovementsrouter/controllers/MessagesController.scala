@@ -39,7 +39,7 @@ import uk.gov.hmrc.transitmovementsrouter.controllers.stream.StreamingParsers
 import uk.gov.hmrc.transitmovementsrouter.models._
 import uk.gov.hmrc.transitmovementsrouter.models.requests.MessageUpdate
 import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesNotification
-import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesNotificationItem
+import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesNotificationType
 
 import java.util.UUID
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse
@@ -170,7 +170,7 @@ class MessagesController @Inject() (
     case _                     => EitherT.leftT(PresentationError.badRequestError(s"${messageType.code} is not valid for requests"))
   }
 
-  private def extractMovementMessageId(sdesResponse: SdesNotificationItem): (MovementId, MessageId) =
+  private def extractMovementMessageId(sdesResponse: SdesNotification): (MovementId, MessageId) =
     ConversationId(
       UUID.fromString(
         sdesResponse.conversationId.get.value
@@ -192,9 +192,9 @@ class MessagesController @Inject() (
           sdesResponse <- parseAndLogSdesResponse(request.body)
           (movementId, messageId) = extractMovementMessageId(sdesResponse)
           persistenceResponse <- sdesResponse.notification match {
-            case SdesNotification.FileProcessed =>
+            case SdesNotificationType.FileProcessed =>
               updateStatus(movementId, messageId, MessageStatus.Success)
-            case SdesNotification.FileProcessingFailure =>
+            case SdesNotificationType.FileProcessingFailure =>
               updateStatus(movementId, messageId, MessageStatus.Failed)
             case _ => EitherT.rightT[Future, PresentationError]((): Unit)
           }

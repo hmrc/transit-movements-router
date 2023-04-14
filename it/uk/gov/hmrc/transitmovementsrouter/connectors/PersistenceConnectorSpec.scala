@@ -43,6 +43,7 @@ import uk.gov.hmrc.transitmovementsrouter.generators.ModelGenerators
 import uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuite
 import uk.gov.hmrc.transitmovementsrouter.models.MessageType.DeclarationAmendment
 import uk.gov.hmrc.transitmovementsrouter.models._
+import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.MessageNotFound
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.MovementNotFound
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.Unexpected
 import uk.gov.hmrc.transitmovementsrouter.models.requests.MessageUpdate
@@ -248,15 +249,13 @@ class PersistenceConnectorSpec
         stubForPatchMessageStatus(statusCode)
 
         whenReady(connector.patchMessageStatus(movementId, messageId, MessageUpdate(MessageStatus.Success)).value) {
-          x =>
-            x.isLeft mustBe true
-
+          case Left(error) =>
             statusCode match {
-              case BAD_REQUEST           => x mustBe a[Left[Unexpected, _]]
-              case NOT_FOUND             => x mustBe a[Left[MovementNotFound, _]]
-              case INTERNAL_SERVER_ERROR => x mustBe a[Left[Unexpected, _]]
+              case BAD_REQUEST           => error mustBe a[Unexpected]
+              case NOT_FOUND             => error mustBe a[MessageNotFound]
+              case INTERNAL_SERVER_ERROR => error mustBe a[Unexpected]
             }
-
+          case Right(_) => fail("An error was expected")
         }
     }
   }
