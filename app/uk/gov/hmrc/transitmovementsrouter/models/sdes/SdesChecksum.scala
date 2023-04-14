@@ -20,7 +20,7 @@ import play.api.libs.json.Format
 import play.api.libs.json.Json
 
 final case class SdesChecksum(
-  value: String,
+  value: FileMd5Checksum,
   algorithm: String = "md5"
 )
 

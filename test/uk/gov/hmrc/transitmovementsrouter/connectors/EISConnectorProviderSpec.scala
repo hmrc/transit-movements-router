@@ -35,6 +35,7 @@ import uk.gov.hmrc.transitmovementsrouter.config.EISInstanceConfig
 import uk.gov.hmrc.transitmovementsrouter.config.Headers
 import uk.gov.hmrc.transitmovementsrouter.config.RetryConfig
 
+import java.time.Clock
 import scala.concurrent.ExecutionContext.Implicits.global
 
 class EISConnectorProviderSpec extends AnyFreeSpec with HttpClientV2Support with Matchers with ScalaFutures with MockitoSugar with BeforeAndAfterEach {
@@ -78,7 +79,7 @@ class EISConnectorProviderSpec extends AnyFreeSpec with HttpClientV2Support with
     "getting the GB connector will get the GB config" in {
 
       // Given this message connector
-      val sut = new EISConnectorProviderImpl(appConfig, retries, httpClientV2)
+      val sut = new EISConnectorProviderImpl(appConfig, retries, httpClientV2, Clock.systemUTC())
 
       // When we call the lazy val for GB
       sut.gb
@@ -93,7 +94,7 @@ class EISConnectorProviderSpec extends AnyFreeSpec with HttpClientV2Support with
     "getting the XI connector will get the XI config" in {
 
       // Given this message connector
-      val sut = new EISConnectorProviderImpl(appConfig, retries, httpClientV2)
+      val sut = new EISConnectorProviderImpl(appConfig, retries, httpClientV2, Clock.systemUTC())
 
       // When we call the lazy val for XI
       sut.xi
@@ -108,7 +109,7 @@ class EISConnectorProviderSpec extends AnyFreeSpec with HttpClientV2Support with
     "both connectors are not the same" in {
 
       // Given this message connector
-      val sut = new EISConnectorProviderImpl(appConfig, retries, httpClientV2)
+      val sut = new EISConnectorProviderImpl(appConfig, retries, httpClientV2, Clock.systemUTC())
 
       sut.gb must not be sut.xi
     }
