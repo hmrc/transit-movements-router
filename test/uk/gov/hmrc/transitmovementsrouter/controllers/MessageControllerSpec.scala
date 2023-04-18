@@ -62,6 +62,7 @@ import uk.gov.hmrc.transitmovementsrouter.models._
 import uk.gov.hmrc.transitmovementsrouter.models.errors.CustomOfficeExtractorError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.MessageTypeExtractionError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.ObjectStoreError
+import uk.gov.hmrc.transitmovementsrouter.models.errors.PushNotificationError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.SDESError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.MovementNotFound
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.Unexpected
@@ -1117,6 +1118,38 @@ class MessageControllerSpec
         )
           .thenReturn(EitherT.rightT(()))
 
+        val request = fakeRequestLargeMessage(Json.toJson(sdesResponse), sdesCallback)
+
+        val result = controller().handleSdesResponse()(request)
+
+        status(result) mustBe OK
+    }
+
+    "must return OK when status is updated successfully but push notification got failed for SDES callback" in forAll(
+      arbitrarySdesResponse(conversationId).arbitrary
+    ) {
+      sdesResponse =>
+        val messageStatus = sdesResponse.notification match {
+          case SdesNotificationType.FileProcessed         => MessageStatus.Success
+          case SdesNotificationType.FileProcessingFailure => MessageStatus.Failed
+        }
+
+        when(
+          mockPersistenceConnector.patchMessageStatus(
+            MovementId(eqTo(movementId.value)),
+            MessageId(eqTo(messageId.value)),
+            eqTo(MessageUpdate(messageStatus))
+          )(any[HeaderCarrier], any[ExecutionContext])
+        )
+          .thenReturn(EitherT.rightT(()))
+        when(
+          mockPushNotificationsConnector
+            .post(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), Some(any[Source[ByteString, _]]), any())(
+              any[HeaderCarrier],
+              any[ExecutionContext]
+            )
+        )
+          .thenReturn(EitherT.fromEither(Left(PushNotificationError.Unexpected(None))))
         val request = fakeRequestLargeMessage(Json.toJson(sdesResponse), sdesCallback)
 
         val result = controller().handleSdesResponse()(request)
