@@ -26,6 +26,7 @@ import org.scalatestplus.mockito.MockitoSugar
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 import uk.gov.hmrc.http.UpstreamErrorResponse
 import uk.gov.hmrc.transitmovementsrouter.models.CustomsOffice
+import uk.gov.hmrc.transitmovementsrouter.models.MessageId
 import uk.gov.hmrc.transitmovementsrouter.models.MovementId
 import uk.gov.hmrc.transitmovementsrouter.models.errors.CustomOfficeExtractorError.NoElementFound
 import uk.gov.hmrc.transitmovementsrouter.models.errors.CustomOfficeExtractorError.TooManyElementsFound
@@ -147,6 +148,13 @@ class ConvertErrorSpec extends AnyFreeSpec with Matchers with OptionValues with 
       val input = Left[PersistenceError, Unit](PersistenceError.MovementNotFound(MovementId("345"))).toEitherT[Future]
       whenReady(input.asPresentation.value) {
         _ mustBe Left(StandardError("Movement 345 not found", NotFound))
+      }
+    }
+
+    "for a failure - handle MessageNotFound error" in {
+      val input = Left[PersistenceError, Unit](PersistenceError.MessageNotFound(MovementId("345"), MessageId("123"))).toEitherT[Future]
+      whenReady(input.asPresentation.value) {
+        _ mustBe Left(StandardError("Message with ID 123 for movement 345 was not found", NotFound))
       }
     }
   }

@@ -110,7 +110,7 @@ trait ModelGenerators extends BaseGenerators {
         FileURL(objectSummary.location, "http://localhost"),
         SdesChecksum(value = FileMd5Checksum.fromBase64(objectSummary.contentMd5)),
         FileSize(objectSummary.contentLength),
-        Seq(SdesProperties("x-conversation-id", ConversationId(movementId, messageId).value.toString))
+        Seq(SdesProperties("X-Conversation-Id", ConversationId(movementId, messageId).value.toString))
       ),
       SdesAudit(uuid.toString)
     )
