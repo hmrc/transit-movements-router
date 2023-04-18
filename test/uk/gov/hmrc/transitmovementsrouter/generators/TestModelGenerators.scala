@@ -145,7 +145,7 @@ trait TestModelGenerators extends BaseGenerators {
       checksumAlgorithm <- Gen.alphaNumStr
       notification      <- Gen.oneOf(SdesNotification.values)
       received   = Instant.now()
-      properties = Seq(SdesProperties(RouterHeaderNames.CONVERSATION_ID, conversationId.value.toString))
+      properties = Seq(SdesProperties(RouterHeaderNames.CONVERSATION_ID.toLowerCase, conversationId.value.toString))
     } yield SdesNotificationItem(
       notification,
       filename,

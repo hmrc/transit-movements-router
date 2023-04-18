@@ -16,29 +16,24 @@
 
 package uk.gov.hmrc.transitmovementsrouter.controllers
 
-import cats.data.EitherT
 import play.api.Logging
 import play.api.libs.json.JsValue
 import play.api.mvc.BaseController
 import uk.gov.hmrc.transitmovementsrouter.controllers.errors.PresentationError
 import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesNotificationItem
 
-import scala.concurrent.Future
-
 trait SdesResponseParser {
   self: BaseController with Logging =>
 
-  def parseAndLogSdesResponse(responseBody: JsValue): EitherT[Future, PresentationError, SdesNotificationItem] =
-    EitherT(
-      responseBody
-        .validate[SdesNotificationItem]
-        .filter(_.conversationId.isDefined)
-        .map(evaluate)
-        .getOrElse {
-          logger.error("Unable to parse unexpected response from SDES")
-          Future.successful(Left(PresentationError.badRequestError("Unexpected SDES callback response")))
-        }
-    )
+  def parseAndLogSdesResponse(responseBody: JsValue): Either[PresentationError, SdesNotificationItem] =
+    responseBody
+      .validate[SdesNotificationItem]
+      .filter(_.conversationId.isDefined)
+      .map(evaluate)
+      .getOrElse {
+        logger.error("Unable to parse unexpected response from SDES")
+        Left(PresentationError.badRequestError("Unexpected SDES callback response"))
+      }
 
   private def evaluate(sdesResponse: SdesNotificationItem) =
     sdesResponse match {
@@ -46,14 +41,14 @@ trait SdesResponseParser {
         logger.info(
           s"Received a successful response from SDES callback for the following x-conversation-id: ${sdesResponse.conversationId.get.value}"
         )
-        Future.successful(Right(sdesResponse))
+        Right(sdesResponse)
       case SdesNotificationItem(_, _, _, _, _, _, Some(failureReason), _, _) =>
         logger.warn(
           s"Received a failure response from SDES callback for the following x-conversation-id: ${sdesResponse.conversationId.get.value}. Failure reason: $failureReason."
         )
-        Future.successful(Right(sdesResponse))
+        Right(sdesResponse)
       case _ =>
         logger.error("Unable to parse unexpected response from SDES")
-        Future.successful(Left(PresentationError.badRequestError("Unexpected SDES callback response")))
+        Left(PresentationError.badRequestError("Unexpected SDES callback response"))
     }
 }

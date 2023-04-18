@@ -22,6 +22,7 @@ import akka.util.ByteString
 import cats.data.EitherT
 import play.api.Logging
 import play.api.libs.Files.TemporaryFileCreator
+import play.api.libs.json.JsValue
 import play.api.libs.json.Json
 import play.api.mvc.Action
 import play.api.mvc.ControllerComponents
@@ -38,19 +39,13 @@ import uk.gov.hmrc.transitmovementsrouter.controllers.errors.PresentationError
 import uk.gov.hmrc.transitmovementsrouter.controllers.stream.StreamingParsers
 import uk.gov.hmrc.transitmovementsrouter.models._
 import uk.gov.hmrc.transitmovementsrouter.models.requests.MessageUpdate
-import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesNotification
-import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesNotificationItem
-
-import java.util.UUID
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.DownloadUrl
-import uk.gov.hmrc.transitmovementsrouter.services.CustomOfficeExtractorService
-import uk.gov.hmrc.transitmovementsrouter.services.EISMessageTransformers
-import uk.gov.hmrc.transitmovementsrouter.services.MessageTypeExtractor
-import uk.gov.hmrc.transitmovementsrouter.services.ObjectStoreService
-import uk.gov.hmrc.transitmovementsrouter.services.RoutingService
-import uk.gov.hmrc.transitmovementsrouter.services.SDESService
+import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesNotification
+import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesNotificationItem
+import uk.gov.hmrc.transitmovementsrouter.services._
 
+import java.util.UUID
 import javax.inject.Inject
 import scala.concurrent.Future
 
@@ -177,30 +172,67 @@ class MessagesController @Inject() (
       )
     ).toMovementAndMessageId
 
-  private def updateStatus(movementId: MovementId, messageId: MessageId, messageStatus: MessageStatus)(implicit
+  private def updateAndSendNotification(movementId: MovementId, messageId: MessageId, messageStatus: MessageStatus, jsonValue: JsValue)(implicit
     hc: HeaderCarrier
   ): EitherT[Future, PresentationError, Unit] =
-    persistenceConnector
-      .patchMessageStatus(movementId, messageId, MessageUpdate(messageStatus))
-      .asPresentation
+    for {
+      persistenceResponse <- persistenceConnector
+        .patchMessageStatus(movementId, messageId, MessageUpdate(messageStatus))
+        .asPresentation
+      _ = pushNotificationsConnector
+        .post(
+          movementId,
+          messageId,
+          None,
+          Some(
+            jsonValue
+          )
+        )
+    } yield persistenceResponse
 
   def handleSdesResponse() =
     Action.async(parse.json) {
       implicit request =>
         implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
-        (for {
-          sdesResponse <- parseAndLogSdesResponse(request.body)
-          (movementId, messageId) = extractMovementMessageId(sdesResponse)
-          persistenceResponse <- sdesResponse.notification match {
-            case SdesNotification.FileProcessed =>
-              updateStatus(movementId, messageId, MessageStatus.Success)
-            case SdesNotification.FileProcessingFailure =>
-              updateStatus(movementId, messageId, MessageStatus.Failed)
-            case _ => EitherT.rightT[Future, PresentationError]((): Unit)
-          }
-        } yield persistenceResponse).fold[Result](
-          error => Status(error.code.statusCode)(Json.toJson(error)),
-          _ => Ok
-        )
+        parseAndLogSdesResponse(request.body) match {
+          case Left(presentationError) =>
+            Future.successful(Status(presentationError.code.statusCode)(Json.toJson(presentationError)))
+          case Right(sdesResponse) =>
+            val (movementId, messageId) = extractMovementMessageId(sdesResponse)
+            (for {
+              persistenceResponse <- sdesResponse.notification match {
+                case SdesNotification.FileProcessed =>
+                  updateAndSendNotification(
+                    movementId,
+                    messageId,
+                    MessageStatus.Success,
+                    Json.toJson(
+                      Json.obj(
+                        "code" -> OK,
+                        "message" ->
+                          s"The message $messageId for movement $movementId was successfully processed"
+                      )
+                    )
+                  )
+                case SdesNotification.FileProcessingFailure =>
+                  updateAndSendNotification(
+                    movementId,
+                    messageId,
+                    MessageStatus.Failed,
+                    Json.toJson(
+                      PresentationError.internalServiceError()
+                    )
+                  )
+                case _ => EitherT.rightT[Future, PresentationError]((): Unit)
+              }
+            } yield persistenceResponse).fold[Result](
+              presentationError => {
+                pushNotificationsConnector.post(movementId, messageId, None, Some(Json.toJson(presentationError)))
+                Status(presentationError.code.statusCode)(Json.toJson(presentationError))
+              },
+              _ => Ok
+            )
+        }
     }
+
 }

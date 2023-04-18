@@ -75,9 +75,10 @@ class PushNotificationsConnectorImpl @Inject() (httpClientV2: HttpClientV2, appC
         val requestBuilder = httpClientV2.post(url"$url")
 
         val requestBuilderWithSource = (sourceXml, sourceJson) match {
-          case (Some(xml), _)  => requestBuilder.setHeader(HeaderNames.CONTENT_TYPE -> MimeTypes.XML).withBody(xml)
-          case (_, Some(json)) => requestBuilder.setHeader(HeaderNames.CONTENT_TYPE -> MimeTypes.JSON).withBody(json)
-          case (_, _)          => requestBuilder
+          case (Some(xml), _) => requestBuilder.setHeader(HeaderNames.CONTENT_TYPE -> MimeTypes.XML).withBody(xml)
+          case (_, Some(json)) =>
+            requestBuilder.setHeader(HeaderNames.CONTENT_TYPE -> MimeTypes.JSON).withBody(json)
+          case (_, _) => requestBuilder
         }
 
         requestBuilderWithSource
