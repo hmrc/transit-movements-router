@@ -47,6 +47,8 @@ class AppConfig @Inject() (config: Configuration, servicesConfig: CTCServicesCon
   lazy val objectStoreUrl: String =
     config.get[String]("microservice.services.object-store.sdes-host")
 
+  lazy val logBodyOnEIS500: Boolean = config.get[Boolean]("microservice.services.eis.log-body-on-500")
+
   // SDES configuration
   lazy val sdesServiceBaseUrl          = Url.parse(servicesConfig.baseUrl("secure-data-exchange-proxy"))
   lazy val sdesInformationType: String = config.get[String]("sdes.information-type")
