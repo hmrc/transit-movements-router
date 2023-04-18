@@ -16,32 +16,29 @@
 
 package uk.gov.hmrc.transitmovementsrouter.models.sdes
 
-import play.api.libs.json.JsError
-import play.api.libs.json.JsString
-import play.api.libs.json.JsSuccess
-import play.api.libs.json.Json
-import play.api.libs.json.Reads
-import play.api.libs.json.Writes
+import play.api.libs.json._
+import uk.gov.hmrc.transitmovementsrouter.utils.RouterHeaderNames
 
-sealed trait SdesNotification
+import java.time.Instant
+
+case class SdesNotification(
+  notification: SdesNotificationType,
+  filename: String,
+  correlationID: String,
+  checksumAlgorithm: String,
+  checksum: String,
+  availableUntil: Instant,
+  failureReason: Option[String],
+  dateTime: Instant,
+  properties: Seq[SdesProperties]
+) {
+
+  val conversationId = properties
+    .find(
+      p => p.name == RouterHeaderNames.CONVERSATION_ID.toLowerCase()
+    )
+}
 
 object SdesNotification {
-  case object FileReady             extends SdesNotification
-  case object FileReceived          extends SdesNotification
-  case object FileProcessed         extends SdesNotification
-  case object FileProcessingFailure extends SdesNotification
-
-  val values = Seq(FileProcessed, FileProcessingFailure)
-
-  implicit val writes = new Writes[SdesNotification] {
-    def writes(sdesNotification: SdesNotification) = Json.toJson(sdesNotification.toString())
-  }
-
-  implicit val reads: Reads[SdesNotification] = Reads {
-    case JsString(x) if x.toLowerCase == "fileready"             => JsSuccess(FileReady)
-    case JsString(x) if x.toLowerCase == "filereceived"          => JsSuccess(FileReceived)
-    case JsString(x) if x.toLowerCase == "fileprocessed"         => JsSuccess(FileProcessed)
-    case JsString(x) if x.toLowerCase == "fileprocessingfailure" => JsSuccess(FileProcessingFailure)
-    case _                                                       => JsError("Invalid file status")
-  }
+  implicit val sdesNotification = Json.format[SdesNotification]
 }

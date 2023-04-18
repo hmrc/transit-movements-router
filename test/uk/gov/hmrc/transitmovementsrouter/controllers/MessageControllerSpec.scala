@@ -67,7 +67,7 @@ import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.Movemen
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.Unexpected
 import uk.gov.hmrc.transitmovementsrouter.models.requests.MessageUpdate
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.DownloadUrl
-import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesNotification
+import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesNotificationType
 import uk.gov.hmrc.transitmovementsrouter.services._
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
 
@@ -1104,8 +1104,8 @@ class MessageControllerSpec
     ) {
       sdesResponse =>
         val messageStatus = sdesResponse.notification match {
-          case SdesNotification.FileProcessed         => MessageStatus.Success
-          case SdesNotification.FileProcessingFailure => MessageStatus.Failed
+          case SdesNotificationType.FileProcessed         => MessageStatus.Success
+          case SdesNotificationType.FileProcessingFailure => MessageStatus.Failed
         }
 
         when(
@@ -1129,8 +1129,8 @@ class MessageControllerSpec
     ) {
       sdesResponse =>
         val messageStatus = sdesResponse.notification match {
-          case SdesNotification.FileProcessed         => MessageStatus.Success
-          case SdesNotification.FileProcessingFailure => MessageStatus.Failed
+          case SdesNotificationType.FileProcessed         => MessageStatus.Success
+          case SdesNotificationType.FileProcessingFailure => MessageStatus.Failed
         }
 
         when(
@@ -1149,7 +1149,7 @@ class MessageControllerSpec
         status(result) mustBe INTERNAL_SERVER_ERROR
     }
 
-    "must return BAD_REQUEST for SDES malformed callback" - {
+    "must return BAD_REQUEST for SDES malformed callback" in {
       val request = fakeRequestLargeMessage(Json.toJson("reference" -> "abc"), sdesCallback)
 
       val result = controller().handleSdesResponse()(request)

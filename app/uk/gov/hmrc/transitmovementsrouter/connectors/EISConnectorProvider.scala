@@ -43,7 +43,10 @@ class EISConnectorProviderImpl @Inject() (
 )(implicit ec: ExecutionContext, mat: Materializer)
     extends EISConnectorProvider {
 
-  lazy val gb: EISConnector = new EISConnectorImpl("GB", appConfig.eisGb, appConfig.headerCarrierConfig, httpClientV2, retries, clock)
-  lazy val xi: EISConnector = new EISConnectorImpl("XI", appConfig.eisXi, appConfig.headerCarrierConfig, httpClientV2, retries, clock)
+  lazy val gb: EISConnector =
+    new EISConnectorImpl("GB", appConfig.eisGb, appConfig.headerCarrierConfig, httpClientV2, retries, clock, appConfig.logBodyOnEIS500)
+
+  lazy val xi: EISConnector =
+    new EISConnectorImpl("XI", appConfig.eisXi, appConfig.headerCarrierConfig, httpClientV2, retries, clock, appConfig.logBodyOnEIS500)
 
 }

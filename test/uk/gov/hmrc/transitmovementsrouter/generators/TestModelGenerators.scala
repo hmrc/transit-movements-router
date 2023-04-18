@@ -28,8 +28,8 @@ import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.DownloadUrl
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.FileStatus
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.Reference
+import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesNotificationType
 import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesNotification
-import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesNotificationItem
 import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesProperties
 import uk.gov.hmrc.transitmovementsrouter.utils.RouterHeaderNames
 
@@ -137,16 +137,16 @@ trait TestModelGenerators extends BaseGenerators {
     )
   }
 
-  implicit def arbitrarySdesResponse(conversationId: ConversationId): Arbitrary[SdesNotificationItem] = Arbitrary {
+  implicit def arbitrarySdesResponse(conversationId: ConversationId): Arbitrary[SdesNotification] = Arbitrary {
     for {
       filename          <- Gen.alphaNumStr
       correlationId     <- Gen.alphaNumStr
       checksum          <- Gen.stringOfN(4, Gen.alphaChar)
       checksumAlgorithm <- Gen.alphaNumStr
-      notification      <- Gen.oneOf(SdesNotification.values)
+      notification      <- Gen.oneOf(SdesNotificationType.values)
       received   = Instant.now()
-      properties = Seq(SdesProperties(RouterHeaderNames.CONVERSATION_ID.toLowerCase, conversationId.value.toString))
-    } yield SdesNotificationItem(
+      properties = Seq(SdesProperties(RouterHeaderNames.CONVERSATION_ID.toLowerCase(), conversationId.value.toString))
+    } yield SdesNotification(
       notification,
       filename,
       correlationId,

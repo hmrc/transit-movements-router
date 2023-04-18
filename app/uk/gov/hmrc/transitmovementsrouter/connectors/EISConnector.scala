@@ -22,6 +22,7 @@ import akka.util.ByteString
 import play.api.Logging
 import play.api.http.HeaderNames
 import play.api.http.MimeTypes
+import play.api.http.Status.INTERNAL_SERVER_ERROR
 import play.api.libs.ws.BodyWritable
 import play.api.libs.ws.SourceBody
 import retry.RetryDetails
@@ -64,7 +65,8 @@ class EISConnectorImpl(
   headerCarrierConfig: HeaderCarrier.Config,
   httpClientV2: HttpClientV2,
   retries: Retries,
-  clock: Clock
+  clock: Clock,
+  logBodyOn500: Boolean
 )(implicit
   ec: ExecutionContext,
   val materializer: Materializer
@@ -140,7 +142,15 @@ class EISConnectorImpl(
               logger.info(logMessage + s"Response status: ${result.status}")
               Right(())
             case Left(error) =>
-              logger.warn(logMessage + s"Response status: ${error.statusCode}")
+              val status =
+                if (logBodyOn500 && error.statusCode == INTERNAL_SERVER_ERROR) {
+                  s"""Response status: ${error.statusCode}"
+                    |Message:
+                    |
+                    |${error.message}""".stripMargin
+                } else s"Response status: ${error.statusCode}"
+
+              logger.warn(logMessage + status)
               Left(RoutingError.Upstream(UpstreamErrorResponse(s"Request Error: Routing to $code returned status code ${error.statusCode}", error.statusCode)))
           }
           .recover {

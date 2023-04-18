@@ -46,6 +46,7 @@ class EISConnectorProviderSpec extends AnyFreeSpec with HttpClientV2Support with
   val retries   = new RetriesImpl()
 
   override def beforeEach(): Unit = {
+    when(appConfig.logBodyOnEIS500).thenReturn(true)
     when(appConfig.eisGb).thenReturn(
       new EISInstanceConfig(
         "http",

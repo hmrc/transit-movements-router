@@ -39,10 +39,11 @@ import uk.gov.hmrc.transitmovementsrouter.controllers.errors.PresentationError
 import uk.gov.hmrc.transitmovementsrouter.controllers.stream.StreamingParsers
 import uk.gov.hmrc.transitmovementsrouter.models._
 import uk.gov.hmrc.transitmovementsrouter.models.requests.MessageUpdate
+import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesNotification
+import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesNotificationType
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.DownloadUrl
-import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesNotification
-import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesNotificationItem
+
 import uk.gov.hmrc.transitmovementsrouter.services._
 
 import java.util.UUID
@@ -165,7 +166,7 @@ class MessagesController @Inject() (
     case _                     => EitherT.leftT(PresentationError.badRequestError(s"${messageType.code} is not valid for requests"))
   }
 
-  private def extractMovementMessageId(sdesResponse: SdesNotificationItem): (MovementId, MessageId) =
+  private def extractMovementMessageId(sdesResponse: SdesNotification): (MovementId, MessageId) =
     ConversationId(
       UUID.fromString(
         sdesResponse.conversationId.get.value
@@ -201,7 +202,7 @@ class MessagesController @Inject() (
             val (movementId, messageId) = extractMovementMessageId(sdesResponse)
             (for {
               persistenceResponse <- sdesResponse.notification match {
-                case SdesNotification.FileProcessed =>
+                case SdesNotificationType.FileProcessed =>
                   updateAndSendNotification(
                     movementId,
                     messageId,
@@ -214,7 +215,7 @@ class MessagesController @Inject() (
                       )
                     )
                   )
-                case SdesNotification.FileProcessingFailure =>
+                case SdesNotificationType.FileProcessingFailure =>
                   updateAndSendNotification(
                     movementId,
                     messageId,
