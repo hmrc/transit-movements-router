@@ -51,6 +51,7 @@ import uk.gov.hmrc.http.HttpVerbs.POST
 import uk.gov.hmrc.objectstore.client.ObjectSummaryWithMd5
 import uk.gov.hmrc.transitmovementsrouter.base.StreamTestHelpers.createStream
 import uk.gov.hmrc.transitmovementsrouter.base.TestActorSystem
+import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
 import uk.gov.hmrc.transitmovementsrouter.connectors.PersistenceConnector
 import uk.gov.hmrc.transitmovementsrouter.connectors.PushNotificationsConnector
 import uk.gov.hmrc.transitmovementsrouter.controllers.actions.AuthenticateEISToken
@@ -128,6 +129,8 @@ class MessageControllerSpec
   }
 
   val mockMessageTypeExtractor: MessageTypeExtractor = mock[MessageTypeExtractor]
+  val config: AppConfig                              = mock[AppConfig]
+  when(config.logIncoming).thenReturn(true)
 
   def controller(eisMessageTransformer: EISMessageTransformers = new FakeXmlTransformer(trimmedXml)) =
     new MessagesController(
@@ -140,7 +143,8 @@ class MessageControllerSpec
       eisMessageTransformer,
       mockObjectStoreService,
       mockCustomOfficeExtractorService,
-      mockSDESService
+      mockSDESService,
+      config
     )
 
   def source = createStream(cc015cOfficeOfDepartureGB)

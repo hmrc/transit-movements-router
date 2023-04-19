@@ -79,6 +79,80 @@ class EISMessageTransformerSpec extends AnyFreeSpec with Matchers with ScalaFutu
       }
     }
 
+    "should successfully transform with more complex valid xml sent from EIS" in {
+      val input =
+        <n1:TraderChannelResponse xmlns:txd="http://ncts.dgtaxud.ec" xmlns:n1="http://www.hmrc.gov.uk/eis/ncts5/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.hmrc.gov.uk/eis/ncts5/v1 EIS_WrapperV11_TraderChannelResponse-51.8.xsd">
+          <txd:CC004C PhaseID="NCTS5.0">
+            <messageSender>!</messageSender>
+            <messageRecipient>!</messageRecipient>
+            <preparationDateAndTime>0231-11-23T10:03:02</preparationDateAndTime>
+            <messageIdentification>!</messageIdentification>
+            <messageType>CC026C</messageType>
+            <correlationIdentifier>!</correlationIdentifier>
+            <TransitOperation>
+              <LRN> </LRN>
+              <MRN>00AA00000000000000</MRN>
+              <amendmentSubmissionDateAndTime>0231-11-23T10:03:02</amendmentSubmissionDateAndTime>
+              <amendmentAcceptanceDateAndTime>0231-11-23T10:03:02</amendmentAcceptanceDateAndTime>
+            </TransitOperation>
+            <CustomsOfficeOfDeparture>
+              <referenceNumber>AA000000</referenceNumber>
+            </CustomsOfficeOfDeparture>
+            <HolderOfTheTransitProcedure>
+              <identificationNumber> </identificationNumber>
+              <TIRHolderIdentificationNumber> </TIRHolderIdentificationNumber>
+              <name> </name>
+              <Address>
+                <streetAndNumber> </streetAndNumber>
+                <postcode> </postcode>
+                <city> </city>
+                <country>AA</country>
+              </Address>
+            </HolderOfTheTransitProcedure>
+          </txd:CC004C>
+        </n1:TraderChannelResponse>.mkString
+
+      val result = Source
+        .single(ByteString.fromString(input))
+        .via(sut.unwrap)
+        .runReduce(_ ++ _)
+        .map {
+          x => x.utf8String
+        }
+
+      whenReady(result) {
+        r =>
+          XML.loadString(r) mustBe <ncts:CC004C PhaseID="NCTS5.0" xmlns:ncts="http://ncts.dgtaxud.ec">
+            <messageSender>!</messageSender>
+            <messageRecipient>!</messageRecipient>
+            <preparationDateAndTime>0231-11-23T10:03:02</preparationDateAndTime>
+            <messageIdentification>!</messageIdentification>
+            <messageType>CC026C</messageType>
+            <correlationIdentifier>!</correlationIdentifier>
+            <TransitOperation>
+              <LRN> </LRN>
+              <MRN>00AA00000000000000</MRN>
+              <amendmentSubmissionDateAndTime>0231-11-23T10:03:02</amendmentSubmissionDateAndTime>
+              <amendmentAcceptanceDateAndTime>0231-11-23T10:03:02</amendmentAcceptanceDateAndTime>
+            </TransitOperation>
+            <CustomsOfficeOfDeparture>
+              <referenceNumber>AA000000</referenceNumber>
+            </CustomsOfficeOfDeparture>
+            <HolderOfTheTransitProcedure>
+              <identificationNumber> </identificationNumber>
+              <TIRHolderIdentificationNumber> </TIRHolderIdentificationNumber>
+              <name> </name>
+              <Address>
+                <streetAndNumber> </streetAndNumber>
+                <postcode> </postcode>
+                <city> </city>
+                <country>AA</country>
+              </Address>
+            </HolderOfTheTransitProcedure>
+          </ncts:CC004C>
+      }
+    }
+
     "fail when xml isn't valid with no namespaces" in {
       val input = "<Wrapper>text</Wrapper>"
 
