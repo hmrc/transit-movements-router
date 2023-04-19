@@ -209,7 +209,7 @@ class MessagesController @Inject() (
                       Json.obj(
                         "code" -> "SUCCESS",
                         "message" ->
-                          s"The message $messageId for movement $movementId was successfully processed"
+                          s"The message ${messageId.value} for movement ${movementId.value} was successfully processed"
                       )
                     )
                   )

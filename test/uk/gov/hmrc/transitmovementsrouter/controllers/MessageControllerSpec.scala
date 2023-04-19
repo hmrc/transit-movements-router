@@ -179,6 +179,7 @@ class MessageControllerSpec
     reset(mockObjectStoreService)
     reset(mockCustomOfficeExtractorService)
     reset(mockSDESService)
+    reset(mockPushNotificationsConnector)
     super.afterEach()
   }
 
@@ -748,7 +749,13 @@ class MessageControllerSpec
       when(mockPersistenceConnector.postBody(any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId], any(), any())(any(), any()))
         .thenReturn(EitherT.fromEither(Right(PersistenceResponse(MessageId("1")))))
       when(mockMessageTypeExtractor.extract(any(), any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](MessageType.RequestOfRelease))
-
+      when(
+        mockPushNotificationsConnector
+          .postXML(any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId], any[Source[ByteString, _]])(
+            any[HeaderCarrier],
+            any[ExecutionContext]
+          )
+      ).thenReturn(EitherT.rightT(()))
       val request = fakeRequest(incomingXml, incoming)
         .withHeaders(FakeHeaders().add("X-Message-Type" -> RequestOfRelease.code))
 
@@ -1098,20 +1105,21 @@ class MessageControllerSpec
     "must return OK when status is successfully updated for SDES callback" in {
       val conversationId          = ConversationId(UUID.randomUUID())
       val (movementId, messageId) = conversationId.toMovementAndMessageId
-      val sdesResponse            = arbitrarySdesResponse(conversationId).arbitrary.sample.get
-      val ppnsMessage = Json.obj(
-        "code"    -> "INTERNAL_SERVER_ERROR",
-        "message" -> "Internal server error"
+      val sdesResponse            = arbitrarySdesResponse(conversationId).arbitrary.sample.get.copy(notification = SdesNotificationType.FileProcessed)
+
+      val ppnsMessage = Json.toJson(
+        Json.obj(
+          "code" -> "SUCCESS",
+          "message" ->
+            s"The message ${messageId.value} for movement ${movementId.value} was successfully processed"
+        )
       )
-      val messageStatus = sdesResponse.notification match {
-        case SdesNotificationType.FileProcessed         => MessageStatus.Success
-        case SdesNotificationType.FileProcessingFailure => MessageStatus.Failed
-      }
+
       when(
         mockPersistenceConnector.patchMessageStatus(
           MovementId(eqTo(movementId.value)),
           MessageId(eqTo(messageId.value)),
-          eqTo(MessageUpdate(messageStatus))
+          eqTo(MessageUpdate(MessageStatus.Success))
         )(any[HeaderCarrier], any[ExecutionContext])
       )
         .thenReturn(EitherT.rightT(()))
@@ -1143,7 +1151,7 @@ class MessageControllerSpec
       verify(mockPersistenceConnector, times(1)).patchMessageStatus(
         MovementId(eqTo(movementId.value)),
         MessageId(eqTo(messageId.value)),
-        eqTo(MessageUpdate(messageStatus))
+        eqTo(MessageUpdate(MessageStatus.Success))
       )(
         any[HeaderCarrier],
         any[ExecutionContext]
@@ -1154,22 +1162,18 @@ class MessageControllerSpec
 
       val conversationId          = ConversationId(UUID.randomUUID())
       val (movementId, messageId) = conversationId.toMovementAndMessageId
-      val sdesResponse            = arbitrarySdesResponse(conversationId).arbitrary.sample.get
+      val sdesResponse            = arbitrarySdesResponse(conversationId).arbitrary.sample.get.copy(notification = SdesNotificationType.FileProcessingFailure)
 
       val ppnsMessage = Json.obj(
         "code"    -> "INTERNAL_SERVER_ERROR",
         "message" -> "Internal server error"
       )
-      val messageStatus = sdesResponse.notification match {
-        case SdesNotificationType.FileProcessed         => MessageStatus.Success
-        case SdesNotificationType.FileProcessingFailure => MessageStatus.Failed
-      }
 
       when(
         mockPersistenceConnector.patchMessageStatus(
           MovementId(eqTo(movementId.value)),
           MessageId(eqTo(messageId.value)),
-          eqTo(MessageUpdate(messageStatus))
+          eqTo(MessageUpdate(MessageStatus.Failed))
         )(any[HeaderCarrier], any[ExecutionContext])
       )
         .thenReturn(EitherT.rightT(()))
@@ -1189,7 +1193,7 @@ class MessageControllerSpec
       verify(mockPushNotificationsConnector, times(1)).postJSON(
         MovementId(eqTo(movementId.value)),
         MessageId(eqTo(messageId.value)),
-        any()
+        eqTo(ppnsMessage)
       )(
         any[HeaderCarrier],
         any[ExecutionContext]
@@ -1198,7 +1202,7 @@ class MessageControllerSpec
       verify(mockPersistenceConnector, times(1)).patchMessageStatus(
         MovementId(eqTo(movementId.value)),
         MessageId(eqTo(messageId.value)),
-        eqTo(MessageUpdate(messageStatus))
+        eqTo(MessageUpdate(MessageStatus.Failed))
       )(
         any[HeaderCarrier],
         any[ExecutionContext]
