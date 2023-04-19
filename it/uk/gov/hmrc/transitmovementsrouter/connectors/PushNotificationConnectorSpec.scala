@@ -119,7 +119,7 @@ class PushNotificationConnectorSpec
     "return unit when post is successful with body" in {
       when(mockAppConfig.pushNotificationsEnabled).thenReturn(true)
 
-      xmlStub(OK)
+      xmlStub(ACCEPTED)
 
       whenReady(connector.postXML(movementId, messageId, source).value) {
         x =>
