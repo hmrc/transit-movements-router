@@ -21,6 +21,8 @@ import akka.util.ByteString
 import cats.data.EitherT
 import org.mockito.ArgumentMatchers.any
 import org.mockito.ArgumentMatchersSugar.eqTo
+import org.mockito.Mockito.times
+import org.mockito.Mockito.verify
 import org.mockito.MockitoSugar.reset
 import org.mockito.MockitoSugar.when
 import org.scalacheck.Gen
@@ -59,13 +61,9 @@ import uk.gov.hmrc.transitmovementsrouter.fakes.actions.FakeXmlTransformer
 import uk.gov.hmrc.transitmovementsrouter.generators.TestModelGenerators
 import uk.gov.hmrc.transitmovementsrouter.models.MessageType.RequestOfRelease
 import uk.gov.hmrc.transitmovementsrouter.models._
-import uk.gov.hmrc.transitmovementsrouter.models.errors.CustomOfficeExtractorError
-import uk.gov.hmrc.transitmovementsrouter.models.errors.MessageTypeExtractionError
-import uk.gov.hmrc.transitmovementsrouter.models.errors.ObjectStoreError
-import uk.gov.hmrc.transitmovementsrouter.models.errors.PushNotificationError
-import uk.gov.hmrc.transitmovementsrouter.models.errors.SDESError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.MovementNotFound
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.Unexpected
+import uk.gov.hmrc.transitmovementsrouter.models.errors._
 import uk.gov.hmrc.transitmovementsrouter.models.requests.MessageUpdate
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.DownloadUrl
 import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesNotificationType
@@ -181,7 +179,7 @@ class MessageControllerSpec
     reset(mockObjectStoreService)
     reset(mockCustomOfficeExtractorService)
     reset(mockSDESService)
-    super.afterEach()
+    //super.afterEach()
   }
 
   lazy val submitDeclarationEither: EitherT[Future, RoutingError, Unit] =
@@ -1097,89 +1095,164 @@ class MessageControllerSpec
 
   "POST SDES callback" - {
 
-    val conversationId          = ConversationId(UUID.randomUUID())
-    val (movementId, messageId) = conversationId.toMovementAndMessageId
+    "must return OK when status is successfully updated for SDES callback" in {
+      val conversationId          = ConversationId(UUID.randomUUID())
+      val (movementId, messageId) = conversationId.toMovementAndMessageId
+      val sdesResponse            = arbitrarySdesResponse(conversationId).arbitrary.sample.get
 
-    "must return OK when status is successfully updated for SDES callback" in forAll(
-      arbitrarySdesResponse(conversationId).arbitrary
-    ) {
-      sdesResponse =>
-        val messageStatus = sdesResponse.notification match {
-          case SdesNotificationType.FileProcessed         => MessageStatus.Success
-          case SdesNotificationType.FileProcessingFailure => MessageStatus.Failed
-        }
-
-        when(
-          mockPersistenceConnector.patchMessageStatus(
-            MovementId(eqTo(movementId.value)),
-            MessageId(eqTo(messageId.value)),
-            eqTo(MessageUpdate(messageStatus))
-          )(any[HeaderCarrier], any[ExecutionContext])
+      val ppnsMessage = Json.toJson(
+        Json.obj(
+          "code" -> OK,
+          "message" ->
+            s"The message $messageId for movement $movementId was successfully processed"
         )
-          .thenReturn(EitherT.rightT(()))
+      )
+      val messageStatus = sdesResponse.notification match {
+        case SdesNotificationType.FileProcessed         => MessageStatus.Success
+        case SdesNotificationType.FileProcessingFailure => MessageStatus.Failed
+      }
+      when(
+        mockPersistenceConnector.patchMessageStatus(
+          MovementId(eqTo(movementId.value)),
+          MessageId(eqTo(messageId.value)),
+          eqTo(MessageUpdate(messageStatus))
+        )(any[HeaderCarrier], any[ExecutionContext])
+      )
+        .thenReturn(EitherT.rightT(()))
 
-        val request = fakeRequestLargeMessage(Json.toJson(sdesResponse), sdesCallback)
+      when(
+        mockPushNotificationsConnector.postJSON(
+          MovementId(eqTo(movementId.value)),
+          MessageId(eqTo(messageId.value)),
+          eqTo(ppnsMessage)
+        )(any[HeaderCarrier], any[ExecutionContext])
+      )
+        .thenReturn(EitherT.rightT(()))
 
-        val result = controller().handleSdesResponse()(request)
+      val request = fakeRequestLargeMessage(Json.toJson(sdesResponse), sdesCallback)
 
-        status(result) mustBe OK
+      val result = controller().handleSdesResponse()(request)
+
+      status(result) mustBe OK
+
+      verify(mockPushNotificationsConnector, times(1)).postJSON(
+        MovementId(eqTo(movementId.value)),
+        MessageId(eqTo(messageId.value)),
+        eqTo(ppnsMessage)
+      )(
+        any[HeaderCarrier],
+        any[ExecutionContext]
+      )
+
+      verify(mockPersistenceConnector, times(1)).patchMessageStatus(
+        MovementId(eqTo(movementId.value)),
+        MessageId(eqTo(messageId.value)),
+        eqTo(MessageUpdate(messageStatus))
+      )(
+        any[HeaderCarrier],
+        any[ExecutionContext]
+      )
     }
 
-    "must return OK when status is updated successfully but push notification got failed for SDES callback" in forAll(
-      arbitrarySdesResponse(conversationId).arbitrary
-    ) {
-      sdesResponse =>
-        val messageStatus = sdesResponse.notification match {
-          case SdesNotificationType.FileProcessed         => MessageStatus.Success
-          case SdesNotificationType.FileProcessingFailure => MessageStatus.Failed
-        }
+    "must return OK when status is updated successfully but push notification got failed for SDES callback" in {
 
-        when(
-          mockPersistenceConnector.patchMessageStatus(
-            MovementId(eqTo(movementId.value)),
-            MessageId(eqTo(messageId.value)),
-            eqTo(MessageUpdate(messageStatus))
-          )(any[HeaderCarrier], any[ExecutionContext])
+      val conversationId          = ConversationId(UUID.randomUUID())
+      val (movementId, messageId) = conversationId.toMovementAndMessageId
+      val sdesResponse            = arbitrarySdesResponse(conversationId).arbitrary.sample.get
+      val ppnsMessage = Json.toJson(
+        Json.obj(
+          "code" -> OK,
+          "message" ->
+            s"The message $messageId for movement $movementId was successfully processed"
         )
-          .thenReturn(EitherT.rightT(()))
-        when(
-          mockPushNotificationsConnector
-            .postJSON(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), any())(
-              any[HeaderCarrier],
-              any[ExecutionContext]
-            )
-        )
-          .thenReturn(EitherT.fromEither(Left(PushNotificationError.Unexpected(None))))
-        val request = fakeRequestLargeMessage(Json.toJson(sdesResponse), sdesCallback)
+      )
+      val messageStatus = sdesResponse.notification match {
+        case SdesNotificationType.FileProcessed         => MessageStatus.Success
+        case SdesNotificationType.FileProcessingFailure => MessageStatus.Failed
+      }
 
-        val result = controller().handleSdesResponse()(request)
+      when(
+        mockPersistenceConnector.patchMessageStatus(
+          MovementId(eqTo(movementId.value)),
+          MessageId(eqTo(messageId.value)),
+          eqTo(MessageUpdate(messageStatus))
+        )(any[HeaderCarrier], any[ExecutionContext])
+      )
+        .thenReturn(EitherT.rightT(()))
+      when(
+        mockPushNotificationsConnector
+          .postJSON(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(ppnsMessage))(
+            any[HeaderCarrier],
+            any[ExecutionContext]
+          )
+      )
+        .thenReturn(EitherT.fromEither(Left(PushNotificationError.Unexpected(None))))
+      val request = fakeRequestLargeMessage(Json.toJson(sdesResponse), sdesCallback)
 
-        status(result) mustBe OK
+      val result = controller().handleSdesResponse()(request)
+
+      status(result) mustBe OK
+      verify(mockPushNotificationsConnector, times(1)).postJSON(
+        MovementId(eqTo(movementId.value)),
+        MessageId(eqTo(messageId.value)),
+        eqTo(ppnsMessage)
+      )(
+        any[HeaderCarrier],
+        any[ExecutionContext]
+      )
+
+      verify(mockPersistenceConnector, times(1)).patchMessageStatus(
+        MovementId(eqTo(movementId.value)),
+        MessageId(eqTo(messageId.value)),
+        eqTo(MessageUpdate(messageStatus))
+      )(
+        any[HeaderCarrier],
+        any[ExecutionContext]
+      )
     }
 
-    "must return INTERNAL_SERVER_ERROR when status is not updated for SDES callback" in forAll(
-      arbitrarySdesResponse(conversationId).arbitrary
-    ) {
-      sdesResponse =>
-        val messageStatus = sdesResponse.notification match {
-          case SdesNotificationType.FileProcessed         => MessageStatus.Success
-          case SdesNotificationType.FileProcessingFailure => MessageStatus.Failed
-        }
+    "must return INTERNAL_SERVER_ERROR when status is not updated for SDES callback" in {
 
-        when(
-          mockPersistenceConnector.patchMessageStatus(
-            MovementId(eqTo(movementId.value)),
-            MessageId(eqTo(messageId.value)),
-            eqTo(MessageUpdate(messageStatus))
-          )(any(), any())
-        )
-          .thenReturn(EitherT.fromEither(Left(Unexpected())))
+      val conversationId          = ConversationId(UUID.randomUUID())
+      val (movementId, messageId) = conversationId.toMovementAndMessageId
+      val sdesResponse            = arbitrarySdesResponse(conversationId).arbitrary.sample.get
+      val messageStatus = sdesResponse.notification match {
+        case SdesNotificationType.FileProcessed         => MessageStatus.Success
+        case SdesNotificationType.FileProcessingFailure => MessageStatus.Failed
+      }
 
-        val request = fakeRequestLargeMessage(Json.toJson(sdesResponse), sdesCallback)
+      when(
+        mockPersistenceConnector.patchMessageStatus(
+          MovementId(eqTo(movementId.value)),
+          MessageId(eqTo(messageId.value)),
+          eqTo(MessageUpdate(messageStatus))
+        )(any(), any())
+      )
+        .thenReturn(EitherT.fromEither(Left(Unexpected())))
 
-        val result = controller().handleSdesResponse()(request)
+      val request = fakeRequestLargeMessage(Json.toJson(sdesResponse), sdesCallback)
 
-        status(result) mustBe INTERNAL_SERVER_ERROR
+      val result = controller().handleSdesResponse()(request)
+
+      status(result) mustBe INTERNAL_SERVER_ERROR
+
+      verify(mockPushNotificationsConnector, times(1)).postJSON(
+        MovementId(eqTo(movementId.value)),
+        MessageId(eqTo(messageId.value)),
+        any()
+      )(
+        any[HeaderCarrier],
+        any[ExecutionContext]
+      )
+
+      verify(mockPersistenceConnector, times(1)).patchMessageStatus(
+        MovementId(eqTo(movementId.value)),
+        MessageId(eqTo(messageId.value)),
+        eqTo(MessageUpdate(messageStatus))
+      )(
+        any[HeaderCarrier],
+        any[ExecutionContext]
+      )
     }
 
     "must return BAD_REQUEST for SDES malformed callback" in {
