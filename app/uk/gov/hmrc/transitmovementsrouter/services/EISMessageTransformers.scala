@@ -76,7 +76,7 @@ class EISMessageTransformersImpl extends EISMessageTransformers {
   }
 
   private def lookingForMessageTypeElement(parseEvent: ParseEvent): (UnwrappingState, ParseEvent) = parseEvent match {
-    case StartElement(name @ messageType(), attributes, Some(WRAPPED_MESSAGE_TYPE_PREFIX), _, _) =>
+    case StartElement(name @ messageType(), attributes, Some(_), _, _) =>
       val phaseId = attributes
         .find(
           a => a.name == "PhaseID"
