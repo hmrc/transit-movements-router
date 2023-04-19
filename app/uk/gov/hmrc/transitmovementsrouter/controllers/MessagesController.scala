@@ -123,7 +123,7 @@ class MessagesController @Inject() (
         (for {
           messageType         <- messageTypeExtractor.extract(request.headers, request.body).asPresentation
           persistenceResponse <- persistenceConnector.postBody(movementId, messageId, messageType, request.body).asPresentation
-          _ = pushNotificationsConnector.post(movementId, persistenceResponse.messageId, Some(request.body), None).asPresentation
+          _ = pushNotificationsConnector.postXML(movementId, persistenceResponse.messageId, request.body).asPresentation
         } yield persistenceResponse)
           .fold[Result](
             error => Status(error.code.statusCode)(Json.toJson(error)),
@@ -146,7 +146,7 @@ class MessagesController @Inject() (
         persistenceResponse <- persistenceConnector
           .postObjectStoreUri(movementId, messageId, messageType, ObjectStoreURI(objectSummary.location.asUri))
           .asPresentation
-        _ = pushNotificationsConnector.post(movementId, messageId, None, None).asPresentation
+        _ = pushNotificationsConnector.post(movementId, messageId).asPresentation
       } yield persistenceResponse)
         .fold[Result](
           presentationError => Status(presentationError.code.statusCode)(Json.toJson(presentationError)),
@@ -181,13 +181,10 @@ class MessagesController @Inject() (
         .patchMessageStatus(movementId, messageId, MessageUpdate(messageStatus))
         .asPresentation
       _ = pushNotificationsConnector
-        .post(
+        .postJSON(
           movementId,
           messageId,
-          None,
-          Some(
-            jsonValue
-          )
+          jsonValue
         )
     } yield persistenceResponse
 
@@ -228,7 +225,7 @@ class MessagesController @Inject() (
               }
             } yield persistenceResponse).fold[Result](
               presentationError => {
-                pushNotificationsConnector.post(movementId, messageId, None, Some(Json.toJson(presentationError)))
+                pushNotificationsConnector.postJSON(movementId, messageId, Json.toJson(presentationError))
                 Status(presentationError.code.statusCode)(Json.toJson(presentationError))
               },
               _ => Ok

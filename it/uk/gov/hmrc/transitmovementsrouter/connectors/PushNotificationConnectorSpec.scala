@@ -120,7 +120,7 @@ class PushNotificationConnectorSpec
 
       xmlStub(OK)
 
-      whenReady(connector.post(movementId, messageId, Some(source), None).value) {
+      whenReady(connector.postXML(movementId, messageId, source).value) {
         x =>
           x mustBe Right(())
       }
@@ -134,7 +134,7 @@ class PushNotificationConnectorSpec
 
         xmlStub(statusCode)
 
-        whenReady(connector.post(movementId, messageId, Some(source), None).value) {
+        whenReady(connector.postXML(movementId, messageId, source).value) {
           x =>
             x.isLeft mustBe true
 
@@ -156,7 +156,7 @@ class PushNotificationConnectorSpec
 
       val failingSource = Source.single(ByteString.fromString("{}")).via(new EISMessageTransformersImpl().unwrap)
 
-      whenReady(connector.post(movementId, messageId, Some(failingSource), None).value) {
+      whenReady(connector.postXML(movementId, messageId, failingSource).value) {
         res =>
           res mustBe a[Left[Unexpected, _]]
           res.left.toOption.get.asInstanceOf[Unexpected].exception.isDefined
@@ -168,7 +168,7 @@ class PushNotificationConnectorSpec
 
       xmlStub(INTERNAL_SERVER_ERROR)
 
-      whenReady(connector.post(movementId, messageId, Some(source), None).value) {
+      whenReady(connector.postXML(movementId, messageId, source).value) {
         case Left(_)  => fail("The stub should never have been hit and therefore should always return a right")
         case Right(_) =>
       }
@@ -182,7 +182,7 @@ class PushNotificationConnectorSpec
 
       jsonStub(OK)
 
-      whenReady(connector.post(movementId, messageId, None, Some(body)).value) {
+      whenReady(connector.postJSON(movementId, messageId, body).value) {
         x =>
           x mustBe Right(())
       }
@@ -196,7 +196,7 @@ class PushNotificationConnectorSpec
 
         jsonStub(statusCode)
 
-        whenReady(connector.post(movementId, messageId, None, Some(body)).value) {
+        whenReady(connector.postJSON(movementId, messageId, body).value) {
           x =>
             x.isLeft mustBe true
 
@@ -218,7 +218,7 @@ class PushNotificationConnectorSpec
       noBodyStub(OK)
 
       implicit val hc = HeaderCarrier()
-      whenReady(connector.post(movementId, messageId, None, None).value) {
+      whenReady(connector.post(movementId, messageId).value) {
         x =>
           x mustBe Right(())
       }
@@ -234,7 +234,7 @@ class PushNotificationConnectorSpec
 
         implicit val hc = HeaderCarrier()
 
-        whenReady(connector.post(movementId, messageId, None, None).value) {
+        whenReady(connector.post(movementId, messageId).value) {
           x =>
             x.isLeft mustBe true
 

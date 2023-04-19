@@ -204,7 +204,7 @@ class MessageControllerSpec
 
       when(
         mockPushNotificationsConnector
-          .post(any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId], Some(any[Source[ByteString, _]]), any())(
+          .postXML(any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId], any[Source[ByteString, _]])(
             any[HeaderCarrier],
             any[ExecutionContext]
           )
@@ -851,7 +851,7 @@ class MessageControllerSpec
 
         when(
           mockPushNotificationsConnector
-            .post(any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId], Some(any[Source[ByteString, _]]), any())(
+            .post(any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId])(
               any(),
               any()
             )
@@ -1144,7 +1144,7 @@ class MessageControllerSpec
           .thenReturn(EitherT.rightT(()))
         when(
           mockPushNotificationsConnector
-            .post(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), Some(any[Source[ByteString, _]]), any())(
+            .postJSON(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), any())(
               any[HeaderCarrier],
               any[ExecutionContext]
             )
