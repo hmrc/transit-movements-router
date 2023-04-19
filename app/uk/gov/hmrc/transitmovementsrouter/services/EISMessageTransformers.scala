@@ -69,9 +69,9 @@ class EISMessageTransformersImpl extends EISMessageTransformers {
   // Unwrapping
 
   private def lookingForWrappedElement(parseEvent: ParseEvent): (UnwrappingState, ParseEvent) = parseEvent match {
-    case StartElement(TRADER_CHANNEL_RESPONSE, _, Some(WRAPPED_MESSAGE_ROOT_PREFIX), _, _) =>
+    case StartElement(TRADER_CHANNEL_RESPONSE, _, _, _, _) =>
       (LookingForMessageTypeElement, parseEvent)
-    case x: StartElement => throw new IllegalStateException(s"First element should be a n1:TraderChannelResponse, not ${x.localName}")
+    case x: StartElement => throw new IllegalStateException(s"First element should be local name TraderChannelResponse, not ${x.localName}")
     case element         => (LookingForWrappedElement, element)
   }
 
