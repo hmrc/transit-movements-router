@@ -192,6 +192,7 @@ class MessagesController @Inject() (
     Action.async(parse.json) {
       implicit request =>
         implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
+        // This is used to handle sdes response. Like if we receive bad json response from sdes then we need to report to sdes and log the response.
         parseAndLogSdesResponse(request.body) match {
           case Left(presentationError) =>
             Future.successful(Status(presentationError.code.statusCode)(Json.toJson(presentationError)))
@@ -206,7 +207,7 @@ class MessagesController @Inject() (
                     MessageStatus.Success,
                     Json.toJson(
                       Json.obj(
-                        "code" -> OK,
+                        "code" -> "SUCCESS",
                         "message" ->
                           s"The message $messageId for movement $movementId was successfully processed"
                       )
@@ -225,7 +226,7 @@ class MessagesController @Inject() (
               }
             } yield persistenceResponse).fold[Result](
               presentationError => {
-                pushNotificationsConnector.postJSON(movementId, messageId, Json.toJson(presentationError))
+                pushNotificationsConnector.postJSON(movementId, messageId, Json.toJson(PresentationError.internalServiceError()))
                 Status(presentationError.code.statusCode)(Json.toJson(presentationError))
               },
               _ => Ok

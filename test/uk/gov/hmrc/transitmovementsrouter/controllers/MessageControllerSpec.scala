@@ -1099,6 +1099,10 @@ class MessageControllerSpec
       val conversationId          = ConversationId(UUID.randomUUID())
       val (movementId, messageId) = conversationId.toMovementAndMessageId
       val sdesResponse            = arbitrarySdesResponse(conversationId).arbitrary.sample.get
+      val ppnsMessage = Json.obj(
+        "code"    -> "INTERNAL_SERVER_ERROR",
+        "message" -> "Internal server error"
+      )
       val messageStatus = sdesResponse.notification match {
         case SdesNotificationType.FileProcessed         => MessageStatus.Success
         case SdesNotificationType.FileProcessingFailure => MessageStatus.Failed
@@ -1116,7 +1120,7 @@ class MessageControllerSpec
         mockPushNotificationsConnector.postJSON(
           MovementId(eqTo(movementId.value)),
           MessageId(eqTo(messageId.value)),
-          any()
+          eqTo(ppnsMessage)
         )(any[HeaderCarrier], any[ExecutionContext])
       )
         .thenReturn(EitherT.rightT(()))
@@ -1130,7 +1134,7 @@ class MessageControllerSpec
       verify(mockPushNotificationsConnector, times(1)).postJSON(
         MovementId(eqTo(movementId.value)),
         MessageId(eqTo(messageId.value)),
-        any()
+        eqTo(ppnsMessage)
       )(
         any[HeaderCarrier],
         any[ExecutionContext]
@@ -1152,6 +1156,10 @@ class MessageControllerSpec
       val (movementId, messageId) = conversationId.toMovementAndMessageId
       val sdesResponse            = arbitrarySdesResponse(conversationId).arbitrary.sample.get
 
+      val ppnsMessage = Json.obj(
+        "code"    -> "INTERNAL_SERVER_ERROR",
+        "message" -> "Internal server error"
+      )
       val messageStatus = sdesResponse.notification match {
         case SdesNotificationType.FileProcessed         => MessageStatus.Success
         case SdesNotificationType.FileProcessingFailure => MessageStatus.Failed
@@ -1167,7 +1175,7 @@ class MessageControllerSpec
         .thenReturn(EitherT.rightT(()))
       when(
         mockPushNotificationsConnector
-          .postJSON(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), any())(
+          .postJSON(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(ppnsMessage))(
             any[HeaderCarrier],
             any[ExecutionContext]
           )
@@ -1202,6 +1210,10 @@ class MessageControllerSpec
       val conversationId          = ConversationId(UUID.randomUUID())
       val (movementId, messageId) = conversationId.toMovementAndMessageId
       val sdesResponse            = arbitrarySdesResponse(conversationId).arbitrary.sample.get
+      val ppnsMessage = Json.obj(
+        "code"    -> "INTERNAL_SERVER_ERROR",
+        "message" -> "Internal server error"
+      )
       val messageStatus = sdesResponse.notification match {
         case SdesNotificationType.FileProcessed         => MessageStatus.Success
         case SdesNotificationType.FileProcessingFailure => MessageStatus.Failed
@@ -1216,6 +1228,14 @@ class MessageControllerSpec
       )
         .thenReturn(EitherT.fromEither(Left(Unexpected())))
 
+      when(
+        mockPushNotificationsConnector
+          .postJSON(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(ppnsMessage))(
+            any[HeaderCarrier],
+            any[ExecutionContext]
+          )
+      ).thenReturn(EitherT.rightT(()))
+
       val request = fakeRequestLargeMessage(Json.toJson(sdesResponse), sdesCallback)
 
       val result = controller().handleSdesResponse()(request)
@@ -1225,7 +1245,7 @@ class MessageControllerSpec
       verify(mockPushNotificationsConnector, times(1)).postJSON(
         MovementId(eqTo(movementId.value)),
         MessageId(eqTo(messageId.value)),
-        any()
+        eqTo(ppnsMessage)
       )(
         any[HeaderCarrier],
         any[ExecutionContext]

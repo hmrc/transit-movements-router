@@ -16,6 +16,7 @@
 
 package uk.gov.hmrc.transitmovementsrouter.connectors
 
+import akka.http.scaladsl.model.StatusCodes.Accepted
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import cats.data.EitherT
@@ -25,7 +26,7 @@ import com.google.inject.Singleton
 import io.lemonlabs.uri.UrlPath
 import play.api.http.HeaderNames
 import play.api.http.MimeTypes
-import play.api.http.Status.INTERNAL_SERVER_ERROR
+import play.api.http.Status.ACCEPTED
 import play.api.http.Status.NOT_FOUND
 import play.api.libs.json.JsValue
 import uk.gov.hmrc.http.HttpReads.Implicits._
@@ -84,7 +85,12 @@ class PushNotificationsConnectorImpl @Inject() (httpClientV2: HttpClientV2, appC
         val request = createRequest(movementId, messageId)
           .setHeader(HeaderNames.CONTENT_TYPE -> MimeTypes.XML)
           .withBody(sourceXml)
-        execute(request, movementId)
+        executeAndExpect(request, ACCEPTED)
+          .map(Right(_))
+          .recover {
+            case UpstreamErrorResponse(_, NOT_FOUND, _, _) => Left(MovementNotFound(movementId))
+            case NonFatal(thr)                             => Left(Unexpected(Some(thr)))
+          }
 
       }
     }
@@ -100,7 +106,12 @@ class PushNotificationsConnectorImpl @Inject() (httpClientV2: HttpClientV2, appC
         val request = createRequest(movementId, messageId)
           .setHeader(HeaderNames.CONTENT_TYPE -> MimeTypes.JSON)
           .withBody(sourceJson)
-        execute(request, movementId)
+        executeAndExpect(request, ACCEPTED)
+          .map(Right(_))
+          .recover {
+            case UpstreamErrorResponse(_, NOT_FOUND, _, _) => Left(MovementNotFound(movementId))
+            case NonFatal(thr)                             => Left(Unexpected(Some(thr)))
+          }
 
       }
     }
@@ -114,26 +125,25 @@ class PushNotificationsConnectorImpl @Inject() (httpClientV2: HttpClientV2, appC
         Future.successful(Right(()))
       } else {
         val request = createRequest(movementId, messageId)
-        execute(request, movementId)
+        executeAndExpect(request, ACCEPTED)
+          .map(Right(_))
+          .recover {
+            case UpstreamErrorResponse(_, NOT_FOUND, _, _) => Left(MovementNotFound(movementId))
+            case NonFatal(thr)                             => Left(Unexpected(Some(thr)))
+          }
 
       }
     }
 
-  private def execute(requestBuilder: RequestBuilder, movementId: MovementId)(implicit ec: ExecutionContext) =
+  private def executeAndExpect(requestBuilder: RequestBuilder, expected: Int)(implicit ec: ExecutionContext) =
     requestBuilder
-      .execute[Either[UpstreamErrorResponse, HttpResponse]]
-      .map {
-        case Right(_) =>
-          Right(())
-        case Left(error) =>
-          error.statusCode match {
-            case NOT_FOUND             => Left(MovementNotFound(movementId))
-            case INTERNAL_SERVER_ERROR => Left(Unexpected(Some(error.getCause)))
-            case _                     => Left(Unexpected(Some(error.getCause)))
+      .execute[HttpResponse]
+      .flatMap {
+        response =>
+          response.status match {
+            case `expected` => Future.successful(())
+            case _          => Future.failed(UpstreamErrorResponse(response.body, response.status))
           }
-      }
-      .recover {
-        case NonFatal(ex) => Left(Unexpected(Some(ex)))
       }
 
   private def createRequest(movementId: MovementId, messageId: MessageId)(implicit hc: HeaderCarrier) = {

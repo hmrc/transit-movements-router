@@ -35,6 +35,7 @@ import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.mockito.MockitoSugar
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import play.api.http.HeaderNames
+import play.api.http.Status.ACCEPTED
 import play.api.http.Status.INTERNAL_SERVER_ERROR
 import play.api.http.Status.NOT_FOUND
 import play.api.http.Status.OK
@@ -152,7 +153,7 @@ class PushNotificationConnectorSpec
 
       when(mockAppConfig.pushNotificationsEnabled).thenReturn(true)
 
-      xmlStub(OK)
+      xmlStub(ACCEPTED)
 
       val failingSource = Source.single(ByteString.fromString("{}")).via(new EISMessageTransformersImpl().unwrap)
 
@@ -180,7 +181,7 @@ class PushNotificationConnectorSpec
     "return unit when post is successful with body" in {
       when(mockAppConfig.pushNotificationsEnabled).thenReturn(true)
 
-      jsonStub(OK)
+      jsonStub(ACCEPTED)
 
       whenReady(connector.postJSON(movementId, messageId, body).value) {
         x =>
@@ -215,7 +216,7 @@ class PushNotificationConnectorSpec
     "successfully post a push notification with no body" in {
       when(mockAppConfig.pushNotificationsEnabled).thenReturn(true)
 
-      noBodyStub(OK)
+      noBodyStub(ACCEPTED)
 
       implicit val hc = HeaderCarrier()
       whenReady(connector.post(movementId, messageId).value) {
