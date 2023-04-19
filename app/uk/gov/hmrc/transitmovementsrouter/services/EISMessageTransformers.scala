@@ -96,7 +96,7 @@ class EISMessageTransformersImpl extends EISMessageTransformers {
           List(Namespace(NCTS_NAMESPACE_URL, Some(UNWRAPPED_PREFIX)))
         )
       )
-    case element: StartElement => throw new IllegalStateException(s"Expecting a message type root (got ${element.localName}")
+    case element: StartElement => throw new IllegalStateException(s"Expecting a message type root (got ${element.localName})")
     case event                 => (LookingForMessageTypeElement, event)
   }
 
