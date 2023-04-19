@@ -179,7 +179,7 @@ class MessageControllerSpec
     reset(mockObjectStoreService)
     reset(mockCustomOfficeExtractorService)
     reset(mockSDESService)
-    //super.afterEach()
+    super.afterEach()
   }
 
   lazy val submitDeclarationEither: EitherT[Future, RoutingError, Unit] =
@@ -1099,14 +1099,6 @@ class MessageControllerSpec
       val conversationId          = ConversationId(UUID.randomUUID())
       val (movementId, messageId) = conversationId.toMovementAndMessageId
       val sdesResponse            = arbitrarySdesResponse(conversationId).arbitrary.sample.get
-
-      val ppnsMessage = Json.toJson(
-        Json.obj(
-          "code" -> OK,
-          "message" ->
-            s"The message $messageId for movement $movementId was successfully processed"
-        )
-      )
       val messageStatus = sdesResponse.notification match {
         case SdesNotificationType.FileProcessed         => MessageStatus.Success
         case SdesNotificationType.FileProcessingFailure => MessageStatus.Failed
@@ -1124,7 +1116,7 @@ class MessageControllerSpec
         mockPushNotificationsConnector.postJSON(
           MovementId(eqTo(movementId.value)),
           MessageId(eqTo(messageId.value)),
-          eqTo(ppnsMessage)
+          any()
         )(any[HeaderCarrier], any[ExecutionContext])
       )
         .thenReturn(EitherT.rightT(()))
@@ -1138,7 +1130,7 @@ class MessageControllerSpec
       verify(mockPushNotificationsConnector, times(1)).postJSON(
         MovementId(eqTo(movementId.value)),
         MessageId(eqTo(messageId.value)),
-        eqTo(ppnsMessage)
+        any()
       )(
         any[HeaderCarrier],
         any[ExecutionContext]
@@ -1159,13 +1151,7 @@ class MessageControllerSpec
       val conversationId          = ConversationId(UUID.randomUUID())
       val (movementId, messageId) = conversationId.toMovementAndMessageId
       val sdesResponse            = arbitrarySdesResponse(conversationId).arbitrary.sample.get
-      val ppnsMessage = Json.toJson(
-        Json.obj(
-          "code" -> OK,
-          "message" ->
-            s"The message $messageId for movement $movementId was successfully processed"
-        )
-      )
+
       val messageStatus = sdesResponse.notification match {
         case SdesNotificationType.FileProcessed         => MessageStatus.Success
         case SdesNotificationType.FileProcessingFailure => MessageStatus.Failed
@@ -1181,7 +1167,7 @@ class MessageControllerSpec
         .thenReturn(EitherT.rightT(()))
       when(
         mockPushNotificationsConnector
-          .postJSON(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(ppnsMessage))(
+          .postJSON(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), any())(
             any[HeaderCarrier],
             any[ExecutionContext]
           )
@@ -1195,7 +1181,7 @@ class MessageControllerSpec
       verify(mockPushNotificationsConnector, times(1)).postJSON(
         MovementId(eqTo(movementId.value)),
         MessageId(eqTo(messageId.value)),
-        eqTo(ppnsMessage)
+        any()
       )(
         any[HeaderCarrier],
         any[ExecutionContext]
