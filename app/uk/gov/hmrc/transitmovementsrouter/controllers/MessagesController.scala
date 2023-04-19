@@ -28,8 +28,10 @@ import play.api.mvc.ControllerComponents
 import play.api.mvc.DefaultActionBuilder
 import play.api.mvc.Result
 import uk.gov.hmrc.http.HeaderCarrier
+import uk.gov.hmrc.http.HeaderNames
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
 import uk.gov.hmrc.play.http.HeaderCarrierConverter
+import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
 import uk.gov.hmrc.transitmovementsrouter.connectors.PersistenceConnector
 import uk.gov.hmrc.transitmovementsrouter.connectors.PushNotificationsConnector
 import uk.gov.hmrc.transitmovementsrouter.controllers.actions.AuthenticateEISToken
@@ -50,6 +52,7 @@ import uk.gov.hmrc.transitmovementsrouter.services.MessageTypeExtractor
 import uk.gov.hmrc.transitmovementsrouter.services.ObjectStoreService
 import uk.gov.hmrc.transitmovementsrouter.services.RoutingService
 import uk.gov.hmrc.transitmovementsrouter.services.SDESService
+import uk.gov.hmrc.transitmovementsrouter.utils.RouterHeaderNames
 
 import javax.inject.Inject
 import scala.concurrent.Future
@@ -64,7 +67,8 @@ class MessagesController @Inject() (
   eisMessageTransformers: EISMessageTransformers,
   objectStoreService: ObjectStoreService,
   customOfficeExtractorService: CustomOfficeExtractorService,
-  sdesService: SDESService
+  sdesService: SDESService,
+  val config: AppConfig
 )(implicit
   val materializer: Materializer,
   val temporaryFileCreator: TemporaryFileCreator
@@ -130,7 +134,19 @@ class MessagesController @Inject() (
           _ = pushNotificationsConnector.post(movementId, persistenceResponse.messageId, Some(request.body)).asPresentation
         } yield persistenceResponse)
           .fold[Result](
-            error => Status(error.code.statusCode)(Json.toJson(error)),
+            {
+              error =>
+                if (config.logIncoming) {
+                  logger.error(s"""Unable to process message from EIS -- bad request:
+                       |
+                       |Request ID: ${request.headers.get(HeaderNames.xRequestId).getOrElse("unavailable")}
+                       |Correlation ID: ${request.headers.get(RouterHeaderNames.CORRELATION_ID).getOrElse("unavailable")}
+                       |Conversation ID: ${request.headers.get(RouterHeaderNames.CONVERSATION_ID).getOrElse("unavailable")}
+                       |
+                       |error is ${Json.toJson(error)}""".stripMargin)
+                }
+                Status(error.code.statusCode)(Json.toJson(error))
+            },
             response => Created.withHeaders("X-Message-Id" -> response.messageId.value)
           )
     }
