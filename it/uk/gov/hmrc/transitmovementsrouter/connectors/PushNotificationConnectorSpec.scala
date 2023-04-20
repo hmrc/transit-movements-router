@@ -19,6 +19,9 @@ package uk.gov.hmrc.transitmovementsrouter.connectors
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import com.github.tomakehurst.wiremock.client.WireMock.aResponse
+import com.github.tomakehurst.wiremock.client.WireMock.equalTo
+import com.github.tomakehurst.wiremock.client.WireMock.equalToJson
+import com.github.tomakehurst.wiremock.client.WireMock.equalToXml
 import com.github.tomakehurst.wiremock.client.WireMock.post
 import com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo
 import io.lemonlabs.uri.Url
@@ -31,9 +34,13 @@ import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.mockito.MockitoSugar
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+import play.api.http.HeaderNames
+import play.api.http.Status.ACCEPTED
 import play.api.http.Status.INTERNAL_SERVER_ERROR
 import play.api.http.Status.NOT_FOUND
 import play.api.http.Status.OK
+import play.api.libs.json.Json
+import play.mvc.Http.MimeTypes
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.test.HttpClientV2Support
 import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
@@ -82,21 +89,39 @@ class PushNotificationConnectorSpec
     )
   )
 
-  def source: Source[ByteString, _] = Source.single(ByteString.fromString("<CC029C></CC029C>"))
+  val source: Source[ByteString, _] = Source.single(ByteString.fromString("<CC029C></CC029C>"))
+  val body                          = Json.obj("messageId" -> messageId.value)
 
-  def stub(codeToReturn: Int) = server.stubFor(
+  def xmlStub(codeToReturn: Int) = server.stubFor(
     post(
       urlEqualTo(uriPushNotifications)
-    ).willReturn(aResponse().withStatus(codeToReturn))
+    ).withHeader(HeaderNames.CONTENT_TYPE, equalTo(MimeTypes.XML))
+      .withRequestBody(equalToXml("<CC029C></CC029C>"))
+      .willReturn(aResponse().withStatus(codeToReturn))
   )
 
-  "post" should {
+  def jsonStub(codeToReturn: Int) = server.stubFor(
+    post(
+      urlEqualTo(uriPushNotifications)
+    ).withHeader(HeaderNames.CONTENT_TYPE, equalTo(MimeTypes.JSON))
+      .withRequestBody(equalToJson(Json.obj("messageId" -> messageId.value).toString()))
+      .willReturn(aResponse().withStatus(codeToReturn))
+  )
+
+  def noBodyStub(codeToReturn: Int) = server.stubFor(
+    post(
+      urlEqualTo(uriPushNotifications)
+    )
+      .willReturn(aResponse().withStatus(codeToReturn))
+  )
+
+  "post with xml body" should {
     "return unit when post is successful with body" in {
       when(mockAppConfig.pushNotificationsEnabled).thenReturn(true)
 
-      stub(OK)
+      xmlStub(ACCEPTED)
 
-      whenReady(connector.post(movementId, messageId, Some(source)).value) {
+      whenReady(connector.postXML(movementId, messageId, source).value) {
         x =>
           x mustBe Right(())
       }
@@ -108,9 +133,9 @@ class PushNotificationConnectorSpec
 
         when(mockAppConfig.pushNotificationsEnabled).thenReturn(true)
 
-        stub(statusCode)
+        xmlStub(statusCode)
 
-        whenReady(connector.post(movementId, messageId, Some(source)).value) {
+        whenReady(connector.postXML(movementId, messageId, source).value) {
           x =>
             x.isLeft mustBe true
 
@@ -128,11 +153,11 @@ class PushNotificationConnectorSpec
 
       when(mockAppConfig.pushNotificationsEnabled).thenReturn(true)
 
-      stub(OK)
+      xmlStub(ACCEPTED)
 
       val failingSource = Source.single(ByteString.fromString("{}")).via(new EISMessageTransformersImpl().unwrap)
 
-      whenReady(connector.post(movementId, messageId, Some(failingSource)).value) {
+      whenReady(connector.postXML(movementId, messageId, failingSource).value) {
         res =>
           res mustBe a[Left[Unexpected, _]]
           res.left.toOption.get.asInstanceOf[Unexpected].exception.isDefined
@@ -142,21 +167,59 @@ class PushNotificationConnectorSpec
     "when the service is disabled, return a unit" in {
       when(mockAppConfig.pushNotificationsEnabled).thenReturn(false)
 
-      stub(INTERNAL_SERVER_ERROR)
+      xmlStub(INTERNAL_SERVER_ERROR)
 
-      whenReady(connector.post(movementId, messageId, Some(source)).value) {
+      whenReady(connector.postXML(movementId, messageId, source).value) {
         case Left(_)  => fail("The stub should never have been hit and therefore should always return a right")
         case Right(_) =>
       }
     }
 
+  }
+
+  "post with json body" should {
+    "return unit when post is successful with body" in {
+      when(mockAppConfig.pushNotificationsEnabled).thenReturn(true)
+
+      jsonStub(ACCEPTED)
+
+      whenReady(connector.postJSON(movementId, messageId, body).value) {
+        x =>
+          x mustBe Right(())
+      }
+    }
+
+    "return a PushNotificationError when unsuccessful with body" in forAll(errorCodes) {
+      statusCode =>
+        server.resetAll()
+
+        when(mockAppConfig.pushNotificationsEnabled).thenReturn(true)
+
+        jsonStub(statusCode)
+
+        whenReady(connector.postJSON(movementId, messageId, body).value) {
+          x =>
+            x.isLeft mustBe true
+
+            statusCode match {
+              case NOT_FOUND             => x mustBe a[Left[MovementNotFound, _]]
+              case INTERNAL_SERVER_ERROR => x mustBe a[Left[Unexpected, _]]
+              case _                     => fail()
+            }
+
+        }
+    }
+
+  }
+
+  "post with no body" should {
     "successfully post a push notification with no body" in {
       when(mockAppConfig.pushNotificationsEnabled).thenReturn(true)
 
-      stub(OK)
+      noBodyStub(ACCEPTED)
 
       implicit val hc = HeaderCarrier()
-      whenReady(connector.post(movementId, messageId, None).value) {
+      whenReady(connector.post(movementId, messageId).value) {
         x =>
           x mustBe Right(())
       }
@@ -168,11 +231,11 @@ class PushNotificationConnectorSpec
 
         when(mockAppConfig.pushNotificationsEnabled).thenReturn(true)
 
-        stub(statusCode)
+        noBodyStub(statusCode)
 
         implicit val hc = HeaderCarrier()
 
-        whenReady(connector.post(movementId, messageId, None).value) {
+        whenReady(connector.post(movementId, messageId).value) {
           x =>
             x.isLeft mustBe true
 
@@ -183,5 +246,7 @@ class PushNotificationConnectorSpec
             }
         }
     }
+
   }
+
 }

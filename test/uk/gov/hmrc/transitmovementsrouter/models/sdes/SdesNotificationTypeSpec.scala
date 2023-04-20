@@ -30,4 +30,5 @@ class SdesNotificationTypeSpec extends AnyFlatSpec with Matchers {
   "SdesNotificationType" should "deserialize correctly" in {
     JsString("FileProcessingFailure").validate[SdesNotificationType].get should be(SdesNotificationType.FileProcessingFailure)
   }
+
 }

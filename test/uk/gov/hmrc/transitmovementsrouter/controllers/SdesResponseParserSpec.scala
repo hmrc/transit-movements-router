@@ -44,25 +44,19 @@ class SdesResponseParserSpec extends AnyFreeSpec with ScalaFutures with Matchers
     val conversationId = ConversationId(UUID.randomUUID())
 
     "given a response in the callback that cannot be deserialized, returns left" in {
-      whenReady(testController.parseAndLogSdesResponse(Json.obj("reference" -> "abc")).value) {
-        either =>
-          either mustBe Left(PresentationError.badRequestError("Unexpected SDES callback response"))
-      }
+      val either = testController.parseAndLogSdesResponse(Json.obj("reference" -> "abc"))
+      either mustBe Left(PresentationError.badRequestError("Unexpected SDES callback response"))
     }
 
     "given a successful response in the callback, returns right" in forAll(
       arbitrarySdesResponse(conversationId).arbitrary
     ) {
       sdesResponse =>
-        val json = Json.toJson(sdesResponse)
-        whenReady(testController.parseAndLogSdesResponse(json).value) {
-
-          either =>
-            either mustBe Right(sdesResponse)
-            either.toOption.get mustBe sdesResponse
-        }
+        val json   = Json.toJson(sdesResponse)
+        val either = testController.parseAndLogSdesResponse(json)
+        either mustBe Right(sdesResponse)
+        either.toOption.get mustBe sdesResponse
     }
-
   }
 
 }
