@@ -22,9 +22,12 @@ import akka.stream.scaladsl.Flow
 import akka.stream.scaladsl.Sink
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
+import org.mockito.Mockito.when
 import org.scalacheck.Gen
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
+import org.scalatestplus.mockito.MockitoSugar.mock
+import play.api.Logging
 import play.api.http.HeaderNames
 import play.api.http.Status.BAD_REQUEST
 import play.api.http.Status.INTERNAL_SERVER_ERROR
@@ -48,6 +51,7 @@ import play.api.test.Helpers.status
 import play.api.test.Helpers.stubControllerComponents
 import uk.gov.hmrc.transitmovementsrouter.base.TestActorSystem
 import uk.gov.hmrc.transitmovementsrouter.base.TestSourceProvider
+import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
 import uk.gov.hmrc.transitmovementsrouter.controllers.errors.PresentationError
 
 import java.nio.charset.StandardCharsets
@@ -69,7 +73,7 @@ class StreamingParsersSpec extends AnyFreeSpec with Matchers with TestActorSyste
     override def parser: BodyParser[AnyContent] = stubControllerComponents().parsers.defaultBodyParser
   }
 
-  object Harness extends BaseController with StreamingParsers {
+  object Harness extends BaseController with StreamingParsers with Logging {
 
     override val controllerComponents = stubControllerComponents()
     implicit val temporaryFileCreator = SingletonTemporaryFileCreator
@@ -133,6 +137,9 @@ class StreamingParsersSpec extends AnyFreeSpec with Matchers with TestActorSyste
         _ =>
           Future.successful(Ok("but should never happen"))
       }
+
+    override val config: AppConfig = mock[AppConfig]
+    when(config.logIncoming).thenReturn(false)
   }
 
   @tailrec

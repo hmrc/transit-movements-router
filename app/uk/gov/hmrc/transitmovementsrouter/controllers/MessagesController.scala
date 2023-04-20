@@ -29,8 +29,10 @@ import play.api.mvc.ControllerComponents
 import play.api.mvc.DefaultActionBuilder
 import play.api.mvc.Result
 import uk.gov.hmrc.http.HeaderCarrier
+import uk.gov.hmrc.http.HeaderNames
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
 import uk.gov.hmrc.play.http.HeaderCarrierConverter
+import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
 import uk.gov.hmrc.transitmovementsrouter.connectors.PersistenceConnector
 import uk.gov.hmrc.transitmovementsrouter.connectors.PushNotificationsConnector
 import uk.gov.hmrc.transitmovementsrouter.controllers.actions.AuthenticateEISToken
@@ -39,12 +41,12 @@ import uk.gov.hmrc.transitmovementsrouter.controllers.errors.PresentationError
 import uk.gov.hmrc.transitmovementsrouter.controllers.stream.StreamingParsers
 import uk.gov.hmrc.transitmovementsrouter.models._
 import uk.gov.hmrc.transitmovementsrouter.models.requests.MessageUpdate
-import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesNotification
-import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesNotificationType
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.DownloadUrl
-
+import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesNotification
+import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesNotificationType
 import uk.gov.hmrc.transitmovementsrouter.services._
+import uk.gov.hmrc.transitmovementsrouter.utils.RouterHeaderNames
 
 import java.util.UUID
 import javax.inject.Inject
@@ -60,7 +62,8 @@ class MessagesController @Inject() (
   eisMessageTransformers: EISMessageTransformers,
   objectStoreService: ObjectStoreService,
   customOfficeExtractorService: CustomOfficeExtractorService,
-  sdesService: SDESService
+  sdesService: SDESService,
+  val config: AppConfig
 )(implicit
   val materializer: Materializer,
   val temporaryFileCreator: TemporaryFileCreator
@@ -126,7 +129,19 @@ class MessagesController @Inject() (
           _ = pushNotificationsConnector.postXML(movementId, persistenceResponse.messageId, request.body).asPresentation
         } yield persistenceResponse)
           .fold[Result](
-            error => Status(error.code.statusCode)(Json.toJson(error)),
+            {
+              error =>
+                if (config.logIncoming) {
+                  logger.error(s"""Unable to process message from EIS -- bad request:
+                       |
+                       |Request ID: ${request.headers.get(HeaderNames.xRequestId).getOrElse("unavailable")}
+                       |Correlation ID: ${request.headers.get(RouterHeaderNames.CORRELATION_ID).getOrElse("unavailable")}
+                       |Conversation ID: ${request.headers.get(RouterHeaderNames.CONVERSATION_ID).getOrElse("unavailable")}
+                       |
+                       |error is ${Json.toJson(error)}""".stripMargin)
+                }
+                Status(error.code.statusCode)(Json.toJson(error))
+            },
             response => Created.withHeaders("X-Message-Id" -> response.messageId.value)
           )
     }

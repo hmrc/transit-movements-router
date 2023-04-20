@@ -69,14 +69,14 @@ class EISMessageTransformersImpl extends EISMessageTransformers {
   // Unwrapping
 
   private def lookingForWrappedElement(parseEvent: ParseEvent): (UnwrappingState, ParseEvent) = parseEvent match {
-    case StartElement(TRADER_CHANNEL_RESPONSE, _, Some(WRAPPED_MESSAGE_ROOT_PREFIX), _, _) =>
+    case StartElement(TRADER_CHANNEL_RESPONSE, _, _, _, _) =>
       (LookingForMessageTypeElement, parseEvent)
-    case x: StartElement => throw new IllegalStateException(s"First element should be a n1:TraderChannelResponse, not ${x.localName}")
+    case x: StartElement => throw new IllegalStateException(s"First element should be local name TraderChannelResponse, not ${x.localName}")
     case element         => (LookingForWrappedElement, element)
   }
 
   private def lookingForMessageTypeElement(parseEvent: ParseEvent): (UnwrappingState, ParseEvent) = parseEvent match {
-    case StartElement(name @ messageType(), attributes, Some(WRAPPED_MESSAGE_TYPE_PREFIX), _, _) =>
+    case StartElement(name @ messageType(), attributes, Some(_), _, _) =>
       val phaseId = attributes
         .find(
           a => a.name == "PhaseID"
@@ -96,7 +96,7 @@ class EISMessageTransformersImpl extends EISMessageTransformers {
           List(Namespace(NCTS_NAMESPACE_URL, Some(UNWRAPPED_PREFIX)))
         )
       )
-    case element: StartElement => throw new IllegalStateException(s"Expecting a message type root (got ${element.localName}")
+    case element: StartElement => throw new IllegalStateException(s"Expecting a message type root (got ${element.localName})")
     case event                 => (LookingForMessageTypeElement, event)
   }
 

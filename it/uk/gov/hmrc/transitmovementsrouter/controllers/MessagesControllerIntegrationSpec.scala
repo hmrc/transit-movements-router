@@ -63,16 +63,35 @@ class MessagesControllerIntegrationSpec
 
   // We don't care about the content in this XML fragment, only the root tag and its child.
   val sampleIncomingXml: String =
-    <n1:TraderChannelResponse xmlns:txd="http://ncts.dgtaxud.ec"
-                              xmlns:n1="http://www.hmrc.gov.uk/eis/ncts5/v1"
-                              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                              xsi:schemaLocation="http://www.hmrc.gov.uk/eis/ncts5/v1 EIS_WrapperV10_TraderChannelSubmission-51.8.xsd">
-      <txd:CC029C PhaseID="NCTS5.0">
-        <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
+    <n1:TraderChannelResponse xmlns:txd="http://ncts.dgtaxud.ec" xmlns:n1="http://www.hmrc.gov.uk/eis/ncts5/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.hmrc.gov.uk/eis/ncts5/v1 EIS_WrapperV11_TraderChannelResponse-51.8.xsd">
+      <txd:CC004C PhaseID="NCTS5.0">
+        <messageSender>!</messageSender>
+        <messageRecipient>!</messageRecipient>
+        <preparationDateAndTime>0231-11-23T10:03:02</preparationDateAndTime>
+        <messageIdentification>!</messageIdentification>
+        <messageType>CC004C</messageType>
+        <correlationIdentifier>!</correlationIdentifier>
+        <TransitOperation>
+          <LRN></LRN>
+          <MRN>00AA00000000000000</MRN>
+          <amendmentSubmissionDateAndTime>0231-11-23T10:03:02</amendmentSubmissionDateAndTime>
+          <amendmentAcceptanceDateAndTime>0231-11-23T10:03:02</amendmentAcceptanceDateAndTime>
+        </TransitOperation>
         <CustomsOfficeOfDeparture>
-          <referenceNumber>GB1234567</referenceNumber>
+          <referenceNumber>AA000000</referenceNumber>
         </CustomsOfficeOfDeparture>
-      </txd:CC029C>
+        <HolderOfTheTransitProcedure>
+          <identificationNumber></identificationNumber>
+          <TIRHolderIdentificationNumber></TIRHolderIdentificationNumber>
+          <name></name>
+          <Address>
+            <streetAndNumber></streetAndNumber>
+            <postcode></postcode>
+            <city></city>
+            <country>AA</country>
+          </Address>
+        </HolderOfTheTransitProcedure>
+      </txd:CC004C>
     </n1:TraderChannelResponse>.mkString
 
   // We don't care about the content in this XML fragment, only the root tag and its child.
@@ -274,7 +293,7 @@ class MessagesControllerIntegrationSpec
             HeaderNames.CONTENT_TYPE -> MimeTypes.XML
           )
         ),
-        Source.single(ByteString(sampleIncomingXml)) // note this is the IE029, not the IE015
+        Source.single(ByteString(sampleIncomingXml)) // note this is the IE004, not the IE015
       )
 
       running(newApp) {
@@ -335,7 +354,7 @@ class MessagesControllerIntegrationSpec
           server.stubFor(
             post(new UrlPathPattern(new EqualToPattern(s"/transit-movements/traders/movements/${movementId.value}/messages"), false))
               .withQueryParam("triggerId", new EqualToPattern(messageId.value))
-              .withHeader("x-message-type", new EqualToPattern("IE029"))
+              .withHeader("x-message-type", new EqualToPattern("IE004"))
               .willReturn(
                 aResponse().withStatus(OK).withBody(Json.stringify(Json.obj("messageId" -> outputMessageId.value)))
               )

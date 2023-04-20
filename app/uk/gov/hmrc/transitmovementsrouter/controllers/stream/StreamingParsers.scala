@@ -24,6 +24,7 @@ import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import cats.syntax.all._
 import com.fasterxml.aalto.WFCException
+import play.api.Logging
 import play.api.libs.Files.TemporaryFileCreator
 import play.api.libs.json.Json
 import play.api.libs.streams.Accumulator
@@ -33,7 +34,10 @@ import play.api.mvc.BaseControllerHelpers
 import play.api.mvc.BodyParser
 import play.api.mvc.Request
 import play.api.mvc.Result
+import uk.gov.hmrc.http.HeaderNames
+import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
 import uk.gov.hmrc.transitmovementsrouter.controllers.errors.PresentationError
+import uk.gov.hmrc.transitmovementsrouter.utils.RouterHeaderNames
 
 import java.util.concurrent.Executors
 import scala.concurrent.ExecutionContext
@@ -42,7 +46,9 @@ import scala.util.Failure
 import scala.util.Success
 
 trait StreamingParsers {
-  self: BaseControllerHelpers =>
+  self: BaseControllerHelpers with Logging =>
+
+  val config: AppConfig
 
   implicit val materializer: Materializer
 
@@ -71,8 +77,35 @@ trait StreamingParsers {
               case Success(_) => block(request.withBody(FileIO.fromPath(tempFile)))
               case Failure(error: IOOperationIncompleteException)
                   if error.getCause.isInstanceOf[IllegalStateException] || error.getCause.isInstanceOf[WFCException] =>
+                if (config.logIncoming) {
+                  logger.error(
+                    s"""Unable to process message from EIS -- bad request:
+                                  |
+                                  |Request ID: ${request.headers.get(HeaderNames.xRequestId).getOrElse("unavailable")}
+                                  |Correlation ID: ${request.headers.get(RouterHeaderNames.CORRELATION_ID).getOrElse("unavailable")}
+                                  |Conversation ID: ${request.headers.get(RouterHeaderNames.CONVERSATION_ID).getOrElse("unavailable")}
+                                  |Message: ${error.getMessage}
+                                  |
+                                  |Failed to transform XML""".stripMargin,
+                    error
+                  )
+                }
                 Future.successful(Status(BAD_REQUEST)(Json.toJson(PresentationError.badRequestError(error.getCause.getMessage))))
-              case Failure(thr) => Future.successful(Status(INTERNAL_SERVER_ERROR)(Json.toJson(PresentationError.internalServiceError(cause = Some(thr)))))
+              case Failure(thr) =>
+                if (config.logIncoming) {
+                  logger.error(
+                    s"""Unable to process message from EIS -- internal server error:
+                       |
+                       |Request ID: ${request.headers.get(HeaderNames.xRequestId).getOrElse("unavailable")}
+                       |Correlation ID: ${request.headers.get(RouterHeaderNames.CORRELATION_ID).getOrElse("unavailable")}
+                       |Conversation ID: ${request.headers.get(RouterHeaderNames.CONVERSATION_ID).getOrElse("unavailable")}
+                       |Message: ${thr.getMessage}
+                       |
+                       |Failed to transform XML""".stripMargin,
+                    thr
+                  )
+                }
+                Future.successful(Status(INTERNAL_SERVER_ERROR)(Json.toJson(PresentationError.internalServiceError(cause = Some(thr)))))
             }
             .attemptTap {
               _ =>
