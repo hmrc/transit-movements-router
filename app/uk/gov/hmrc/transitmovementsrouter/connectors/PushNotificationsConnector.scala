@@ -16,7 +16,6 @@
 
 package uk.gov.hmrc.transitmovementsrouter.connectors
 
-import akka.http.scaladsl.model.StatusCodes.Accepted
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import cats.data.EitherT
