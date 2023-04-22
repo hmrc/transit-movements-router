@@ -277,7 +277,9 @@ class MessagesController @Inject() (
        |Correlation ID: ${request.headers.get(RouterHeaderNames.CORRELATION_ID).getOrElse("unavailable")}
        |Conversation ID: ${request.headers.get(RouterHeaderNames.CONVERSATION_ID).getOrElse("unavailable")}""".stripMargin
 
-  private def logIncomingSuccess(movementId: MovementId, triggerId: MessageId, newMessageId: MessageId, messageType: MessageType)(implicit request: Request[_]): Unit =
+  private def logIncomingSuccess(movementId: MovementId, triggerId: MessageId, newMessageId: MessageId, messageType: MessageType)(implicit
+    request: Request[_]
+  ): Unit =
     if (config.logIncoming) {
       logger.info(s"""Received message from EIS
            |
