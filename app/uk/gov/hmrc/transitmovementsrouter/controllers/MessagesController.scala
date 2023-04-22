@@ -91,7 +91,7 @@ class MessagesController @Inject() (
     with SdesResponseParser
     with Logging {
 
-  def outgoing(eori: EoriNumber, movementType: MovementType, movementId: MovementId, messageId: MessageId) =
+  def outgoing(eori: EoriNumber, movementType: MovementType, movementId: MovementId, messageId: MessageId): Action[Source[ByteString, _]] =
     contentTypeRoute {
       case Some(_) => outgoingSmallMessage(eori, movementType, movementId, messageId)
       case None    => outgoingLargeMessage(eori, movementType, movementId, messageId)
@@ -138,15 +138,15 @@ class MessagesController @Inject() (
         import MessagesController.PresentationEitherTHelper
 
         implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
-        val (movementId, messageId)    = ids.toMovementAndMessageId
+        val (movementId, triggerId)    = ids.toMovementAndMessageId
 
         (for {
           messageType <- messageTypeExtractor.extract(request.headers, request.body).asPresentationWithMessageType(None)
           persistenceResponse <- persistenceConnector
-            .postBody(movementId, messageId, messageType, request.body)
+            .postBody(movementId, triggerId, messageType, request.body)
             .asPresentationWithMessageType(Some(messageType))
           _ = pushNotificationsConnector.postXML(movementId, persistenceResponse.messageId, request.body).asPresentation
-          _ = logIncomingSuccess(messageType)
+          _ = logIncomingSuccess(movementId, triggerId, persistenceResponse.messageId, messageType)
         } yield persistenceResponse)
           .fold[Result](
             {
@@ -154,7 +154,7 @@ class MessagesController @Inject() (
                 if (config.logIncoming) {
                   logger.error(s"""Unable to process message from EIS -- bad request:
                        |
-                       |${generateRequestLog(error._2)}
+                       |${generateRequestLog(movementId, triggerId, error._2)}
                        |
                        |error is ${Json.toJson(error._1)}""".stripMargin)
                 }
@@ -164,7 +164,7 @@ class MessagesController @Inject() (
           )
     }
 
-  def incomingLargeMessage(movementId: MovementId, messageId: MessageId) = Action.async(cc.parsers.json) {
+  def incomingLargeMessage(movementId: MovementId, messageId: MessageId): Action[JsValue] = Action.async(cc.parsers.json) {
     implicit request =>
       implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
       (for {
@@ -221,7 +221,7 @@ class MessagesController @Inject() (
         )
     } yield persistenceResponse
 
-  def handleSdesResponse() =
+  def handleSdesResponse(): Action[JsValue] =
     Action.async(parse.json) {
       implicit request =>
         implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
@@ -269,16 +269,19 @@ class MessagesController @Inject() (
 
   // Logging methods
 
-  private def generateRequestLog(messageType: Option[MessageType])(implicit request: Request[_]): String =
+  private def generateRequestLog(movementId: MovementId, triggerId: MessageId, messageType: Option[MessageType])(implicit request: Request[_]): String =
     s"""Message Type: ${messageType.map(_.code).getOrElse("unknown")}
+       |Movement ID: ${movementId.value}
+       |Trigger ID: ${triggerId.value}
        |Request ID: ${request.headers.get(HeaderNames.xRequestId).getOrElse("unavailable")}
        |Correlation ID: ${request.headers.get(RouterHeaderNames.CORRELATION_ID).getOrElse("unavailable")}
        |Conversation ID: ${request.headers.get(RouterHeaderNames.CONVERSATION_ID).getOrElse("unavailable")}""".stripMargin
 
-  private def logIncomingSuccess(messageType: MessageType)(implicit request: Request[_]): Unit =
+  private def logIncomingSuccess(movementId: MovementId, triggerId: MessageId, newMessageId: MessageId, messageType: MessageType)(implicit request: Request[_]): Unit =
     if (config.logIncoming) {
       logger.info(s"""Received message from EIS
            |
-           |${generateRequestLog(Some(messageType))}""".stripMargin)
+           |${generateRequestLog(movementId, triggerId, Some(messageType))}
+           |New Message ID: ${newMessageId.value}""".stripMargin)
     }
 }
