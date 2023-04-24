@@ -27,6 +27,7 @@ import org.mockito.MockitoSugar.reset
 import org.mockito.MockitoSugar.when
 import org.scalacheck.Gen
 import org.scalatest.BeforeAndAfterEach
+import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers.convertToAnyMustWrapper
 import org.scalatest.matchers.should.Matchers
@@ -83,7 +84,8 @@ class MessageControllerSpec
     with TestActorSystem
     with BeforeAndAfterEach
     with ScalaCheckDrivenPropertyChecks
-    with TestModelGenerators {
+    with TestModelGenerators
+    with ScalaFutures {
 
   val eori         = EoriNumber("eori")
   val movementType = MovementType("departures")
@@ -1275,6 +1277,35 @@ class MessageControllerSpec
       val result = controller().handleSdesResponse()(request)
 
       status(result) mustBe BAD_REQUEST
+    }
+  }
+
+  "MessagesController object" - {
+    "PresentationEitherTHelper" - {
+
+      import MessagesController.PresentationEitherTHelper
+
+      "for an EitherT with a Right, return the right" in forAll(Gen.option(Gen.oneOf(MessageType.values))) {
+        messageTypeMaybe =>
+          val incoming: EitherT[Future, RoutingError, Unit]                    = EitherT(Future.successful[Either[RoutingError, Unit]](Right((): Unit)))
+          val expected: Either[(PresentationError, Option[MessageType]), Unit] = Right((): Unit)
+
+          whenReady(incoming.asPresentationWithMessageType(messageTypeMaybe).value) {
+            _ mustBe expected
+          }
+      }
+
+      "for an EitherT with a Left, return the left with the appropriate message type, if any" in forAll(Gen.option(Gen.oneOf(MessageType.values))) {
+        messageTypeMaybe =>
+          val incoming: EitherT[Future, RoutingError, Unit] =
+            EitherT(Future.successful[Either[RoutingError, Unit]](Left(RoutingError.Unexpected("error", None))))
+          val expected: Either[(PresentationError, Option[MessageType]), Unit] = Left((PresentationError.internalServiceError(), messageTypeMaybe))
+
+          whenReady(incoming.asPresentationWithMessageType(messageTypeMaybe).value) {
+            _ mustBe expected
+          }
+      }
+
     }
   }
 }

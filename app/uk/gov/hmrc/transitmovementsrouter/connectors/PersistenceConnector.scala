@@ -97,24 +97,24 @@ class PersistenceConnectorImpl @Inject() (httpClientV2: HttpClientV2, appConfig:
   private def persistenceUpdateStatus(movementId: MovementId, messageId: MessageId): UrlPath =
     Url(path = s"$baseRoute/traders/movements/${movementId.value}/messages/${messageId.value}").path
 
-  override def postBody(movementId: MovementId, messageId: MessageId, messageType: MessageType, source: Source[ByteString, _])(implicit
+  override def postBody(movementId: MovementId, triggerId: MessageId, messageType: MessageType, source: Source[ByteString, _])(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): EitherT[Future, PersistenceError, PersistenceResponse] =
     EitherT {
-      val request = createRequest(movementId, messageId)
+      val request = createRequest(movementId, triggerId)
         .transform(_.addHttpHeaders(HeaderNames.CONTENT_TYPE -> MimeTypes.XML, RouterHeaderNames.MESSAGE_TYPE -> messageType.code))
         .withBody(source)
       execute(request, movementId)
 
     }
 
-  override def postObjectStoreUri(movementId: MovementId, messageId: MessageId, messageType: MessageType, objectStoreURI: ObjectStoreURI)(implicit
+  override def postObjectStoreUri(movementId: MovementId, triggerId: MessageId, messageType: MessageType, objectStoreURI: ObjectStoreURI)(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): EitherT[Future, PersistenceError, PersistenceResponse] =
     EitherT {
-      val request = createRequest(movementId, messageId).transform(
+      val request = createRequest(movementId, triggerId).transform(
         _.addHttpHeaders(
           RouterHeaderNames.MESSAGE_TYPE     -> messageType.code,
           RouterHeaderNames.OBJECT_STORE_URI -> objectStoreURI.value
@@ -174,8 +174,8 @@ class PersistenceConnectorImpl @Inject() (httpClientV2: HttpClientV2, appConfig:
           }
       }
 
-  private def createRequest(movementId: MovementId, messageId: MessageId)(implicit hc: HeaderCarrier) = {
-    val url = baseUrl.withPath(persistenceSendMessage(movementId)).withQueryString(QueryString.fromPairs("triggerId" -> messageId.value))
+  private def createRequest(movementId: MovementId, triggerId: MessageId)(implicit hc: HeaderCarrier) = {
+    val url = baseUrl.withPath(persistenceSendMessage(movementId)).withQueryString(QueryString.fromPairs("triggerId" -> triggerId.value))
     httpClientV2.post(url"$url")
   }
 

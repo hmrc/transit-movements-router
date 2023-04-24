@@ -27,6 +27,7 @@ import play.api.libs.json.Json
 import play.api.mvc.Action
 import play.api.mvc.ControllerComponents
 import play.api.mvc.DefaultActionBuilder
+import play.api.mvc.Request
 import play.api.mvc.Result
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.HeaderNames
@@ -50,7 +51,21 @@ import uk.gov.hmrc.transitmovementsrouter.utils.RouterHeaderNames
 
 import java.util.UUID
 import javax.inject.Inject
+import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
+
+object MessagesController extends ConvertError {
+
+  implicit class PresentationEitherTHelper[E: Converter, A](val value: EitherT[Future, E, A]) {
+
+    def asPresentationWithMessageType(messageTypeMaybe: Option[MessageType])(implicit
+      ec: ExecutionContext
+    ): EitherT[Future, (PresentationError, Option[MessageType]), A] =
+      value.asPresentation.leftMap(
+        x => (x, messageTypeMaybe)
+      )
+  }
+}
 
 class MessagesController @Inject() (
   cc: ControllerComponents,
@@ -76,7 +91,7 @@ class MessagesController @Inject() (
     with SdesResponseParser
     with Logging {
 
-  def outgoing(eori: EoriNumber, movementType: MovementType, movementId: MovementId, messageId: MessageId) =
+  def outgoing(eori: EoriNumber, movementType: MovementType, movementId: MovementId, messageId: MessageId): Action[Source[ByteString, _]] =
     contentTypeRoute {
       case Some(_) => outgoingSmallMessage(eori, movementType, movementId, messageId)
       case None    => outgoingLargeMessage(eori, movementType, movementId, messageId)
@@ -120,13 +135,18 @@ class MessagesController @Inject() (
   def incoming(ids: ConversationId): Action[Source[ByteString, _]] =
     authenticateEISToken.stream(transformer = eisMessageTransformers.unwrap) {
       implicit request =>
+        import MessagesController.PresentationEitherTHelper
+
         implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
-        val (movementId, messageId)    = ids.toMovementAndMessageId
+        val (movementId, triggerId)    = ids.toMovementAndMessageId
 
         (for {
-          messageType         <- messageTypeExtractor.extract(request.headers, request.body).asPresentation
-          persistenceResponse <- persistenceConnector.postBody(movementId, messageId, messageType, request.body).asPresentation
+          messageType <- messageTypeExtractor.extract(request.headers, request.body).asPresentationWithMessageType(None)
+          persistenceResponse <- persistenceConnector
+            .postBody(movementId, triggerId, messageType, request.body)
+            .asPresentationWithMessageType(Some(messageType))
           _ = pushNotificationsConnector.postXML(movementId, persistenceResponse.messageId, request.body).asPresentation
+          _ = logIncomingSuccess(movementId, triggerId, persistenceResponse.messageId, messageType)
         } yield persistenceResponse)
           .fold[Result](
             {
@@ -134,19 +154,17 @@ class MessagesController @Inject() (
                 if (config.logIncoming) {
                   logger.error(s"""Unable to process message from EIS -- bad request:
                        |
-                       |Request ID: ${request.headers.get(HeaderNames.xRequestId).getOrElse("unavailable")}
-                       |Correlation ID: ${request.headers.get(RouterHeaderNames.CORRELATION_ID).getOrElse("unavailable")}
-                       |Conversation ID: ${request.headers.get(RouterHeaderNames.CONVERSATION_ID).getOrElse("unavailable")}
+                       |${generateRequestLog(movementId, triggerId, error._2)}
                        |
-                       |error is ${Json.toJson(error)}""".stripMargin)
+                       |error is ${Json.toJson(error._1)}""".stripMargin)
                 }
-                Status(error.code.statusCode)(Json.toJson(error))
+                Status(error._1.code.statusCode)(Json.toJson(error._1))
             },
             response => Created.withHeaders("X-Message-Id" -> response.messageId.value)
           )
     }
 
-  def incomingLargeMessage(movementId: MovementId, messageId: MessageId) = Action.async(cc.parsers.json) {
+  def incomingLargeMessage(movementId: MovementId, messageId: MessageId): Action[JsValue] = Action.async(cc.parsers.json) {
     implicit request =>
       implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
       (for {
@@ -203,7 +221,7 @@ class MessagesController @Inject() (
         )
     } yield persistenceResponse
 
-  def handleSdesResponse() =
+  def handleSdesResponse(): Action[JsValue] =
     Action.async(parse.json) {
       implicit request =>
         implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
@@ -249,4 +267,23 @@ class MessagesController @Inject() (
         }
     }
 
+  // Logging methods
+
+  private def generateRequestLog(movementId: MovementId, triggerId: MessageId, messageType: Option[MessageType])(implicit request: Request[_]): String =
+    s"""Message Type: ${messageType.map(_.code).getOrElse("unknown")}
+       |Movement ID: ${movementId.value}
+       |Trigger ID: ${triggerId.value}
+       |Request ID: ${request.headers.get(HeaderNames.xRequestId).getOrElse("unavailable")}
+       |Correlation ID: ${request.headers.get(RouterHeaderNames.CORRELATION_ID).getOrElse("unavailable")}
+       |Conversation ID: ${request.headers.get(RouterHeaderNames.CONVERSATION_ID).getOrElse("unavailable")}""".stripMargin
+
+  private def logIncomingSuccess(movementId: MovementId, triggerId: MessageId, newMessageId: MessageId, messageType: MessageType)(implicit
+    request: Request[_]
+  ): Unit =
+    if (config.logIncoming) {
+      logger.info(s"""Received message from EIS
+           |
+           |${generateRequestLog(movementId, triggerId, Some(messageType))}
+           |New Message ID: ${newMessageId.value}""".stripMargin)
+    }
 }
