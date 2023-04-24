@@ -53,12 +53,20 @@ trait TestModelGenerators extends BaseGenerators {
 
   implicit lazy val arbitraryMovementId: Arbitrary[MovementId] =
     Arbitrary {
-      Gen.listOfN(16, Gen.hexChar).map(_.mkString).map(MovementId)
+      Gen.listOfN(16, Gen.hexChar).map(_.mkString.toLowerCase).map(MovementId)
     }
 
   implicit lazy val arbitraryMessageId: Arbitrary[MessageId] =
     Arbitrary {
-      Gen.listOfN(16, Gen.hexChar).map(_.mkString).map(MessageId)
+      Gen.listOfN(16, Gen.hexChar).map(_.mkString.toLowerCase).map(MessageId)
+    }
+
+  implicit lazy val arbitraryConversationId: Arbitrary[ConversationId] =
+    Arbitrary {
+      for {
+        movementId <- arbitraryMovementId.arbitrary
+        messageId  <- arbitraryMessageId.arbitrary
+      } yield ConversationId(movementId, messageId)
     }
 
   implicit lazy val arbitraryMessageType: Arbitrary[MessageType] =

@@ -381,7 +381,7 @@ class MessagesControllerIntegrationSpec
 
           running(newApp) {
             val sut    = newApp.injector.instanceOf[MessagesController]
-            val result = sut.incoming(conversationId)(eisRequest)
+            val result = sut.incomingViaEIS(conversationId)(eisRequest)
 
             Helpers.status(result) mustBe CREATED
           }
@@ -406,7 +406,7 @@ class MessagesControllerIntegrationSpec
 
       running(newApp) {
         val sut    = newApp.injector.instanceOf[MessagesController]
-        val result = sut.incoming(conversationId)(eisRequest)
+        val result = sut.incomingViaEIS(conversationId)(eisRequest)
 
         Helpers.status(result) mustBe BAD_REQUEST
       }
@@ -430,7 +430,7 @@ class MessagesControllerIntegrationSpec
 
         running(app) {
           val sut    = app.injector.instanceOf[MessagesController]
-          val result = sut.incoming(conversationId)(eisRequest)
+          val result = sut.incomingViaEIS(conversationId)(eisRequest)
 
           Helpers.status(result) mustBe UNAUTHORIZED
         }

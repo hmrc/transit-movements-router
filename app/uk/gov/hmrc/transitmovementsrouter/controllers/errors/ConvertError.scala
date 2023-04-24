@@ -28,6 +28,7 @@ import uk.gov.hmrc.transitmovementsrouter.models.errors.CustomOfficeExtractorErr
 import uk.gov.hmrc.transitmovementsrouter.models.errors.CustomOfficeExtractorError.UnrecognisedOffice
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError._
+import uk.gov.hmrc.transitmovementsrouter.services.error.UpscanError
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
@@ -111,6 +112,16 @@ trait ConvertError {
 
     def convert(error: SDESError): PresentationError = error match {
       case UnexpectedError(thr) => PresentationError.internalServiceError(cause = thr)
+    }
+  }
+
+  implicit val upscanErrorConverter = new Converter[UpscanError] {
+
+    import uk.gov.hmrc.transitmovementsrouter.services.error.UpscanError._
+
+    def convert(error: UpscanError): PresentationError = error match {
+      case NotFound        => PresentationError.notFoundError("Upscan returned a not found error for the provided URL")
+      case Unexpected(thr) => PresentationError.internalServiceError(cause = thr)
     }
   }
 

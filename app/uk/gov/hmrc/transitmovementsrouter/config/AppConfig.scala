@@ -48,6 +48,7 @@ class AppConfig @Inject() (config: Configuration, servicesConfig: CTCServicesCon
     config.get[String]("microservice.services.object-store.sdes-host")
 
   lazy val logBodyOnEIS500: Boolean = config.get[Boolean]("microservice.services.eis.log-body-on-500")
+  lazy val eisSizeLimit: Long       = config.underlying.getMemorySize("microservice.services.eis.message-size-limit").toBytes
   lazy val logIncoming: Boolean     = config.get[Boolean]("log-incoming-errors")
 
   // SDES configuration

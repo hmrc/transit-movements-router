@@ -17,11 +17,13 @@
 package uk.gov.hmrc.transitmovementsrouter.services
 
 import akka.NotUsed
+import akka.stream.Materializer
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import cats.data.EitherT
 import com.google.inject.ImplementedBy
 import play.api.Logging
+import play.mvc.Http.MimeTypes
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.objectstore.client.ObjectSummaryWithMd5
 import uk.gov.hmrc.objectstore.client.Path
@@ -57,6 +59,11 @@ trait ObjectStoreService {
     ec: ExecutionContext
   ): EitherT[Future, ObjectStoreError, ObjectSummaryWithMd5]
 
+  def storeOutgoing(conversationId: ConversationId, stream: Source[ByteString, _])(implicit
+    hc: HeaderCarrier,
+    ec: ExecutionContext
+  ): EitherT[Future, ObjectStoreError, ObjectSummaryWithMd5]
+
   def storeOutgoing(objectStoreResourceLocation: ObjectStoreResourceLocation)(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
@@ -70,7 +77,9 @@ trait ObjectStoreService {
 }
 
 @Singleton
-class ObjectStoreServiceImpl @Inject() (clock: Clock, appConfig: AppConfig, client: PlayObjectStoreClientEither) extends ObjectStoreService with Logging {
+class ObjectStoreServiceImpl @Inject() (clock: Clock, appConfig: AppConfig, client: PlayObjectStoreClientEither)(implicit mat: Materializer)
+    extends ObjectStoreService
+    with Logging {
   private val dateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").withZone(ZoneOffset.UTC)
 
   override def storeIncoming(upscanUrl: DownloadUrl, movementId: MovementId, messageId: MessageId)(implicit
@@ -79,7 +88,7 @@ class ObjectStoreServiceImpl @Inject() (clock: Clock, appConfig: AppConfig, clie
   ): EitherT[Future, ObjectStoreError, ObjectSummaryWithMd5] =
     addMessage(
       upscanUrl,
-      Path.File(s"movements/${movementId.value}/${movementId.value}-${messageId.value}-${fileFormat(clock)}.xml"),
+      Path.File(s"movements/${movementId.value}/${movementId.value}-${messageId.value}-$dateFormat.xml"),
       ObjectStoreOwner("common-transit-convention-traders"),
       RetentionPeriod.SevenYears
     )
@@ -94,6 +103,23 @@ class ObjectStoreServiceImpl @Inject() (clock: Clock, appConfig: AppConfig, clie
       ObjectStoreOwner("transit-movements-router"),
       RetentionPeriod.OneWeek
     )
+
+  override def storeOutgoing(conversationId: ConversationId, stream: Source[ByteString, _])(implicit
+    hc: HeaderCarrier,
+    ec: ExecutionContext
+  ): EitherT[Future, ObjectStoreError, ObjectSummaryWithMd5] =
+    EitherT {
+      client.putObject[Source[ByteString, _]](
+        Path.File(s"sdes/${conversationId.value.toString}-$dateFormat.xml"),
+        stream,
+        retentionPeriod = RetentionPeriod.OneWeek,
+        contentType = Some(MimeTypes.XML),
+        owner = "transit-movements-router",
+        contentMd5 = None
+      )
+    }.leftMap {
+      case NonFatal(thr) => ObjectStoreError.UnexpectedError(thr = Some(thr))
+    }
 
   private def addMessage(
     upscanUrl: DownloadUrl,
@@ -143,6 +169,6 @@ class ObjectStoreServiceImpl @Inject() (clock: Clock, appConfig: AppConfig, clie
         }
     )
 
-  private def fileFormat(clock: Clock) =
+  private def dateFormat =
     dateTimeFormatter.format(OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC))
 }

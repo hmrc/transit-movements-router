@@ -2,8 +2,8 @@
 
 POST        /traders/:eori/movements/:movementType/:movementId/messages/:messageId             uk.gov.hmrc.transitmovementsrouter.controllers.MessagesController.outgoing(eori: EoriNumber, movementType: MovementType, movementId: MovementId, messageId: MessageId)
 
-POST        /movements/:movementId/messages/:messageId                                         uk.gov.hmrc.transitmovementsrouter.controllers.MessagesController.incomingLargeMessage(movementId: MovementId, messageId: MessageId)
+POST        /movements/:movementId/messages/:messageId                                         uk.gov.hmrc.transitmovementsrouter.controllers.MessagesController.incomingViaUpscan(movementId: MovementId, messageId: MessageId)
 
-POST        /movements/:ids/messages                                                           uk.gov.hmrc.transitmovementsrouter.controllers.MessagesController.incoming(ids: ConversationId)
+POST        /movements/:ids/messages                                                           uk.gov.hmrc.transitmovementsrouter.controllers.MessagesController.incomingViaEIS(ids: ConversationId)
 
 POST        /sdes/callback                                                          uk.gov.hmrc.transitmovementsrouter.controllers.MessagesController.handleSdesResponse()

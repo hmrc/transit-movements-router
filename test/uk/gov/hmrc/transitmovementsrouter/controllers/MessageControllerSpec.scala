@@ -57,6 +57,7 @@ import uk.gov.hmrc.transitmovementsrouter.base.TestActorSystem
 import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
 import uk.gov.hmrc.transitmovementsrouter.connectors.PersistenceConnector
 import uk.gov.hmrc.transitmovementsrouter.connectors.PushNotificationsConnector
+import uk.gov.hmrc.transitmovementsrouter.connectors.UpscanConnector
 import uk.gov.hmrc.transitmovementsrouter.controllers.actions.AuthenticateEISToken
 import uk.gov.hmrc.transitmovementsrouter.controllers.errors.PresentationError
 import uk.gov.hmrc.transitmovementsrouter.fakes.actions.FakeXmlTransformer
@@ -115,6 +116,7 @@ class MessageControllerSpec
   val mockCustomOfficeExtractorService = mock[CustomOfficeExtractorService]
   val mockSDESService                  = mock[SDESService]
   val mockSdesResponseParser           = mock[SdesResponseParser]
+  val mockUpscanConnector              = mock[UpscanConnector]
 
   implicit val temporaryFileCreator = SingletonTemporaryFileCreator
 
@@ -132,6 +134,7 @@ class MessageControllerSpec
   val mockMessageTypeExtractor: MessageTypeExtractor = mock[MessageTypeExtractor]
   val config: AppConfig                              = mock[AppConfig]
   when(config.logIncoming).thenReturn(true)
+  when(config.eisSizeLimit).thenReturn(5000000) // 5MB, TODO: we'll need to vary this per test
 
   def controller(eisMessageTransformer: EISMessageTransformers = new FakeXmlTransformer(trimmedXml)) =
     new MessagesController(
@@ -143,6 +146,7 @@ class MessageControllerSpec
       FakeAuthenticateEISToken,
       eisMessageTransformer,
       mockObjectStoreService,
+      mockUpscanConnector,
       mockCustomOfficeExtractorService,
       mockSDESService,
       config
@@ -151,8 +155,8 @@ class MessageControllerSpec
   def source = createStream(cc015cOfficeOfDepartureGB)
 
   val outgoing             = routes.MessagesController.outgoing(eori, movementType, movementId, messageId).url
-  val incoming             = routes.MessagesController.incoming(ConversationId(movementId, messageId)).url
-  val incomingLargeMessage = routes.MessagesController.incomingLargeMessage(movementId, messageId).url
+  val incoming             = routes.MessagesController.incomingViaEIS(ConversationId(movementId, messageId)).url
+  val incomingLargeMessage = routes.MessagesController.incomingViaUpscan(movementId, messageId).url
   val sdesCallback         = routes.MessagesController.handleSdesResponse().url
 
   def fakeRequest[A](
@@ -186,6 +190,7 @@ class MessageControllerSpec
     reset(mockCustomOfficeExtractorService)
     reset(mockSDESService)
     reset(mockPushNotificationsConnector)
+    reset(mockUpscanConnector)
     super.afterEach()
   }
 
@@ -765,7 +770,7 @@ class MessageControllerSpec
       val request = fakeRequest(incomingXml, incoming)
         .withHeaders(FakeHeaders().add("X-Message-Type" -> RequestOfRelease.code))
 
-      val result = controller().incoming(ConversationId(movementId, messageId))(request)
+      val result = controller().incomingViaEIS(ConversationId(movementId, messageId))(request)
 
       status(result) mustBe CREATED
       header("X-Message-Id", result) mustBe Some("1")
@@ -774,7 +779,7 @@ class MessageControllerSpec
     "must return BAD_REQUEST when the X-Message-Type header is missing or body seems to not contain an appropriate root tag" in {
 
       when(mockMessageTypeExtractor.extract(any(), any())).thenReturn(EitherT.leftT[Future, MessageType](MessageTypeExtractionError.UnableToExtractFromBody))
-      val result = controller().incoming(ConversationId(movementId, messageId))(fakeRequest(incomingXml, incoming))
+      val result = controller().incomingViaEIS(ConversationId(movementId, messageId))(fakeRequest(incomingXml, incoming))
 
       status(result) mustBe BAD_REQUEST
 
@@ -787,7 +792,7 @@ class MessageControllerSpec
       when(mockMessageTypeExtractor.extract(any(), any()))
         .thenReturn(EitherT.leftT[Future, MessageType](MessageTypeExtractionError.InvalidMessageType("abcde")))
 
-      val result = controller().incoming(ConversationId(movementId, messageId))(request)
+      val result = controller().incomingViaEIS(ConversationId(movementId, messageId))(request)
 
       status(result) mustBe BAD_REQUEST
     }
@@ -801,7 +806,7 @@ class MessageControllerSpec
       val request = fakeRequest(incomingXml, incoming)
         .withHeaders(FakeHeaders().add("X-Message-Type" -> RequestOfRelease.code))
 
-      val result = controller().incoming(ConversationId(movementId, messageId))(request)
+      val result = controller().incomingViaEIS(ConversationId(movementId, messageId))(request)
 
       status(result) mustBe NOT_FOUND
     }
@@ -815,7 +820,7 @@ class MessageControllerSpec
       val request = fakeRequest(incomingXml, incoming)
         .withHeaders(FakeHeaders().add("X-Message-Type" -> RequestOfRelease.code))
 
-      val result = controller().incoming(ConversationId(movementId, messageId))(request)
+      val result = controller().incomingViaEIS(ConversationId(movementId, messageId))(request)
 
       status(result) mustBe INTERNAL_SERVER_ERROR
     }
@@ -870,7 +875,7 @@ class MessageControllerSpec
 
         val request = fakeRequestLargeMessage(Json.toJson(successUpscanResponse), incomingLargeMessage)
 
-        val result = controller().incomingLargeMessage(movementId, messageId)(request)
+        val result = controller().incomingViaUpscan(movementId, messageId)(request)
 
         status(result) mustBe CREATED
         header("X-Message-Id", result) mustBe Some(messageId.value)
@@ -913,7 +918,7 @@ class MessageControllerSpec
         ).thenReturn(EitherT.fromEither(Left(MovementNotFound(MovementId("ABC")))))
 
         val request = fakeRequestLargeMessage(Json.toJson(successUpscanResponse), incomingLargeMessage)
-        val result  = controller().incomingLargeMessage(movementId, messageId)(request)
+        val result  = controller().incomingViaUpscan(movementId, messageId)(request)
 
         status(result) mustBe NOT_FOUND
     }
@@ -931,7 +936,7 @@ class MessageControllerSpec
         ).thenReturn(EitherT.fromEither(Left(PresentationError.badRequestError("Unexpected Upscan callback response"))))
 
         val request = fakeRequestLargeMessage(Json.obj("reference" -> "abc"), incomingLargeMessage)
-        val result  = controller().incomingLargeMessage(movementId, messageId)(request)
+        val result  = controller().incomingViaUpscan(movementId, messageId)(request)
 
         status(result) mustBe BAD_REQUEST
     }
@@ -955,7 +960,7 @@ class MessageControllerSpec
 
         val request = fakeRequestLargeMessage(Json.toJson(successUpscanResponse), incomingLargeMessage)
 
-        val result = controller().incomingLargeMessage(movementId, messageId)(request)
+        val result = controller().incomingViaUpscan(movementId, messageId)(request)
 
         status(result) mustBe INTERNAL_SERVER_ERROR
     }
@@ -988,7 +993,7 @@ class MessageControllerSpec
         when(mockMessageTypeExtractor.extractFromBody(any())).thenReturn(EitherT.leftT[Future, MessageType](MessageTypeExtractionError.UnableToExtractFromBody))
 
         val request = fakeRequestLargeMessage(Json.toJson(successUpscanResponse), incomingLargeMessage)
-        val result  = controller().incomingLargeMessage(movementId, messageId)(request)
+        val result  = controller().incomingViaUpscan(movementId, messageId)(request)
 
         status(result) mustBe BAD_REQUEST
     }
@@ -1022,7 +1027,7 @@ class MessageControllerSpec
           .thenReturn(EitherT.leftT[Future, MessageType](MessageTypeExtractionError.InvalidMessageType("abcde")))
 
         val request = fakeRequestLargeMessage(Json.toJson(successUpscanResponse), incomingLargeMessage)
-        val result  = controller().incomingLargeMessage(movementId, messageId)(request)
+        val result  = controller().incomingViaUpscan(movementId, messageId)(request)
 
         status(result) mustBe BAD_REQUEST
     }
@@ -1053,7 +1058,7 @@ class MessageControllerSpec
           .thenReturn(EitherT.leftT(ObjectStoreError.FileNotFound(objectStoreResourceLocation.contextPath)))
 
         val request = fakeRequestLargeMessage(Json.toJson(successUpscanResponse), incomingLargeMessage)
-        val result  = controller().incomingLargeMessage(movementId, messageId)(request)
+        val result  = controller().incomingViaUpscan(movementId, messageId)(request)
 
         status(result) mustBe BAD_REQUEST
         contentAsJson(result) mustBe Json.obj(
@@ -1100,7 +1105,7 @@ class MessageControllerSpec
           .thenReturn(EitherT.fromEither(Left(Unexpected(None))))
 
         val request = fakeRequestLargeMessage(Json.toJson(successUpscanResponse), incomingLargeMessage)
-        val result  = controller().incomingLargeMessage(movementId, messageId)(request)
+        val result  = controller().incomingViaUpscan(movementId, messageId)(request)
 
         status(result) mustBe INTERNAL_SERVER_ERROR
     }
