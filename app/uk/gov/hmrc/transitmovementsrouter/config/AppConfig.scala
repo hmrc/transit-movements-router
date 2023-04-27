@@ -17,11 +17,12 @@
 package uk.gov.hmrc.transitmovementsrouter.config
 
 import io.lemonlabs.uri.Url
+import io.lemonlabs.uri.UrlPath
+import play.api.Configuration
+import uk.gov.hmrc.http.HeaderCarrier
 
 import javax.inject.Inject
 import javax.inject.Singleton
-import play.api.Configuration
-import uk.gov.hmrc.http.HeaderCarrier
 
 @Singleton
 class AppConfig @Inject() (config: Configuration, servicesConfig: CTCServicesConfig) {
@@ -46,4 +47,20 @@ class AppConfig @Inject() (config: Configuration, servicesConfig: CTCServicesCon
   lazy val objectStoreUrl: String =
     config.get[String]("microservice.services.object-store.sdes-host")
 
+  lazy val logBodyOnEIS500: Boolean = config.get[Boolean]("microservice.services.eis.log-body-on-500")
+  lazy val logIncoming: Boolean     = config.get[Boolean]("log-incoming-errors")
+
+  // SDES configuration
+  lazy val sdesServiceBaseUrl          = Url.parse(servicesConfig.baseUrl("secure-data-exchange-proxy"))
+  lazy val sdesInformationType: String = config.get[String]("sdes.information-type")
+  lazy val sdesSrn: String             = config.get[String]("sdes.srn")
+  lazy val sdesClientId: String        = config.get[String]("sdes.client-id")
+
+  lazy val sdesFileReadyUri: UrlPath =
+    UrlPath(
+      config
+        .get[String]("microservice.services.secure-data-exchange-proxy.file-ready-uri")
+        .split("/")
+        .filter(_.nonEmpty)
+    )
 }

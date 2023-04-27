@@ -14,17 +14,17 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovementsrouter.models.responses
+package uk.gov.hmrc.transitmovementsrouter.models.sdes
 
+import play.api.libs.json.Format
 import play.api.libs.json.Json
 
-import java.time.OffsetDateTime
+final case class SdesFilereadyRequest(
+  informationType: String,
+  file: SdesFile,
+  audit: SdesAudit
+)
 
-case class EISResponse(message: String, timestamp: OffsetDateTime, path: String) {
-  def invalidAccessCode = message == "Not Valid Access Code for this operation"
-  def invalidGRN        = message.contains("Guarantee not found for GRN")
-}
-
-object EISResponse {
-  implicit val format = Json.format[EISResponse]
+object SdesFilereadyRequest {
+  implicit lazy val format: Format[SdesFilereadyRequest] = Json.format
 }

@@ -14,17 +14,20 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovementsrouter.models.responses
+package uk.gov.hmrc.transitmovementsrouter.models
 
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
+import play.api.libs.json.JsString
 import play.api.libs.json.Json
 
-import java.time.OffsetDateTime
+class MessageStatusSpec extends AnyFlatSpec with Matchers {
 
-case class EISResponse(message: String, timestamp: OffsetDateTime, path: String) {
-  def invalidAccessCode = message == "Not Valid Access Code for this operation"
-  def invalidGRN        = message.contains("Guarantee not found for GRN")
-}
+  "MessageStatus" should "serialise correctly" in {
+    Json.toJson[MessageStatus](MessageStatus.Processing) should be(JsString("Processing"))
+  }
 
-object EISResponse {
-  implicit val format = Json.format[EISResponse]
+  "MessageStatus" should "deserialize correctly" in {
+    JsString("Processing").validate[MessageStatus].get should be(MessageStatus.Processing)
+  }
 }

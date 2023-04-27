@@ -23,6 +23,7 @@ import com.google.inject.Singleton
 import uk.gov.hmrc.http.client.HttpClientV2
 import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
 
+import java.time.Clock
 import scala.concurrent.ExecutionContext
 
 @ImplementedBy(classOf[EISConnectorProviderImpl])
@@ -37,11 +38,15 @@ trait EISConnectorProvider {
 class EISConnectorProviderImpl @Inject() (
   appConfig: AppConfig,
   retries: Retries,
-  httpClientV2: HttpClientV2
+  httpClientV2: HttpClientV2,
+  clock: Clock
 )(implicit ec: ExecutionContext, mat: Materializer)
     extends EISConnectorProvider {
 
-  lazy val gb: EISConnector = new EISConnectorImpl("GB", appConfig.eisGb, appConfig.headerCarrierConfig, httpClientV2, retries)
-  lazy val xi: EISConnector = new EISConnectorImpl("XI", appConfig.eisXi, appConfig.headerCarrierConfig, httpClientV2, retries)
+  lazy val gb: EISConnector =
+    new EISConnectorImpl("GB", appConfig.eisGb, appConfig.headerCarrierConfig, httpClientV2, retries, clock, appConfig.logBodyOnEIS500)
+
+  lazy val xi: EISConnector =
+    new EISConnectorImpl("XI", appConfig.eisXi, appConfig.headerCarrierConfig, httpClientV2, retries, clock, appConfig.logBodyOnEIS500)
 
 }

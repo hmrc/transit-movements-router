@@ -43,8 +43,10 @@ import uk.gov.hmrc.transitmovementsrouter.generators.ModelGenerators
 import uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuite
 import uk.gov.hmrc.transitmovementsrouter.models.MessageType.DeclarationAmendment
 import uk.gov.hmrc.transitmovementsrouter.models._
+import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.MessageNotFound
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.MovementNotFound
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.Unexpected
+import uk.gov.hmrc.transitmovementsrouter.models.requests.MessageUpdate
 import uk.gov.hmrc.transitmovementsrouter.services.EISMessageTransformersImpl
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -67,6 +69,10 @@ class PersistenceConnectorSpec
   val uriPersistence = Url(
     path = s"/transit-movements/traders/movements/${movementId.value}/messages",
     query = QueryString.fromPairs("triggerId" -> messageId.value)
+  ).toStringRaw
+
+  val uriStatus = Url(
+    path = s"/transit-movements/traders/movements/${movementId.value}/messages/${messageId.value}"
   ).toStringRaw
 
   val appConfig = mock[AppConfig]
@@ -109,6 +115,24 @@ class PersistenceConnectorSpec
       .willReturn(
         if (body.isEmpty) aResponse().withStatus(codeToReturn)
         else aResponse().withStatus(codeToReturn).withBody(body.get)
+      )
+  )
+
+  def stubForPatchMessageStatus(codeToReturn: Int) = server.stubFor(
+    patch(
+      urlEqualTo(uriStatus)
+    ).withHeader(HeaderNames.CONTENT_TYPE, equalTo(MimeTypes.JSON))
+      .withRequestBody(
+        equalToJson(
+          Json
+            .obj(
+              "status" -> MessageStatus.Success.toString
+            )
+            .toString()
+        )
+      )
+      .willReturn(
+        aResponse().withStatus(codeToReturn)
       )
   )
 
@@ -204,5 +228,35 @@ class PersistenceConnectorSpec
       }
     }
 
+  }
+
+  "patch for update message status" should {
+    "return 200 when it is successful" in {
+
+      stubForPatchMessageStatus(OK)
+
+      whenReady(connector.patchMessageStatus(movementId, messageId, MessageUpdate(MessageStatus.Success)).value) {
+        x =>
+          x.isRight mustBe true
+          x mustBe Right(())
+      }
+    }
+
+    "return a PersistenceError when unsuccessful" in forAll(errorCodes) {
+      statusCode =>
+        server.resetAll()
+
+        stubForPatchMessageStatus(statusCode)
+
+        whenReady(connector.patchMessageStatus(movementId, messageId, MessageUpdate(MessageStatus.Success)).value) {
+          case Left(error) =>
+            statusCode match {
+              case BAD_REQUEST           => error mustBe a[Unexpected]
+              case NOT_FOUND             => error mustBe a[MessageNotFound]
+              case INTERNAL_SERVER_ERROR => error mustBe a[Unexpected]
+            }
+          case Right(_) => fail("An error was expected")
+        }
+    }
   }
 }

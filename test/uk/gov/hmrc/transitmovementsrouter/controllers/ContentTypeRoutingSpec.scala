@@ -20,9 +20,11 @@ import akka.NotUsed
 import akka.stream.Materializer
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
+import org.mockito.Mockito.when
 import org.scalatest.OptionValues
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
+import org.scalatestplus.mockito.MockitoSugar.mock
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 import play.api.Logging
 import play.api.http.HeaderNames
@@ -37,6 +39,7 @@ import play.api.test.Helpers.stubControllerComponents
 import uk.gov.hmrc.http.HttpVerbs.POST
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
 import uk.gov.hmrc.transitmovementsrouter.base.TestActorSystem
+import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
 import uk.gov.hmrc.transitmovementsrouter.controllers.stream.StreamingParsers
 
 import java.nio.charset.StandardCharsets
@@ -70,6 +73,8 @@ class ContentTypeRoutingSpec
       _ => Future.successful(Ok("Two"))
     }
 
+    override val config: AppConfig = mock[AppConfig]
+    when(config.logIncoming).thenReturn(false)
   }
 
   private def generateSource(string: String): Source[ByteString, NotUsed] =

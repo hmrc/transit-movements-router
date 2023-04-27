@@ -26,6 +26,7 @@ import org.scalatestplus.mockito.MockitoSugar
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 import uk.gov.hmrc.http.UpstreamErrorResponse
 import uk.gov.hmrc.transitmovementsrouter.models.CustomsOffice
+import uk.gov.hmrc.transitmovementsrouter.models.MessageId
 import uk.gov.hmrc.transitmovementsrouter.models.MovementId
 import uk.gov.hmrc.transitmovementsrouter.models.errors.CustomOfficeExtractorError.NoElementFound
 import uk.gov.hmrc.transitmovementsrouter.models.errors.CustomOfficeExtractorError.TooManyElementsFound
@@ -41,6 +42,7 @@ import uk.gov.hmrc.transitmovementsrouter.models.errors.MessageTypeExtractionErr
 import uk.gov.hmrc.transitmovementsrouter.models.errors.ObjectStoreError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PushNotificationError
+import uk.gov.hmrc.transitmovementsrouter.models.errors.SDESError
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError._
 
@@ -148,6 +150,13 @@ class ConvertErrorSpec extends AnyFreeSpec with Matchers with OptionValues with 
         _ mustBe Left(StandardError("Movement 345 not found", NotFound))
       }
     }
+
+    "for a failure - handle MessageNotFound error" in {
+      val input = Left[PersistenceError, Unit](PersistenceError.MessageNotFound(MovementId("345"), MessageId("123"))).toEitherT[Future]
+      whenReady(input.asPresentation.value) {
+        _ mustBe Left(StandardError("Message with ID 123 for movement 345 was not found", NotFound))
+      }
+    }
   }
 
   "PushNotificationError error" - {
@@ -208,6 +217,25 @@ class ConvertErrorSpec extends AnyFreeSpec with Matchers with OptionValues with 
 
     "an UnexpectedError Error with no exception returns an internal service error with no exception" in {
       val input = Left[ObjectStoreError, Unit](ObjectStoreError.UnexpectedError(None)).toEitherT[Future]
+      whenReady(input.asPresentation.value) {
+        _ mustBe Left(InternalServiceError("Internal server error", InternalServerError, None))
+
+      }
+    }
+  }
+
+  "SDESError" - {
+
+    "an UnexpectedError Error with exception returns an internal service error with an exception" in {
+      val exception = new IllegalStateException()
+      val input     = Left[SDESError, Unit](SDESError.UnexpectedError(Some(exception))).toEitherT[Future]
+      whenReady(input.asPresentation.value) {
+        _ mustBe Left(InternalServiceError("Internal server error", InternalServerError, Some(exception)))
+      }
+    }
+
+    "an UnexpectedError Error with no exception returns an internal service error with no exception" in {
+      val input = Left[SDESError, Unit](SDESError.UnexpectedError(None)).toEitherT[Future]
       whenReady(input.asPresentation.value) {
         _ mustBe Left(InternalServiceError("Internal server error", InternalServerError, None))
 

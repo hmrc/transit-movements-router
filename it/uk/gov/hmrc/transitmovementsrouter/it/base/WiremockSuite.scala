@@ -64,13 +64,14 @@ trait WiremockSuiteWithGuice extends WiremockSuite {
   protected def appBuilder: GuiceApplicationBuilder =
     new GuiceApplicationBuilder()
       .configure(
-        "microservice.services.eis.gb.port"          -> server.port().toString,
-        "microservice.services.eis.xi.port"          -> server.port().toString,
-        "microservice.services.ncts-monitoring.port" -> server.port().toString
+        "microservice.services.eis.gb.port"                     -> server.port().toString,
+        "microservice.services.eis.xi.port"                     -> server.port().toString,
+        "microservice.services.ncts-monitoring.port"            -> server.port().toString,
+        "microservice.services.secure-data-exchange-proxy.port" -> server.port().toString
       )
       .overrides(bindings: _*)
 
-  protected lazy val injector: Injector = fakeApplication.injector
+  protected lazy val injector: Injector = fakeApplication().injector
 
   protected def bindings: Seq[GuiceableModule] = Seq(
     bind[Metrics].toInstance(new TestMetrics),
@@ -79,13 +80,13 @@ trait WiremockSuiteWithGuice extends WiremockSuite {
 
   override def beforeAll(): Unit = {
     server.start()
-    fakeApplication
+    fakeApplication()
     super.beforeAll()
   }
 
   override def beforeEach(): Unit = {
     server.resetAll()
-    fakeApplication
+    fakeApplication()
     super.beforeEach()
   }
 

@@ -19,8 +19,6 @@ package uk.gov.hmrc.transitmovementsrouter.connectors
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import com.github.tomakehurst.wiremock.client.WireMock._
-import com.github.tomakehurst.wiremock.matching.AnythingPattern
-import com.github.tomakehurst.wiremock.matching.StringValuePattern
 import com.github.tomakehurst.wiremock.stubbing.Scenario
 import org.mockito.ArgumentMatchers
 import org.mockito.Mockito.when
@@ -39,6 +37,7 @@ import play.api.test.Helpers._
 import retry.RetryPolicies
 import retry.RetryPolicy
 import uk.gov.hmrc.http.HeaderCarrier
+import uk.gov.hmrc.http.RequestId
 import uk.gov.hmrc.http.client.HttpClientV2
 import uk.gov.hmrc.http.test.HttpClientV2Support
 import uk.gov.hmrc.transitmovementsrouter.config.CircuitBreakerConfig
@@ -56,8 +55,12 @@ import uk.gov.hmrc.transitmovementsrouter.models.MovementId
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
 
 import java.net.URL
-import scala.concurrent.ExecutionContext.Implicits.global
+import java.time.Clock
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
+import java.util.UUID
 import scala.concurrent.ExecutionContext
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 class EISConnectorSpec
@@ -72,8 +75,6 @@ class EISConnectorSpec
     with TableDrivenPropertyChecks
     with TestActorSystem
     with ModelGenerators {
-
-  lazy val anything: StringValuePattern = new AnythingPattern()
 
   private object NoRetries extends Retries {
 
@@ -101,23 +102,25 @@ class EISConnectorSpec
     Headers("bearertokenhereGB"),
     CircuitBreakerConfig(
       3,
-      2.seconds,
-      2.seconds,
-      3.seconds,
+      5.seconds,
+      5.seconds,
+      10.seconds,
       1,
       0
     ),
     RetryConfig(
       1,
       1.second,
-      2.seconds
+      5.seconds
     ),
-    true
+    false
   )
 
+  private val clock = Clock.fixed(OffsetDateTime.of(2023, 4, 13, 10, 34, 41, 500, ZoneOffset.UTC).toInstant, ZoneOffset.UTC)
+
   // We construct the connector each time to avoid issues with the circuit breaker
-  def noRetriesConnector = new EISConnectorImpl("NoRetry", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, NoRetries)
-  def oneRetryConnector  = new EISConnectorImpl("OneRetry", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, OneRetry)
+  def noRetriesConnector = new EISConnectorImpl("NoRetry", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, NoRetries, clock, true)
+  def oneRetryConnector  = new EISConnectorImpl("OneRetry", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, OneRetry, clock, true)
 
   lazy val connectorGen: Gen[() => EISConnector] = Gen.oneOf(() => noRetriesConnector, () => oneRetryConnector)
 
@@ -125,7 +128,7 @@ class EISConnectorSpec
 
   "post" should {
 
-    "add CustomProcessHost, X-Correlation-Id and X-Conversation-Id and Date headers to messages for GB" in forAll(
+    "add X-Correlation-Id and X-Conversation-Id and Date headers to messages for GB" in forAll(
       connectorGen,
       arbitrary[MovementId],
       arbitrary[MessageId]
@@ -143,6 +146,7 @@ class EISConnectorSpec
         // should be the code the determines if a result is successful.
 
         val expectedConversationId = ConversationId(movementId, messageId)
+        val requestId              = UUID.randomUUID().toString
 
         def stub(currentState: String, targetState: String, codeToReturn: Int) =
           server.stubFor(
@@ -151,10 +155,11 @@ class EISConnectorSpec
             )
               .inScenario("Standard Call")
               .whenScenarioStateIs(currentState)
-              .withHeader("Date", anything)
+              .withHeader(HeaderNames.AUTHORIZATION, equalTo("Bearer bearertokenhereGB"))
+              .withHeader("Date", equalTo("Thu, 13 Apr 2023 10:34:41 UTC"))
+              .withHeader("X-Request-Id", equalTo(requestId))
               .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
               .withHeader("X-Conversation-Id", equalTo(expectedConversationId.value.toString))
-              .withHeader("CustomProcessHost", equalTo("Digital"))
               .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
               .withHeader(HeaderNames.CONTENT_TYPE, equalTo("application/xml"))
               .willReturn(aResponse().withStatus(codeToReturn))
@@ -166,14 +171,18 @@ class EISConnectorSpec
         stub(Scenario.STARTED, secondState, OK)
         stub(secondState, secondState, INTERNAL_SERVER_ERROR)
 
-        val hc = HeaderCarrier()
+        // allows us to ensure the logs are correctly grabbing the request ID and message ID, by eye for the moment
+        val hc = HeaderCarrier(
+          requestId = Some(RequestId(requestId)),
+          extraHeaders = Seq("X-Message-Type" -> "IE015")
+        )
 
         whenReady(connector().post(movementId, messageId, source, hc)) {
           _.isRight mustBe true
         }
     }
 
-    "add CustomProcessHost, X-Correlation-Id and X-Conversation-Id headers, but retain the Date header, to messages for GB" in forAll(
+    "add X-Correlation-Id and X-Conversation-Id headers, but retain the Date header, to messages for GB" in forAll(
       connectorGen,
       arbitrary[MovementId],
       arbitrary[MessageId]
@@ -199,10 +208,9 @@ class EISConnectorSpec
             )
               .inScenario("Standard Call")
               .whenScenarioStateIs(currentState)
-              .withHeader("Date", anything)
+              .withHeader("Date", equalTo("Thu, 13 Apr 2023 10:34:41 UTC"))
               .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
               .withHeader("X-Conversation-Id", equalTo(expectedConversationId.value.toString))
-              .withHeader("CustomProcessHost", equalTo("Digital"))
               .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
               .withHeader(HeaderNames.CONTENT_TYPE, equalTo("application/xml"))
               .willReturn(aResponse().withStatus(codeToReturn))
@@ -232,7 +240,7 @@ class EISConnectorSpec
             post(
               urlEqualTo(uriStub)
             ).withHeader("Authorization", equalTo("Bearer bearertokenhereGB"))
-              .withHeader("Date", anything)
+              .withHeader("Date", equalTo("Thu, 13 Apr 2023 10:34:41 UTC"))
               .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
               .withHeader(HeaderNames.CONTENT_TYPE, equalTo("application/xml"))
               .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
@@ -267,7 +275,7 @@ class EISConnectorSpec
               .inScenario("Flaky Call")
               .whenScenarioStateIs(currentState)
               .willSetStateTo(targetState)
-              .withHeader("Date", anything)
+              .withHeader("Date", equalTo("Thu, 13 Apr 2023 10:34:41 UTC"))
               .withHeader("Authorization", equalTo("Bearer bearertokenhereGB"))
               .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
               .withHeader(HeaderNames.CONTENT_TYPE, equalTo("application/xml"))
@@ -309,7 +317,7 @@ class EISConnectorSpec
             urlEqualTo(uriStub)
           ).withHeader("Authorization", equalTo("Bearer bearertokenhereGB"))
             .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
-            .withHeader("Date", anything)
+            .withHeader("Date", equalTo("Thu, 13 Apr 2023 10:34:41 UTC"))
             .withHeader(HeaderNames.CONTENT_TYPE, equalTo("application/xml"))
             .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
             .withHeader("X-Conversation-Id", equalTo(expectedConversationId.value.toString))
@@ -321,8 +329,8 @@ class EISConnectorSpec
         whenReady(connector().post(movementId, messageId, source, hc)) {
           case Left(x) if x.isInstanceOf[RoutingError.Upstream] =>
             x.asInstanceOf[RoutingError.Upstream].upstreamErrorResponse.statusCode mustBe statusCode
-          case _ =>
-            fail("Left was not a RoutingError.Upstream")
+          case x =>
+            fail("Left was not a RoutingError.Upstream: " + x)
         }
     }
   }
@@ -332,7 +340,7 @@ class EISConnectorSpec
       val httpClientV2 = mock[HttpClientV2]
 
       val hc        = HeaderCarrier()
-      val connector = new EISConnectorImpl("Failure", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, NoRetries)
+      val connector = new EISConnectorImpl("Failure", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, NoRetries, clock, true)
 
       when(httpClientV2.post(ArgumentMatchers.any[URL])(ArgumentMatchers.any[HeaderCarrier])).thenReturn(new FakeRequestBuilder)
 

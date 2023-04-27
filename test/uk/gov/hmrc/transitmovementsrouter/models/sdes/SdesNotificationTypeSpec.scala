@@ -14,17 +14,21 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovementsrouter.models.responses
+package uk.gov.hmrc.transitmovementsrouter.models.sdes
 
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
+import play.api.libs.json.JsString
 import play.api.libs.json.Json
 
-import java.time.OffsetDateTime
+class SdesNotificationTypeSpec extends AnyFlatSpec with Matchers {
 
-case class EISResponse(message: String, timestamp: OffsetDateTime, path: String) {
-  def invalidAccessCode = message == "Not Valid Access Code for this operation"
-  def invalidGRN        = message.contains("Guarantee not found for GRN")
-}
+  "SdesNotificationType" should "serialise correctly" in {
+    Json.toJson[SdesNotificationType](SdesNotificationType.FileProcessed) should be(JsString("FileProcessed"))
+  }
 
-object EISResponse {
-  implicit val format = Json.format[EISResponse]
+  "SdesNotificationType" should "deserialize correctly" in {
+    JsString("FileProcessingFailure").validate[SdesNotificationType].get should be(SdesNotificationType.FileProcessingFailure)
+  }
+
 }

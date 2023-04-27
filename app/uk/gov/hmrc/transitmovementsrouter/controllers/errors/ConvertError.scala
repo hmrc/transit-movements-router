@@ -18,13 +18,14 @@ package uk.gov.hmrc.transitmovementsrouter.controllers.errors
 
 import cats.data.EitherT
 import uk.gov.hmrc.transitmovementsrouter.models.errors.CustomOfficeExtractorError
-import uk.gov.hmrc.transitmovementsrouter.models.errors.CustomOfficeExtractorError.NoElementFound
-import uk.gov.hmrc.transitmovementsrouter.models.errors.CustomOfficeExtractorError.TooManyElementsFound
-import uk.gov.hmrc.transitmovementsrouter.models.errors.CustomOfficeExtractorError.UnrecognisedOffice
 import uk.gov.hmrc.transitmovementsrouter.models.errors.MessageTypeExtractionError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.ObjectStoreError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PushNotificationError
+import uk.gov.hmrc.transitmovementsrouter.models.errors.SDESError
+import uk.gov.hmrc.transitmovementsrouter.models.errors.CustomOfficeExtractorError.NoElementFound
+import uk.gov.hmrc.transitmovementsrouter.models.errors.CustomOfficeExtractorError.TooManyElementsFound
+import uk.gov.hmrc.transitmovementsrouter.models.errors.CustomOfficeExtractorError.UnrecognisedOffice
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
 import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError._
 
@@ -46,9 +47,10 @@ trait ConvertError {
   implicit val routingErrorConverter = new Converter[RoutingError] {
 
     def convert(routingError: RoutingError): PresentationError = routingError match {
-      case InvalidGRN           => PresentationError.notFoundError("GRN not found")
-      case InvalidAccessCode    => PresentationError.forbiddenError("Invalid access code")
-      case Unexpected(_, cause) => PresentationError.internalServiceError(cause = cause)
+      case Upstream(upstreamErrorResponse) => PresentationError.internalServiceError(cause = Some(upstreamErrorResponse.getCause))
+      case Unexpected(_, cause)            => PresentationError.internalServiceError(cause = cause)
+      case BadDateTime(element, ex)        => PresentationError.badRequestError(s"Could not parse datetime for $element: ${ex.getMessage}")
+
     }
   }
 
@@ -67,7 +69,9 @@ trait ConvertError {
 
     def convert(error: PersistenceError): PresentationError = error match {
       case MovementNotFound(movementId) => PresentationError.notFoundError(s"Movement ${movementId.value} not found")
-      case Unexpected(error)            => PresentationError.internalServiceError(cause = error)
+      case MessageNotFound(movementId, messageId) =>
+        PresentationError.notFoundError(s"Message with ID ${messageId.value} for movement ${movementId.value} was not found")
+      case Unexpected(error) => PresentationError.internalServiceError(cause = error)
     }
   }
 
@@ -97,6 +101,15 @@ trait ConvertError {
     override def convert(objectStoreError: ObjectStoreError): PresentationError = objectStoreError match {
       case FileNotFound(fileLocation) => PresentationError.badRequestError(s"file not found at location: $fileLocation")
       case UnexpectedError(thr)       => PresentationError.internalServiceError(cause = thr)
+    }
+  }
+
+  implicit val sdesErrorConverter = new Converter[SDESError] {
+
+    import uk.gov.hmrc.transitmovementsrouter.models.errors.SDESError._
+
+    def convert(error: SDESError): PresentationError = error match {
+      case UnexpectedError(thr) => PresentationError.internalServiceError(cause = thr)
     }
   }
 

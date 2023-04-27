@@ -14,17 +14,20 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovementsrouter.models.responses
+package uk.gov.hmrc.transitmovementsrouter.utils
 
-import play.api.libs.json.Json
+import com.google.inject.ImplementedBy
+import com.google.inject.Singleton
 
-import java.time.OffsetDateTime
+import java.util.UUID
 
-case class EISResponse(message: String, timestamp: OffsetDateTime, path: String) {
-  def invalidAccessCode = message == "Not Valid Access Code for this operation"
-  def invalidGRN        = message.contains("Guarantee not found for GRN")
+// Enables testing by allowing for a static UUID to be generated instead.
+@ImplementedBy(classOf[UUIDGeneratorImpl])
+trait UUIDGenerator {
+  def generateUUID(): UUID
 }
 
-object EISResponse {
-  implicit val format = Json.format[EISResponse]
+@Singleton
+class UUIDGeneratorImpl extends UUIDGenerator {
+  override def generateUUID(): UUID = UUID.randomUUID()
 }

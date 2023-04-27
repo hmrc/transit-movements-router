@@ -14,17 +14,20 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovementsrouter.models.responses
+package uk.gov.hmrc.transitmovementsrouter.models.sdes
 
+import play.api.libs.json.Format
 import play.api.libs.json.Json
+import uk.gov.hmrc.objectstore.client.Md5Hash
 
-import java.time.OffsetDateTime
+import java.util.Base64
 
-case class EISResponse(message: String, timestamp: OffsetDateTime, path: String) {
-  def invalidAccessCode = message == "Not Valid Access Code for this operation"
-  def invalidGRN        = message.contains("Guarantee not found for GRN")
+object FileMd5Checksum {
+  implicit val format: Format[FileMd5Checksum] = Json.valueFormat[FileMd5Checksum]
+
+  // Md5Hash stores a Base64 encoded version of the checksum, when we want hex string encoded
+  def fromBase64(hash: Md5Hash): FileMd5Checksum = FileMd5Checksum(Base64.getDecoder.decode(hash.value).map("%02x".format(_)).mkString)
+
 }
 
-object EISResponse {
-  implicit val format = Json.format[EISResponse]
-}
+case class FileMd5Checksum(value: String) extends AnyVal
