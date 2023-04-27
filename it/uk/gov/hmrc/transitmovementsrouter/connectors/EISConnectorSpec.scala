@@ -111,7 +111,8 @@ class EISConnectorSpec
       1,
       1.second,
       2.seconds
-    )
+    ),
+    true
   )
 
   // We construct the connector each time to avoid issues with the circuit breaker
