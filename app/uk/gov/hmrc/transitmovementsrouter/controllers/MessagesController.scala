@@ -43,8 +43,10 @@ import uk.gov.hmrc.transitmovementsrouter.controllers.errors.PresentationError
 import uk.gov.hmrc.transitmovementsrouter.controllers.stream.StreamingParsers
 import uk.gov.hmrc.transitmovementsrouter.models._
 import uk.gov.hmrc.transitmovementsrouter.models.requests.MessageUpdate
+import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanFailedResponse
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.DownloadUrl
+import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanSuccessResponse
 import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesNotification
 import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesNotificationType
 import uk.gov.hmrc.transitmovementsrouter.services._
@@ -114,7 +116,7 @@ class MessagesController @Inject() (
           messageType        <- messageTypeExtractor.extractFromHeaders(request.headers).asPresentation
           requestMessageType <- filterRequestMessageType(messageType)
           customsOffice      <- customOfficeExtractorService.extractCustomOffice(request.body, requestMessageType).asPresentation
-          submitted          <- if (config.eisSizeLimit <= size) viaEIS(customsOffice, request.body) else viaSDES(request.body)
+          submitted          <- if (config.eisSizeLimit >= size) viaEIS(customsOffice, request.body) else viaSDES(request.body)
         } yield submitted).valueOr(
           error => Status(error.code.statusCode)(Json.toJson(error))
         )
@@ -161,8 +163,12 @@ class MessagesController @Inject() (
         persistenceResponse <- withUpscanSource(movementId, triggerId, source)
       } yield persistenceResponse)
         .fold[Result](
-          presentationError => Status(presentationError.code.statusCode)(Json.toJson(presentationError)),
-          response => Created.withHeaders("X-Message-Id" -> response.messageId.value)
+          presentationError =>
+            // TODO: Inform SDES of failure
+            Status(presentationError.code.statusCode)(Json.toJson(presentationError)),
+          response =>
+            // TODO: Inform SDES of success
+            Created.withHeaders("X-Message-Id" -> response.messageId.value)
         )
   }
 
@@ -189,9 +195,12 @@ class MessagesController @Inject() (
 
   private def handleUpscanSuccessResponse(upscanResponse: UpscanResponse): EitherT[Future, PresentationError, DownloadUrl] =
     EitherT {
-      Future.successful(upscanResponse.downloadUrl.toRight {
-        PresentationError.badRequestError("Upscan failed to process file")
-      })
+      Future.successful {
+        upscanResponse match {
+          case x: UpscanSuccessResponse => Right(x.downloadUrl)
+          case x: UpscanFailedResponse  => Left(PresentationError.badRequestError("Upscan failed to process file"))
+        }
+      }
     }
 
   private def filterRequestMessageType(messageType: MessageType): EitherT[Future, PresentationError, RequestMessageType] = messageType match {

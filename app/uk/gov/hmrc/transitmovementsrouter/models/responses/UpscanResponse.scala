@@ -17,10 +17,13 @@
 package uk.gov.hmrc.transitmovementsrouter.models.responses
 
 import play.api.libs.json.Format
+import play.api.libs.json.JsDefined
 import play.api.libs.json.JsError
 import play.api.libs.json.JsString
 import play.api.libs.json.JsSuccess
 import play.api.libs.json.Json
+import play.api.libs.json.OFormat
+import play.api.libs.json.OWrites
 import play.api.libs.json.Reads
 import play.api.libs.json.Writes
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.DownloadUrl
@@ -32,13 +35,13 @@ import java.time.Instant
 final case class UploadDetails(fileName: String, fileMimeType: String, uploadTimestamp: Instant, checksum: String, size: Long)
 
 object UploadDetails {
-  implicit val format = Json.format[UploadDetails]
+  implicit val format: OFormat[UploadDetails] = Json.format[UploadDetails]
 }
 
 final case class FailureDetails(failureReason: String, message: String)
 
 object FailureDetails {
-  implicit val format = Json.format[FailureDetails]
+  implicit val format: OFormat[FailureDetails] = Json.format[FailureDetails]
 }
 
 object UpscanResponse {
@@ -52,7 +55,6 @@ object UpscanResponse {
   case class DownloadUrl(value: String) extends AnyVal
 
   object DownloadUrl {
-
     implicit val format: Format[DownloadUrl] = Json.valueFormat[DownloadUrl]
   }
 
@@ -63,12 +65,9 @@ object UpscanResponse {
 
     case object Failed extends FileStatus
 
-    val values = Seq(Ready, Failed)
+    val values: Seq[FileStatus] = Seq(Ready, Failed)
 
-    implicit val writes = new Writes[FileStatus] {
-
-      def writes(status: FileStatus) = Json.toJson(status.toString())
-    }
+    implicit val writes: Writes[FileStatus] = (status: FileStatus) => Json.toJson(status.toString)
 
     implicit val reads: Reads[FileStatus] = Reads {
       case JsString(x) if x.toLowerCase == "ready"  => JsSuccess(Ready)
@@ -77,15 +76,33 @@ object UpscanResponse {
     }
   }
 
-  implicit val upscanResponseFormat = Json.format[UpscanResponse]
+  private val upscanSuccessResponseFormat: OFormat[UpscanSuccessResponse] = Json.format[UpscanSuccessResponse]
+  private val upscanFailedResponseFormat: OFormat[UpscanFailedResponse]   = Json.format[UpscanFailedResponse]
+
+  implicit val upscanResponseReads: Reads[UpscanResponse] = Reads[UpscanResponse] {
+    jsValue =>
+      jsValue \ "fileStatus" match {
+        case JsDefined(JsString("READY"))  => upscanSuccessResponseFormat.reads(jsValue)
+        case JsDefined(JsString("FAILED")) => upscanFailedResponseFormat.reads(jsValue)
+        case _                             => JsError("Invalid")
+      }
+  }
+
+  implicit val upscanResponsWrites: OWrites[UpscanResponse] = OWrites[UpscanResponse] {
+    case x: UpscanSuccessResponse => upscanSuccessResponseFormat.writes(x) ++ Json.obj("fileStatus" -> "READY")
+    case x: UpscanFailedResponse  => upscanFailedResponseFormat.writes(x) ++ Json.obj("fileStatus" -> "FAILED")
+  }
 }
 
-final case class UpscanResponse(
-  reference: Reference,
-  fileStatus: FileStatus,
-  downloadUrl: Option[DownloadUrl],
-  uploadDetails: Option[UploadDetails],
-  failureDetails: Option[FailureDetails]
-) {
-  val isSuccess = uploadDetails.isDefined
+sealed abstract class UpscanResponse {
+  def reference: Reference
+  def fileStatus: FileStatus
+}
+
+final case class UpscanSuccessResponse(reference: Reference, downloadUrl: DownloadUrl, uploadDetails: UploadDetails) extends UpscanResponse {
+  override val fileStatus: FileStatus = FileStatus.Ready
+}
+
+final case class UpscanFailedResponse(reference: Reference, failureDetails: FailureDetails) extends UpscanResponse {
+  override def fileStatus: FileStatus = FileStatus.Failed
 }

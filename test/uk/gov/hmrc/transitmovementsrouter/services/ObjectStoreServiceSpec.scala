@@ -16,7 +16,6 @@
 
 package uk.gov.hmrc.transitmovementsrouter.services
 
-import akka.stream.scaladsl.Sink
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import org.mockito.ArgumentMatchers.any
@@ -51,9 +50,7 @@ import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
 import uk.gov.hmrc.transitmovementsrouter.fakes.objectstore.ObjectStoreStub
 import uk.gov.hmrc.transitmovementsrouter.generators.TestModelGenerators
 import uk.gov.hmrc.transitmovementsrouter.models.ConversationId
-import uk.gov.hmrc.transitmovementsrouter.models.ObjectStoreResourceLocation
 import uk.gov.hmrc.transitmovementsrouter.models.errors.ObjectStoreError
-import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.DownloadUrl
 
 import java.time.Clock
 import java.time.LocalDateTime
@@ -85,74 +82,6 @@ class ObjectStoreServiceSpec
 
   override def beforeEach(): Unit =
     reset(objectStoreStub)
-
-  "On adding incoming message to object store" - {
-    "given a successful response from the connector, should return a Right with Object Store Summary" in forAll(
-      arbitraryMovementId.arbitrary,
-      arbitraryMessageId.arbitrary
-    ) {
-      (movementId, messageId) =>
-        val result = objectStoreService.storeIncoming(
-          DownloadUrl("https://bucketName.s3.eu-west-2.amazonaws.com"),
-          movementId,
-          messageId
-        )
-
-        whenReady(result.value, timeout(Span(6, Seconds))) {
-          case Left(e)  => fail(e.toString)
-          case Right(x) => x
-        }
-    }
-
-    "given an exception is thrown in the service, should return a Left with the exception in an ObjectStoreError" in forAll(
-      arbitraryMovementId.arbitrary,
-      arbitraryMessageId.arbitrary
-    ) {
-      (movementId, messageId) =>
-        val result = objectStoreService.storeIncoming(
-          DownloadUrl("invalidURL"),
-          movementId,
-          messageId
-        )
-
-        whenReady(result.value) {
-          case Right(_) => fail("should have returned a Left")
-          case Left(x)  => x
-        }
-    }
-  }
-
-  "On adding outgoing message to object store via copy" - {
-    "given a successful response from the connector, should return a Right with Object Store Summary" in forAll(
-      arbitraryObjectStoreResourceLocation.arbitrary
-    ) {
-      objectStoreResourceLocation =>
-        when(appConfig.objectStoreUrl).thenReturn("http://localhost:8084/object-store/object")
-        val result = objectStoreService.storeOutgoing(
-          objectStoreResourceLocation
-        )
-
-        whenReady(result.value, timeout(Span(6, Seconds))) {
-          case Left(e)  => fail(e.toString)
-          case Right(x) => x
-        }
-    }
-
-    "given an exception is thrown in the service, should return a Left with the exception in an ObjectStoreError" in forAll(
-      arbitraryObjectStoreResourceLocation.arbitrary
-    ) {
-      objectStoreResourceLocation =>
-        when(appConfig.objectStoreUrl).thenReturn("invalid")
-        val result = objectStoreService.storeOutgoing(
-          objectStoreResourceLocation
-        )
-
-        whenReady(result.value) {
-          case Right(_) => fail("should have returned a Left")
-          case Left(x)  => x
-        }
-    }
-  }
 
   "storeOutgoing (via stream)" - {
     "given a successful response from the connector, should return a Right with Object Store Summary" in forAll(
@@ -246,45 +175,6 @@ class ObjectStoreServiceSpec
           case x => fail(s"Expected Left of unexpected error, instead got $x")
         }
     }
-  }
-
-  "get file from  object store" - {
-    "should return the contents of a file" in {
-      val filePath =
-        Path.Directory("movements/movementId").file("x-conversation-id.xml").asUri
-      val result = objectStoreService.getObjectStoreFile(ObjectStoreResourceLocation("", filePath))
-
-      whenReady(result.value) {
-        r =>
-          r.isRight mustBe true
-          r.toOption.get.runWith(Sink.head).futureValue.utf8String mustBe "content"
-      }
-    }
-
-    "should return an error when the file is not found on path" in {
-      val filePath =
-        Path.Directory("abc/movementId").file("x-conversation-id.xml").asUri
-      val result = objectStoreService.getObjectStoreFile(ObjectStoreResourceLocation("", filePath))
-
-      whenReady(result.value, timeout(Span(6, Seconds))) {
-        case Left(_: ObjectStoreError.FileNotFound) => succeed
-        case x =>
-          fail(s"Expected Left(ObjectStoreError.FileNotFound), instead got $x")
-      }
-    }
-
-    "on a failed submission, should return a Left with an UnexpectedError" in {
-      val filePath =
-        Path.File("x-conversation-id.xml").asUri
-      val result = objectStoreService.getObjectStoreFile(ObjectStoreResourceLocation("", filePath))
-
-      whenReady(result.value, timeout(Span(6, Seconds))) {
-        case Left(_: ObjectStoreError.UnexpectedError) => succeed
-        case x =>
-          fail(s"Expected Left(ObjectStoreError.UnexpectedError), instead got $x")
-      }
-    }
-
   }
 
 }

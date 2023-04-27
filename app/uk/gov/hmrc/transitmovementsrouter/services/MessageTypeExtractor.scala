@@ -16,6 +16,8 @@
 
 package uk.gov.hmrc.transitmovementsrouter.services
 
+import akka.event.Logging
+import akka.stream.Attributes
 import akka.stream.Materializer
 import akka.stream.alpakka.xml.StartElement
 import akka.stream.alpakka.xml.scaladsl.XmlParsing
@@ -72,6 +74,13 @@ class MessageTypeExtractorImpl @Inject() (implicit ec: ExecutionContext, mat: Ma
           .getOrElse(Left(InvalidMessageType(s.localName)))
       case _ => Left(UnableToExtractFromBody)
     }
+    .addAttributes(
+      Attributes.logLevels(
+        // the exceptions here are client induced, we shouldn't cause alerts,
+        // especially as we recover anyway
+        onFailure = Attributes.LogLevels.Off
+      )
+    )
     .recover {
       case _: WFCException => Left(UnableToExtractFromBody)
       case NonFatal(e)     => Left(MessageTypeExtractionError.Unexpected(Some(e)))
