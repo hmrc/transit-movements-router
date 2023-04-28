@@ -104,7 +104,8 @@ class EISConnectorImpl(
     ) {
       // blank-ish carrier so that we control what we're sending to EIS, and let the carrier/platform do the rest
       implicit val headerCarrier: HeaderCarrier =
-        if (eisInstanceConfig.forwardClientId) HeaderCarrier(requestChain = hc.requestChain, extraHeaders = hc.headers(Seq("X-Client-Id")))
+        if (eisInstanceConfig.forwardClientId)
+          HeaderCarrier(requestChain = hc.requestChain, extraHeaders = hc.headers(Seq("X-Client-Id")))
         else HeaderCarrier(requestChain = hc.requestChain)
 
       val requestId      = hc.requestId.map(_.value)
