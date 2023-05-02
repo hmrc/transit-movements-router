@@ -122,6 +122,9 @@ class EISConnectorSpec
   def noRetriesConnector = new EISConnectorImpl("NoRetry", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, NoRetries, clock, true)
   def oneRetryConnector  = new EISConnectorImpl("OneRetry", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, OneRetry, clock, true)
 
+  def forwardClientIdConnector =
+    new EISConnectorImpl("ForwardClient", connectorConfig.copy(forwardClientId = true), TestHelpers.headerCarrierConfig, httpClientV2, NoRetries, clock, true)
+
   lazy val connectorGen: Gen[() => EISConnector] = Gen.oneOf(() => noRetriesConnector, () => oneRetryConnector)
 
   def source: Source[ByteString, _] = Source.single(ByteString.fromString("<test></test>"))
@@ -259,6 +262,39 @@ class EISConnectorSpec
         val hc = HeaderCarrier()
 
         whenReady(connector().post(movementId, messageId, source, hc)) {
+          _.isRight mustBe true
+        }
+    }
+
+    "return a unit when post is successful and the client id is passed in the request" in forAll(arbitrary[MovementId], arbitrary[MessageId]) {
+      (movementId, messageId) =>
+        server.resetAll() // Need to reset due to the forAll - it's technically the same test
+
+        val expectedConversationId = ConversationId(movementId, messageId)
+
+        def stub(currentState: String, codeToReturn: Int) =
+          server.stubFor(
+            post(
+              urlEqualTo(uriStub)
+            ).withHeader("Authorization", equalTo("Bearer bearertokenhereGB"))
+              .withHeader("Date", equalTo("Thu, 13 Apr 2023 10:34:41 UTC"))
+              .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
+              .withHeader(HeaderNames.CONTENT_TYPE, equalTo("application/xml"))
+              .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
+              .withHeader("X-Conversation-Id", equalTo(expectedConversationId.value.toString))
+              .withHeader("X-Client-Id", equalTo("CLIENT_ABC"))
+              .inScenario("Standard Call")
+              .whenScenarioStateIs(currentState)
+              .willReturn(aResponse().withStatus(codeToReturn))
+          )
+
+        stub(Scenario.STARTED, OK)
+
+        val hc = HeaderCarrier(
+          otherHeaders = Seq("X-Client-Id" -> "CLIENT_ABC")
+        )
+
+        whenReady(forwardClientIdConnector.post(movementId, messageId, source, hc)) {
           _.isRight mustBe true
         }
     }
