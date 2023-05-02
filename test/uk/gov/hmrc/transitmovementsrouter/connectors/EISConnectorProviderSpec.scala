@@ -55,7 +55,8 @@ class EISConnectorProviderSpec extends AnyFreeSpec with HttpClientV2Support with
         "/gb",
         Headers("bearertokengb"),
         CircuitBreakerConfig(1, 1.second, 1.second, 1.second, 1, 0),
-        RetryConfig(1, 1.second, 1.second)
+        RetryConfig(1, 1.second, 1.second),
+        true
       )
     )
 
@@ -67,7 +68,8 @@ class EISConnectorProviderSpec extends AnyFreeSpec with HttpClientV2Support with
         "/xi",
         Headers("bearertokengb"),
         CircuitBreakerConfig(1, 1.second, 1.second, 1.second, 1, 0),
-        RetryConfig(1, 1.second, 1.second)
+        RetryConfig(1, 1.second, 1.second),
+        true
       )
     )
   }

@@ -52,7 +52,6 @@ trait ConvertError {
       case BadDateTime(element, ex)        => PresentationError.badRequestError(s"Could not parse datetime for $element: ${ex.getMessage}")
 
     }
-
   }
 
   implicit val customOfficeErrorConverter = new Converter[CustomOfficeExtractorError] {
