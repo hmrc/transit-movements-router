@@ -103,7 +103,10 @@ class EISConnectorImpl(
       onFailure
     ) {
       // blank-ish carrier so that we control what we're sending to EIS, and let the carrier/platform do the rest
-      implicit val headerCarrier: HeaderCarrier = HeaderCarrier(requestChain = hc.requestChain)
+      implicit val headerCarrier: HeaderCarrier =
+        if (eisInstanceConfig.forwardClientId)
+          HeaderCarrier(requestChain = hc.requestChain, extraHeaders = hc.headers(Seq("X-Client-Id")))
+        else HeaderCarrier(requestChain = hc.requestChain)
 
       val requestId      = hc.requestId.map(_.value)
       val correlationId  = UUID.randomUUID().toString
@@ -145,9 +148,9 @@ class EISConnectorImpl(
               val status =
                 if (logBodyOn500 && error.statusCode == INTERNAL_SERVER_ERROR) {
                   s"""Response status: ${error.statusCode}"
-                    |Message:
-                    |
-                    |${error.message}""".stripMargin
+                     |Message:
+                     |
+                     |${error.message}""".stripMargin
                 } else s"Response status: ${error.statusCode}"
 
               logger.warn(logMessage + status)

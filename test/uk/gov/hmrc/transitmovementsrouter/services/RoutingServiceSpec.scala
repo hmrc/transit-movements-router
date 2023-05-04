@@ -87,6 +87,7 @@ class RoutingServiceSpec
                 )
               )
                 .thenReturn(Future.successful(Right(())))
+
               val mockEISMessageTransformer = mock[EISMessageTransformers]
               when(mockEISMessageTransformer.wrap).thenAnswer(
                 _ => Flow[ByteString]

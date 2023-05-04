@@ -32,7 +32,8 @@ object EISInstanceConfig {
           config.get[String]("uri"),
           config.get[Headers]("headers"),
           config.get[CircuitBreakerConfig]("circuit-breaker"),
-          config.get[RetryConfig]("retry")
+          config.get[RetryConfig]("retry"),
+          config.get[Boolean]("forward-client-id")
         )
     }
 
@@ -45,7 +46,8 @@ case class EISInstanceConfig(
   uri: String,
   headers: Headers,
   circuitBreaker: CircuitBreakerConfig,
-  retryConfig: RetryConfig
+  retryConfig: RetryConfig,
+  forwardClientId: Boolean
 ) {
 
   lazy val url: String = s"$protocol://$host:$port$uri"
