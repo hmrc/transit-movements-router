@@ -21,6 +21,7 @@ import akka.util.ByteString
 import com.github.tomakehurst.wiremock.client.WireMock.aResponse
 import com.github.tomakehurst.wiremock.client.WireMock.equalTo
 import com.github.tomakehurst.wiremock.client.WireMock.equalToJson
+import com.github.tomakehurst.wiremock.client.WireMock.equalToXml
 import com.github.tomakehurst.wiremock.client.WireMock.matching
 import com.github.tomakehurst.wiremock.client.WireMock.post
 import com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo
@@ -121,6 +122,16 @@ class MessagesControllerIntegrationSpec
       </CustomsOfficeOfDeparture>
     </ncts:CC015C>.mkString
 
+  val sampleOutgoingXmlWrapped: String =
+    <n1:TraderChannelRequest xmlns:txd="http://ncts.dgtaxud.ec" xmlns:n1="http://www.hmrc.gov.uk/eis/ncts5/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.hmrc.gov.uk/eis/ncts5/v1 EIS_WrapperV11_TraderChannelRequest-51.8.xsd">
+      <txd:CC015C PhaseID="NCTS5.0">
+        <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
+        <CustomsOfficeOfDeparture>
+          <referenceNumber>GB1234567</referenceNumber>
+        </CustomsOfficeOfDeparture>
+      </txd:CC015C>
+    </n1:TraderChannelRequest>.mkString
+
   val sampleOutgoingLargeXml: String =
     <ncts:CC015C PhaseID="NCTS5.0" xmlns:ncts="http://ncts.dgtaxud.ec">
       <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
@@ -132,6 +143,19 @@ class MessagesControllerIntegrationSpec
       </something>
     </ncts:CC015C>.mkString
 
+  val sampleOutgoingLargeXmlWrapped: String =
+    <n1:TraderChannelRequest xmlns:txd="http://ncts.dgtaxud.ec" xmlns:n1="http://www.hmrc.gov.uk/eis/ncts5/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.hmrc.gov.uk/eis/ncts5/v1 EIS_WrapperV11_TraderChannelRequest-51.8.xsd">
+      <txd:CC015C PhaseID="NCTS5.0" xmlns:ncts="http://ncts.dgtaxud.ec">
+        <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
+        <CustomsOfficeOfDeparture>
+          <referenceNumber>GB1234567</referenceNumber>
+        </CustomsOfficeOfDeparture>
+        <something>
+          <somethingElse>test</somethingElse>
+        </something>
+      </txd:CC015C>
+    </n1:TraderChannelRequest>.mkString
+
   val sampleOutgoingLargeXmlSize: Long = ByteString(sampleOutgoingLargeXml).size - 1
 
   val sampleOutgoingXIXml: String =
@@ -141,6 +165,16 @@ class MessagesControllerIntegrationSpec
         <referenceNumber>XI1234567</referenceNumber>
       </CustomsOfficeOfDeparture>
     </ncts:CC015C>.mkString
+
+  val sampleOutgoingXIXmlWrapped: String =
+    <n1:TraderChannelRequest xmlns:txd="http://ncts.dgtaxud.ec" xmlns:n1="http://www.hmrc.gov.uk/eis/ncts5/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.hmrc.gov.uk/eis/ncts5/v1 EIS_WrapperV11_TraderChannelRequest-51.8.xsd">
+      <txd:CC015C PhaseID="NCTS5.0">
+        <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
+        <CustomsOfficeOfDeparture>
+          <referenceNumber>XI1234567</referenceNumber>
+        </CustomsOfficeOfDeparture>
+      </txd:CC015C>
+    </n1:TraderChannelRequest>.mkString
 
   val brokenXml: String =
     """<nope>
@@ -226,6 +260,7 @@ class MessagesControllerIntegrationSpec
             .withHeader("X-Conversation-Id", equalTo(conversationId.value.toString))
             .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
             .withHeader(HeaderNames.CONTENT_TYPE, equalTo("application/xml"))
+            .withRequestBody(equalToXml(sampleOutgoingXmlWrapped))
             .willReturn(aResponse().withStatus(OK))
         )
 
@@ -261,7 +296,6 @@ class MessagesControllerIntegrationSpec
         val time      = OffsetDateTime.of(2023, 2, 14, 15, 55, 28, 0, ZoneOffset.UTC)
         val formatted = DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss z", Locale.ENGLISH).withZone(ZoneOffset.UTC).format(time)
 
-        // should not happen
         server.stubFor(
           post(
             urlEqualTo("/xi")
@@ -272,6 +306,7 @@ class MessagesControllerIntegrationSpec
             .withHeader("X-Conversation-Id", equalTo(conversationId.value.toString))
             .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
             .withHeader(HeaderNames.CONTENT_TYPE, equalTo("application/xml"))
+            .withRequestBody(equalToXml(sampleOutgoingXIXmlWrapped))
             .willReturn(aResponse().withStatus(OK))
         )
 
@@ -315,6 +350,7 @@ class MessagesControllerIntegrationSpec
             .withHeader("X-Conversation-Id", equalTo(conversationId.value.toString))
             .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
             .withHeader(HeaderNames.CONTENT_TYPE, equalTo("application/xml"))
+            .withRequestBody(equalToXml(sampleOutgoingXmlWrapped))
             .willReturn(aResponse().withStatus(FORBIDDEN))
         )
 

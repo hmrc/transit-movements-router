@@ -30,8 +30,8 @@ import uk.gov.hmrc.http.HttpResponse
 import uk.gov.hmrc.http.StringContextOps
 import uk.gov.hmrc.http.UpstreamErrorResponse
 import uk.gov.hmrc.http.client.HttpClientV2
+import uk.gov.hmrc.transitmovementsrouter.models.errors.UpscanError
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.DownloadUrl
-import uk.gov.hmrc.transitmovementsrouter.services.error.UpscanError
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future

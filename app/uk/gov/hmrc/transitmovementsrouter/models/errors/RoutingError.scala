@@ -14,11 +14,16 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovementsrouter.services.error
+package uk.gov.hmrc.transitmovementsrouter.models.errors
 
-sealed trait UpscanError
+import uk.gov.hmrc.http.UpstreamErrorResponse
 
-object UpscanError {
-  final case class Unexpected(cause: Option[Throwable]) extends UpscanError
-  final case object NotFound                            extends UpscanError
+import java.time.format.DateTimeParseException
+
+object RoutingError {
+  case class Upstream(upstreamErrorResponse: UpstreamErrorResponse)          extends RoutingError
+  case class Unexpected(message: String, cause: Option[Throwable])           extends RoutingError
+  case class BadDateTime(element: String, exception: DateTimeParseException) extends RoutingError
 }
+
+sealed trait RoutingError

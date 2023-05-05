@@ -43,9 +43,9 @@ import uk.gov.hmrc.transitmovementsrouter.models.errors.ObjectStoreError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PushNotificationError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.SDESError
-import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
-import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError._
-import uk.gov.hmrc.transitmovementsrouter.services.error.UpscanError
+import uk.gov.hmrc.transitmovementsrouter.models.errors.RoutingError
+import uk.gov.hmrc.transitmovementsrouter.models.errors.RoutingError._
+import uk.gov.hmrc.transitmovementsrouter.models.errors.UpscanError
 
 import java.time.format.DateTimeParseException
 import scala.concurrent.ExecutionContext.Implicits.global

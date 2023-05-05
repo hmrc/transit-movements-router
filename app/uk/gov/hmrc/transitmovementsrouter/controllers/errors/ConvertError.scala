@@ -26,9 +26,9 @@ import uk.gov.hmrc.transitmovementsrouter.models.errors.SDESError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.CustomOfficeExtractorError.NoElementFound
 import uk.gov.hmrc.transitmovementsrouter.models.errors.CustomOfficeExtractorError.TooManyElementsFound
 import uk.gov.hmrc.transitmovementsrouter.models.errors.CustomOfficeExtractorError.UnrecognisedOffice
-import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
-import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError._
-import uk.gov.hmrc.transitmovementsrouter.services.error.UpscanError
+import uk.gov.hmrc.transitmovementsrouter.models.errors.RoutingError
+import uk.gov.hmrc.transitmovementsrouter.models.errors.RoutingError._
+import uk.gov.hmrc.transitmovementsrouter.models.errors.UpscanError
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
@@ -116,7 +116,7 @@ trait ConvertError {
 
   implicit val upscanErrorConverter = new Converter[UpscanError] {
 
-    import uk.gov.hmrc.transitmovementsrouter.services.error.UpscanError._
+    import uk.gov.hmrc.transitmovementsrouter.models.errors.UpscanError._
 
     def convert(error: UpscanError): PresentationError = error match {
       case NotFound        => PresentationError.notFoundError("Upscan returned a not found error for the provided URL")

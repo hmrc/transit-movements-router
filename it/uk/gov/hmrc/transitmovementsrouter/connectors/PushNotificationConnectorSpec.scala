@@ -38,7 +38,6 @@ import play.api.http.HeaderNames
 import play.api.http.Status.ACCEPTED
 import play.api.http.Status.INTERNAL_SERVER_ERROR
 import play.api.http.Status.NOT_FOUND
-import play.api.http.Status.OK
 import play.api.libs.json.Json
 import play.mvc.Http.MimeTypes
 import uk.gov.hmrc.http.HeaderCarrier

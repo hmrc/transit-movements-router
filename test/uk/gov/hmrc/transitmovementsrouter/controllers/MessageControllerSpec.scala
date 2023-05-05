@@ -78,7 +78,6 @@ import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.Downlo
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanSuccessResponse
 import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesNotificationType
 import uk.gov.hmrc.transitmovementsrouter.services._
-import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
 
 import java.util.UUID
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -241,16 +240,17 @@ class MessageControllerSpec
       arbitrary[MovementType],
       arbitrary[MovementId],
       arbitrary[MessageId],
-      arbitrary[ObjectSummaryWithMd5]
+      arbitrary[ObjectSummaryWithMd5],
+      arbitrary[RequestMessageType]
     ) {
-      (eori, movementType, movementId, messageId, summary) =>
+      (eori, movementType, movementId, messageId, summary, messageType) =>
         val expectedConversationId = ConversationId(movementId, messageId)
 
         when(config.eisSizeLimit).thenReturn(-1)
 
-        when(mockMessageTypeExtractor.extractFromHeaders(any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](MessageType.DeclarationData))
+        when(mockMessageTypeExtractor.extractFromHeaders(any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](messageType))
 
-        when(mockCustomOfficeExtractorService.extractCustomOffice(any(), any()))
+        when(mockCustomOfficeExtractorService.extractCustomOffice(any(), eqTo(messageType)))
           .thenReturn(EitherT.rightT[Future, CustomOfficeExtractorError](CustomsOffice("GB1234567")))
 
         when(
@@ -273,6 +273,12 @@ class MessageControllerSpec
           any[Source[ByteString, _]],
           any[String].asInstanceOf[CustomsOffice]
         )(any[HeaderCarrier], any[ExecutionContext])
+
+        verify(mockSDESService, times(1)).send(
+          MovementId(eqTo(movementId.value)),
+          MessageId(eqTo(messageId.value)),
+          eqTo(summary)
+        )(any[ExecutionContext], any[HeaderCarrier])
     }
 
     "must return BAD_REQUEST when declaration submission fails" - {

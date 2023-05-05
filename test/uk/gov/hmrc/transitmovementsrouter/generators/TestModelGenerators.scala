@@ -61,7 +61,7 @@ trait TestModelGenerators extends BaseGenerators {
 
   implicit lazy val arbitraryMovementType: Arbitrary[MovementType] =
     Arbitrary {
-      Gen.oneOf(MovementType("departure"), MovementType("arrival"))
+      Gen.oneOf(MovementType("departures"), MovementType("arrivals"))
     }
 
   implicit lazy val arbitraryMovementId: Arbitrary[MovementId] =
