@@ -18,9 +18,11 @@ package uk.gov.hmrc.transitmovementsrouter.services
 
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
+import org.scalacheck.Gen
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
+import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 import uk.gov.hmrc.transitmovementsrouter.base.TestActorSystem
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -28,7 +30,7 @@ import scala.util.Failure
 import scala.util.Success
 import scala.xml.XML
 
-class EISMessageTransformerSpec extends AnyFreeSpec with Matchers with ScalaFutures with TestActorSystem {
+class EISMessageTransformerSpec extends AnyFreeSpec with Matchers with ScalaFutures with TestActorSystem with ScalaCheckDrivenPropertyChecks {
 
   val sut = new EISMessageTransformersImpl
 
@@ -212,8 +214,34 @@ class EISMessageTransformerSpec extends AnyFreeSpec with Matchers with ScalaFutu
 
       whenReady(result) {
         r =>
+          // format: off
           XML.loadString(r) mustBe
             <n1:TraderChannelSubmission xmlns:txd="http://ncts.dgtaxud.ec" xmlns:n1="http://www.hmrc.gov.uk/eis/ncts5/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.hmrc.gov.uk/eis/ncts5/v1 EIS_WrapperV10_TraderChannelSubmission-51.8.xsd"><txd:CC029C PhaseID="NCTS5.0">text</txd:CC029C></n1:TraderChannelSubmission>
+          // format: on
+      }
+    }
+
+    "should successfully transform valid xml with a different namespace" in {
+      // We do this instead of forAll as forAll seems to then use substrings of the prefix,
+      // and this test fails when we have an empty string.
+      val prefix = Gen.stringOfN(3, Gen.alphaLowerChar).sample.get
+      val input =
+        s"""<$prefix:CC029C xmlns:$prefix="http://ncts.dgtaxud.ec" PhaseID="NCTS5.0">text</$prefix:CC029C>"""
+
+      val result = Source
+        .single(ByteString.fromString(input))
+        .via(sut.wrap)
+        .runReduce(_ ++ _)
+        .map {
+          x => x.utf8String
+        }
+
+      whenReady(result) {
+        r =>
+          // format: off
+          XML.loadString(r) mustBe
+            <n1:TraderChannelSubmission xmlns:txd="http://ncts.dgtaxud.ec" xmlns:n1="http://www.hmrc.gov.uk/eis/ncts5/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.hmrc.gov.uk/eis/ncts5/v1 EIS_WrapperV10_TraderChannelSubmission-51.8.xsd"><txd:CC029C PhaseID="NCTS5.0">text</txd:CC029C></n1:TraderChannelSubmission>
+          // format: on
       }
     }
 
