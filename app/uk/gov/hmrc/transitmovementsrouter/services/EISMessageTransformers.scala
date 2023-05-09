@@ -130,7 +130,7 @@ class EISMessageTransformersImpl extends EISMessageTransformers {
   private lazy val wrappingTail: ParseEvent = EndElement(s"$WRAPPED_MESSAGE_ROOT_PREFIX:$TRADER_CHANNEL_SUBMISSION")
 
   private def lookingForMessageType(event: ParseEvent): (WrappingState, Seq[ParseEvent]) = event match {
-    case StartElement(localName @ messageType(), attributesList, Some(UNWRAPPED_PREFIX), _, _) =>
+    case StartElement(localName @ messageType(), attributesList, _, _, _) =>
       (
         WrappingState.FoundMessageType(localName),
         Seq(wrappingHead, StartElement(localName, attributesList, Some(WRAPPED_MESSAGE_TYPE_PREFIX), Some(NCTS_NAMESPACE_URL), List.empty))
