@@ -16,12 +16,13 @@
 
 package uk.gov.hmrc.transitmovementsrouter.services
 
-import akka.NotUsed
+import akka.stream.Materializer
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import cats.data.EitherT
 import com.google.inject.ImplementedBy
 import play.api.Logging
+import play.mvc.Http.MimeTypes
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.objectstore.client.ObjectSummaryWithMd5
 import uk.gov.hmrc.objectstore.client.Path
@@ -31,9 +32,7 @@ import uk.gov.hmrc.objectstore.client.play.PlayObjectStoreClientEither
 import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
 import uk.gov.hmrc.transitmovementsrouter.models._
 import uk.gov.hmrc.transitmovementsrouter.models.errors.ObjectStoreError
-import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.DownloadUrl
 
-import java.net.URL
 import java.time.Clock
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -42,107 +41,41 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
-import scala.util.Try
 import scala.util.control.NonFatal
 
 @ImplementedBy(classOf[ObjectStoreServiceImpl])
 trait ObjectStoreService {
 
-  def storeIncoming(
-    upscanUrl: DownloadUrl,
-    movementId: MovementId,
-    messageId: MessageId
-  )(implicit
+  def storeOutgoing(conversationId: ConversationId, stream: Source[ByteString, _])(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): EitherT[Future, ObjectStoreError, ObjectSummaryWithMd5]
-
-  def storeOutgoing(objectStoreResourceLocation: ObjectStoreResourceLocation)(implicit
-    hc: HeaderCarrier,
-    ec: ExecutionContext
-  ): EitherT[Future, ObjectStoreError, ObjectSummaryWithMd5]
-
-  def getObjectStoreFile(objectStoreResourceLocation: ObjectStoreResourceLocation)(implicit
-    hc: HeaderCarrier,
-    ec: ExecutionContext
-  ): EitherT[Future, ObjectStoreError, Source[ByteString, _]]
 
 }
 
 @Singleton
-class ObjectStoreServiceImpl @Inject() (clock: Clock, appConfig: AppConfig, client: PlayObjectStoreClientEither) extends ObjectStoreService with Logging {
+class ObjectStoreServiceImpl @Inject() (clock: Clock, appConfig: AppConfig, client: PlayObjectStoreClientEither)(implicit mat: Materializer)
+    extends ObjectStoreService
+    with Logging {
   private val dateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").withZone(ZoneOffset.UTC)
 
-  override def storeIncoming(upscanUrl: DownloadUrl, movementId: MovementId, messageId: MessageId)(implicit
-    hc: HeaderCarrier,
-    ec: ExecutionContext
-  ): EitherT[Future, ObjectStoreError, ObjectSummaryWithMd5] =
-    addMessage(
-      upscanUrl,
-      Path.File(s"movements/${movementId.value}/${movementId.value}-${messageId.value}-${fileFormat(clock)}.xml"),
-      ObjectStoreOwner("common-transit-convention-traders"),
-      RetentionPeriod.SevenYears
-    )
-
-  override def storeOutgoing(objectStoreResourceLocation: ObjectStoreResourceLocation)(implicit
-    hc: HeaderCarrier,
-    ec: ExecutionContext
-  ): EitherT[Future, ObjectStoreError, ObjectSummaryWithMd5] =
-    addMessage(
-      DownloadUrl(s"${appConfig.objectStoreUrl}/${objectStoreResourceLocation.contextPath}"),
-      Path.File(s"sdes/" + objectStoreResourceLocation.resourceLocation),
-      ObjectStoreOwner("transit-movements-router"),
-      RetentionPeriod.OneWeek
-    )
-
-  private def addMessage(
-    upscanUrl: DownloadUrl,
-    objectStoreFileDirectory: Path.File,
-    objectStoreOwner: ObjectStoreOwner,
-    retentionPeriod: RetentionPeriod
-  )(implicit
+  override def storeOutgoing(conversationId: ConversationId, stream: Source[ByteString, _])(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): EitherT[Future, ObjectStoreError, ObjectSummaryWithMd5] =
     EitherT {
-
-      (for {
-        url <- Future.fromTry(Try(new URL(upscanUrl.value)))
-        response <- client
-          .uploadFromUrl(
-            from = url,
-            to = objectStoreFileDirectory,
-            owner = objectStoreOwner.value,
-            retentionPeriod = retentionPeriod
-          )
-          .map {
-            case Right(load) => Right(load)
-            case Left(thr)   => Left(ObjectStoreError.UnexpectedError(thr = Some(thr)))
-          }
-      } yield response).recover {
-        case NonFatal(thr) => Left(ObjectStoreError.UnexpectedError(thr = Some(thr)))
-      }
+      client.putObject[Source[ByteString, _]](
+        Path.File(s"sdes/${conversationId.value.toString}-$dateFormat.xml"),
+        stream,
+        retentionPeriod = RetentionPeriod.OneWeek,
+        contentType = Some(MimeTypes.XML),
+        owner = "transit-movements-router",
+        contentMd5 = None
+      )
+    }.leftMap {
+      case NonFatal(thr) => ObjectStoreError.UnexpectedError(thr = Some(thr))
     }
 
-  override def getObjectStoreFile(objectStoreResourceLocation: ObjectStoreResourceLocation)(implicit
-    hc: HeaderCarrier,
-    ec: ExecutionContext
-  ): EitherT[Future, ObjectStoreError, Source[ByteString, _]] =
-    EitherT(
-      client
-        .getObject[Source[ByteString, NotUsed]](
-          Path.File(objectStoreResourceLocation.resourceLocation),
-          "common-transit-convention-traders"
-        )
-        .map {
-          case Right(Some(source)) => Right(source.content)
-          case _                   => Left(ObjectStoreError.FileNotFound(objectStoreResourceLocation.contextPath))
-        }
-        .recover {
-          case NonFatal(ex) => Left(ObjectStoreError.UnexpectedError(Some(ex)))
-        }
-    )
-
-  private def fileFormat(clock: Clock) =
+  private def dateFormat =
     dateTimeFormatter.format(OffsetDateTime.ofInstant(clock.instant, ZoneOffset.UTC))
 }

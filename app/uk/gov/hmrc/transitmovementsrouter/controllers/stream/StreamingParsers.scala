@@ -39,6 +39,7 @@ import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
 import uk.gov.hmrc.transitmovementsrouter.controllers.errors.PresentationError
 import uk.gov.hmrc.transitmovementsrouter.utils.RouterHeaderNames
 
+import java.nio.file.Files
 import java.util.concurrent.Executors
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
@@ -65,7 +66,7 @@ trait StreamingParsers {
     // This method allows for the transformation of a stream before it goes into a file,
     // such that we only transform it once.
     def stream(transformer: Flow[ByteString, ByteString, _])(
-      block: Request[Source[ByteString, _]] => Future[Result]
+      block: Request[Source[ByteString, _]] => Long => Future[Result]
     )(implicit temporaryFileCreator: TemporaryFileCreator): Action[Source[ByteString, _]] =
       actionBuilder.async(streamFromMemory) {
         request =>
@@ -74,7 +75,9 @@ trait StreamingParsers {
             .via(transformer)
             .runWith(FileIO.toPath(tempFile))
             .transformWith {
-              case Success(_) => block(request.withBody(FileIO.fromPath(tempFile)))
+              case Success(_) =>
+                val size = Files.size(tempFile.path)
+                block(request.withBody(FileIO.fromPath(tempFile)))(size)
               case Failure(error: IOOperationIncompleteException)
                   if error.getCause.isInstanceOf[IllegalStateException] || error.getCause.isInstanceOf[WFCException] =>
                 if (config.logIncoming) {
@@ -115,7 +118,7 @@ trait StreamingParsers {
       }
 
     def stream(
-      block: Request[Source[ByteString, _]] => Future[Result]
+      block: Request[Source[ByteString, _]] => Long => Future[Result]
     )(implicit temporaryFileCreator: TemporaryFileCreator): Action[Source[ByteString, _]] =
       stream(Flow.apply[ByteString])(block)(temporaryFileCreator)
   }

@@ -52,7 +52,7 @@ import uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuite
 import uk.gov.hmrc.transitmovementsrouter.models.ConversationId
 import uk.gov.hmrc.transitmovementsrouter.models.MessageId
 import uk.gov.hmrc.transitmovementsrouter.models.MovementId
-import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
+import uk.gov.hmrc.transitmovementsrouter.models.errors.RoutingError
 
 import java.net.URL
 import java.time.Clock

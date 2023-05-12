@@ -36,21 +36,26 @@ import uk.gov.hmrc.play.http.HeaderCarrierConverter
 import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
 import uk.gov.hmrc.transitmovementsrouter.connectors.PersistenceConnector
 import uk.gov.hmrc.transitmovementsrouter.connectors.PushNotificationsConnector
+import uk.gov.hmrc.transitmovementsrouter.connectors.UpscanConnector
 import uk.gov.hmrc.transitmovementsrouter.controllers.actions.AuthenticateEISToken
 import uk.gov.hmrc.transitmovementsrouter.controllers.errors.ConvertError
 import uk.gov.hmrc.transitmovementsrouter.controllers.errors.PresentationError
 import uk.gov.hmrc.transitmovementsrouter.controllers.stream.StreamingParsers
 import uk.gov.hmrc.transitmovementsrouter.models._
 import uk.gov.hmrc.transitmovementsrouter.models.requests.MessageUpdate
+import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanFailedResponse
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.DownloadUrl
+import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanSuccessResponse
 import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesNotification
 import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesNotificationType
 import uk.gov.hmrc.transitmovementsrouter.services._
 import uk.gov.hmrc.transitmovementsrouter.utils.RouterHeaderNames
+import uk.gov.hmrc.transitmovementsrouter.utils.StreamWithFile
 
 import java.util.UUID
 import javax.inject.Inject
+import scala.annotation.unused
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 
@@ -76,6 +81,7 @@ class MessagesController @Inject() (
   authenticateEISToken: AuthenticateEISToken,
   eisMessageTransformers: EISMessageTransformers,
   objectStoreService: ObjectStoreService,
+  upscanConnector: UpscanConnector,
   customOfficeExtractorService: CustomOfficeExtractorService,
   sdesService: SDESService,
   val config: AppConfig
@@ -89,63 +95,46 @@ class MessagesController @Inject() (
     with ObjectStoreURIExtractor
     with ContentTypeRouting
     with SdesResponseParser
-    with Logging {
+    with Logging
+    with StreamWithFile {
 
-  def outgoing(eori: EoriNumber, movementType: MovementType, movementId: MovementId, messageId: MessageId): Action[Source[ByteString, _]] =
-    contentTypeRoute {
-      case Some(_) => outgoingSmallMessage(eori, movementType, movementId, messageId)
-      case None    => outgoingLargeMessage(eori, movementType, movementId, messageId)
-    }
+  def outgoing(@unused eori: EoriNumber, movementType: MovementType, movementId: MovementId, messageId: MessageId): Action[Source[ByteString, _]] = {
+    def viaEIS(customsOffice: CustomsOffice, source: Source[ByteString, _])(implicit hc: HeaderCarrier): EitherT[Future, PresentationError, Status] =
+      for {
+        _ <- routingService.submitMessage(movementType, movementId, messageId, source, customsOffice).asPresentation
+      } yield Created
 
-  private def outgoingLargeMessage(eori: EoriNumber, movementType: MovementType, movementId: MovementId, messageId: MessageId) =
-    Action.async {
-      implicit request =>
-        implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
-        (for {
-          messageType                 <- messageTypeExtractor.extractFromHeaders(request.headers).asPresentation
-          requestMessageType          <- filterRequestMessageType(messageType)
-          objectStoreResourceLocation <- extractObjectStoreURIHeader(request.headers)
-          source                      <- objectStoreService.getObjectStoreFile(objectStoreResourceLocation).asPresentation
-          customOffice                <- customOfficeExtractorService.extractCustomOffice(source, requestMessageType).asPresentation
-          objectSummary <- objectStoreService
-            .storeOutgoing(objectStoreResourceLocation)
-            .asPresentation
-          result <- sdesService.send(movementId, messageId, objectSummary).asPresentation
-        } yield result).fold[Result](
-          error => Status(error.code.statusCode)(Json.toJson(error)),
-          _ => Accepted
-        )
-    }
+    def viaSDES(source: Source[ByteString, _])(implicit hc: HeaderCarrier): EitherT[Future, PresentationError, Status] =
+      for {
+        objectStoreFile <- objectStoreService.storeOutgoing(ConversationId(movementId, messageId), source).asPresentation
+        _               <- sdesService.send(movementId, messageId, objectStoreFile).asPresentation
+      } yield Accepted
 
-  private def outgoingSmallMessage(eori: EoriNumber, movementType: MovementType, movementId: MovementId, messageId: MessageId): Action[Source[ByteString, _]] =
     DefaultActionBuilder.apply(cc.parsers.anyContent).stream {
-      implicit request =>
-        implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
+      implicit request => size =>
         (for {
           messageType        <- messageTypeExtractor.extractFromHeaders(request.headers).asPresentation
           requestMessageType <- filterRequestMessageType(messageType)
-          customOffice       <- customOfficeExtractorService.extractCustomOffice(request.body, requestMessageType).asPresentation
-          submitted          <- routingService.submitMessage(movementType, movementId, messageId, request.body, customOffice).asPresentation
-        } yield submitted).fold[Result](
-          error => Status(error.code.statusCode)(Json.toJson(error)),
-          _ => Accepted
+          customsOffice      <- customOfficeExtractorService.extractCustomOffice(request.body, requestMessageType).asPresentation
+          submitted          <- if (config.eisSizeLimit >= size) viaEIS(customsOffice, request.body) else viaSDES(request.body)
+        } yield submitted).valueOr(
+          error => Status(error.code.statusCode)(Json.toJson(error))
         )
     }
+  }
 
-  def incoming(ids: ConversationId): Action[Source[ByteString, _]] =
+  def incomingViaEIS(ids: ConversationId): Action[Source[ByteString, _]] =
     authenticateEISToken.stream(transformer = eisMessageTransformers.unwrap) {
-      implicit request =>
+      implicit request => _ =>
         import MessagesController.PresentationEitherTHelper
 
-        implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
-        val (movementId, triggerId)    = ids.toMovementAndMessageId
+        val (movementId, triggerId) = ids.toMovementAndMessageId
 
         (for {
           messageType <- messageTypeExtractor.extract(request.headers, request.body).asPresentationWithMessageType(None)
-          persistenceResponse <- persistenceConnector
-            .postBody(movementId, triggerId, messageType, request.body)
-            .asPresentationWithMessageType(Some(messageType))
-          _ = pushNotificationsConnector.postXML(movementId, persistenceResponse.messageId, request.body).asPresentation
+          persistenceResponse <- persistStream(movementId, triggerId, messageType, request.body).leftMap(
+            err => (err, Option(messageType))
+          )
           _ = logIncomingSuccess(movementId, triggerId, persistenceResponse.messageId, messageType)
         } yield persistenceResponse)
           .fold[Result](
@@ -164,34 +153,54 @@ class MessagesController @Inject() (
           )
     }
 
-  def incomingLargeMessage(movementId: MovementId, messageId: MessageId): Action[JsValue] = Action.async(cc.parsers.json) {
+  def incomingViaUpscan(movementId: MovementId, triggerId: MessageId): Action[JsValue] = Action.async(cc.parsers.json) {
     implicit request =>
       implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
       (for {
-        upscanResponse <- parseAndLogUpscanResponse(request.body)
-        downloadUrl    <- handleUpscanSuccessResponse(upscanResponse)
-        objectSummary <- objectStoreService
-          .storeIncoming(downloadUrl, movementId, messageId)
-          .asPresentation
-        objectStoreResourceLocation <- extractObjectStoreResourceLocation(ObjectStoreURI(objectSummary.location.asUri))
-        source                      <- objectStoreService.getObjectStoreFile(objectStoreResourceLocation).asPresentation
-        messageType                 <- messageTypeExtractor.extractFromBody(source).asPresentation
-        persistenceResponse <- persistenceConnector
-          .postObjectStoreUri(movementId, messageId, messageType, ObjectStoreURI(objectSummary.location.asUri))
-          .asPresentation
-        _ = pushNotificationsConnector.post(movementId, messageId).asPresentation
+        upscanResponse      <- parseAndLogUpscanResponse(request.body)
+        downloadUrl         <- handleUpscanSuccessResponse(upscanResponse)
+        source              <- upscanConnector.streamFile(downloadUrl).map(_.via(eisMessageTransformers.unwrap)).asPresentation
+        persistenceResponse <- withUpscanSource(movementId, triggerId, source)
       } yield persistenceResponse)
         .fold[Result](
-          presentationError => Status(presentationError.code.statusCode)(Json.toJson(presentationError)),
-          response => Created.withHeaders("X-Message-Id" -> response.messageId.value)
+          presentationError =>
+            // TODO: Inform SDES of failure
+            Status(presentationError.code.statusCode)(Json.toJson(presentationError)),
+          response =>
+            // TODO: Inform SDES of success
+            Created.withHeaders("X-Message-Id" -> response.messageId.value)
         )
   }
 
+  private def withUpscanSource(movementId: MovementId, triggerId: MessageId, source: Source[ByteString, _])(implicit
+    hc: HeaderCarrier
+  ): EitherT[Future, PresentationError, PersistenceResponse] =
+    withReusableSource(source) {
+      fileSource =>
+        for {
+          messageType         <- messageTypeExtractor.extractFromBody(fileSource).asPresentation
+          persistenceResponse <- persistStream(movementId, triggerId, messageType, fileSource)
+        } yield persistenceResponse
+    }
+
+  private def persistStream(movementId: MovementId, triggerId: MessageId, messageType: MessageType, source: Source[ByteString, _])(implicit
+    hc: HeaderCarrier
+  ): EitherT[Future, PresentationError, PersistenceResponse] =
+    for {
+      persistenceResponse <- persistenceConnector
+        .postBody(movementId, triggerId, messageType, source)
+        .asPresentation
+      _ = pushNotificationsConnector.postXML(movementId, persistenceResponse.messageId, source).asPresentation
+    } yield persistenceResponse
+
   private def handleUpscanSuccessResponse(upscanResponse: UpscanResponse): EitherT[Future, PresentationError, DownloadUrl] =
     EitherT {
-      Future.successful(upscanResponse.downloadUrl.toRight {
-        PresentationError.badRequestError("Upscan failed to process file")
-      })
+      Future.successful {
+        upscanResponse match {
+          case x: UpscanSuccessResponse => Right(x.downloadUrl)
+          case x: UpscanFailedResponse  => Left(PresentationError.badRequestError("Upscan failed to process file"))
+        }
+      }
     }
 
   private def filterRequestMessageType(messageType: MessageType): EitherT[Future, PresentationError, RequestMessageType] = messageType match {

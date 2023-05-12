@@ -16,6 +16,7 @@
 
 package uk.gov.hmrc.transitmovementsrouter.controllers
 
+import org.scalacheck.Arbitrary.arbitrary
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
@@ -27,6 +28,9 @@ import play.api.mvc.ControllerComponents
 import play.api.test.Helpers.stubControllerComponents
 import uk.gov.hmrc.transitmovementsrouter.controllers.errors.PresentationError
 import uk.gov.hmrc.transitmovementsrouter.generators.TestModelGenerators
+import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanFailedResponse
+import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse
+import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanSuccessResponse
 
 class UpscanResponseParserSpec extends AnyFreeSpec with ScalaFutures with Matchers with ScalaCheckPropertyChecks with TestModelGenerators {
 
@@ -38,28 +42,24 @@ class UpscanResponseParserSpec extends AnyFreeSpec with ScalaFutures with Matche
 
   "parseUpscanResponse" - {
     "given a successful response in the callback, returns a defined option with value of UploadDetails" in forAll(
-      arbitraryUpscanResponse(true).arbitrary
+      arbitrary[UpscanSuccessResponse]
     ) {
       successUpscanResponse =>
-        val json = Json.toJson(successUpscanResponse)
+        val json = Json.toJson[UpscanResponse](successUpscanResponse)
         whenReady(testController.parseAndLogUpscanResponse(json).value) {
           either =>
             either mustBe Right(successUpscanResponse)
-            either.toOption.get.isSuccess mustBe true
-            either.toOption.get.uploadDetails.isDefined mustBe true
         }
     }
 
     "given a failure response in the callback, returns a defined option with value of FailedDetails" in forAll(
-      arbitraryUpscanResponse(false).arbitrary
+      arbitrary[UpscanFailedResponse]
     ) {
       failureUpscanResponse =>
-        val json = Json.toJson(failureUpscanResponse)
+        val json = Json.toJson[UpscanResponse](failureUpscanResponse)
         whenReady(testController.parseAndLogUpscanResponse(json).value) {
           either =>
             either mustBe Right(failureUpscanResponse)
-            either.toOption.get.isSuccess mustBe false
-            either.toOption.get.failureDetails.isDefined mustBe true
         }
     }
 

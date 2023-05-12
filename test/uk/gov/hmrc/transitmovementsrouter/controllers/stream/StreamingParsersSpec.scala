@@ -61,7 +61,7 @@ import scala.concurrent.Future
 
 class StreamingParsersSpec extends AnyFreeSpec with Matchers with TestActorSystem with TestSourceProvider {
 
-  lazy val headers = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> "text/plain", HeaderNames.ACCEPT -> "application/vnd.hmrc.2.0+json"))
+  lazy val headers: FakeHeaders = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> "text/plain", HeaderNames.ACCEPT -> "application/vnd.hmrc.2.0+json"))
 
   object TestActionBuilder extends ActionRefiner[Request, Request] with ActionBuilder[Request, AnyContent] {
 
@@ -89,7 +89,7 @@ class StreamingParsersSpec extends AnyFreeSpec with Matchers with TestActorSyste
     }
 
     def resultStream: Action[Source[ByteString, _]] = Action.andThen(TestActionBuilder).stream {
-      request =>
+      request => _ =>
         (for {
           a <- request.body.runWith(Sink.last)
           b <- request.body.runWith(Sink.last)
@@ -106,7 +106,7 @@ class StreamingParsersSpec extends AnyFreeSpec with Matchers with TestActorSyste
           a => a ++ a
         )
       ) {
-        request =>
+        request => _ =>
           (for {
             a <- request.body.runWith(Sink.last)
             b <- request.body.runWith(Sink.last)
@@ -123,7 +123,7 @@ class StreamingParsersSpec extends AnyFreeSpec with Matchers with TestActorSyste
           _ => throw new IllegalStateException("this happened")
         )
       ) {
-        _ =>
+        _ => _ =>
           Future.successful(Ok("but should never happen"))
       }
 
@@ -134,7 +134,7 @@ class StreamingParsersSpec extends AnyFreeSpec with Matchers with TestActorSyste
           _ => throw new NumberFormatException() // doesn't matter - we're just not expecting it
         )
       ) {
-        _ =>
+        _ => _ =>
           Future.successful(Ok("but should never happen"))
       }
 

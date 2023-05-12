@@ -20,7 +20,6 @@ import cats.data.NonEmptyList
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Arbitrary
 import org.scalacheck.Gen
-import org.scalacheck.Gen.alphaNumChar
 import org.scalacheck.Gen.choose
 import org.scalacheck.Gen.listOfN
 import org.scalacheck.Gen.numChar
@@ -41,10 +40,5 @@ trait BaseGenerators {
       length        <- choose(minLength, maxLength)
       listOfCharNum <- listOfN(length, numChar)
     } yield listOfCharNum.mkString.toInt
-
-  def alphaNumeric(length: Int): Gen[String] =
-    for {
-      listOfChar <- listOfN(length, alphaNumChar)
-    } yield listOfChar.mkString
 
 }
