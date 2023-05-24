@@ -39,6 +39,16 @@ trait ConvertError {
 
     def asPresentation(implicit c: Converter[E], ec: ExecutionContext): EitherT[Future, PresentationError, A] =
       value.leftMap(c.convert)
+
+    // Allows for fire and forget, but still calls asPresentation in case we need to log anything
+    def suppress(implicit c: Converter[E], ec: ExecutionContext): EitherT[Future, PresentationError, Unit] =
+      value.asPresentation
+        .map(
+          _ => (): Unit
+        )
+        .leftFlatMap(
+          _ => EitherT.rightT((): Unit)
+        )
   }
 
   sealed trait Converter[E] {

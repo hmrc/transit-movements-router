@@ -271,4 +271,21 @@ class ConvertErrorSpec extends AnyFreeSpec with Matchers with OptionValues with 
     }
   }
 
+  "suppress" - {
+    "returns Unit on a right" in {
+      val input = Right[RoutingError, Unit](()).toEitherT[Future]
+      whenReady(input.suppress.value) {
+        _ mustBe Right((): Unit)
+      }
+    }
+
+    "returns Unit on a left" in {
+      val exception = new IllegalStateException()
+      val input     = Left[RoutingError, Unit](Unexpected("Unexpected error", Some(exception))).toEitherT[Future]
+      whenReady(input.suppress.value) {
+        _ mustBe Right((): Unit)
+      }
+    }
+  }
+
 }
