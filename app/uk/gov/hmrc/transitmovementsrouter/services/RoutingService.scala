@@ -25,7 +25,7 @@ import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.transitmovementsrouter.connectors.EISConnector
 import uk.gov.hmrc.transitmovementsrouter.connectors.EISConnectorProvider
 import uk.gov.hmrc.transitmovementsrouter.models._
-import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
+import uk.gov.hmrc.transitmovementsrouter.models.errors.RoutingError
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future

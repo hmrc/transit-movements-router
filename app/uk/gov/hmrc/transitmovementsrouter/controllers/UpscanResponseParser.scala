@@ -21,7 +21,9 @@ import play.api.Logging
 import play.api.libs.json.JsValue
 import play.api.mvc.BaseController
 import uk.gov.hmrc.transitmovementsrouter.controllers.errors.PresentationError
+import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanFailedResponse
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse
+import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanSuccessResponse
 
 import scala.concurrent.Future
 
@@ -45,11 +47,11 @@ trait UpscanResponseParser {
 
   private def logResponse(upscanResponse: Option[UpscanResponse]) =
     upscanResponse match {
-      case Some(UpscanResponse(_, reference, _, _, None)) =>
+      case Some(UpscanSuccessResponse(reference, _, _)) =>
         logger.info(s"Received a successful response from Upscan callback for the following reference: $reference")
-      case Some(UpscanResponse(_, reference, _, None, failureDetails)) =>
+      case Some(UpscanFailedResponse(reference, failureDetails)) =>
         logger.warn(
-          s"Received a failure response from Upscan callback for the following reference: $reference. Failure reason: ${failureDetails.get.failureReason}. Failure message: ${failureDetails.get.message}"
+          s"Received a failure response from Upscan callback for the following reference: $reference. Failure reason: ${failureDetails.failureReason}. Failure message: ${failureDetails.message}"
         )
       case _ => logger.error("Unable to parse unexpected response from Upscan")
     }

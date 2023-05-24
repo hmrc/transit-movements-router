@@ -24,12 +24,12 @@ import uk.gov.hmrc.objectstore.client.Path
 import uk.gov.hmrc.transitmovementsrouter.models._
 import uk.gov.hmrc.transitmovementsrouter.models.responses.FailureDetails
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UploadDetails
-import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse
+import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanFailedResponse
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.DownloadUrl
-import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.FileStatus
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.Reference
-import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesNotificationType
+import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanSuccessResponse
 import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesNotification
+import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesNotificationType
 import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesProperties
 import uk.gov.hmrc.transitmovementsrouter.utils.RouterHeaderNames
 
@@ -51,14 +51,35 @@ trait TestModelGenerators extends BaseGenerators {
       } yield CustomsOffice(s"$destination$id")
     }
 
+  implicit lazy val arbitraryEoriNumber: Arbitrary[EoriNumber] =
+    Arbitrary {
+      for {
+        country <- Gen.oneOf("GB", "XI")
+        code    <- Gen.stringOfN(10, Gen.numChar)
+      } yield EoriNumber(s"$country$code")
+    }
+
+  implicit lazy val arbitraryMovementType: Arbitrary[MovementType] =
+    Arbitrary {
+      Gen.oneOf(MovementType("departures"), MovementType("arrivals"))
+    }
+
   implicit lazy val arbitraryMovementId: Arbitrary[MovementId] =
     Arbitrary {
-      Gen.listOfN(16, Gen.hexChar).map(_.mkString).map(MovementId)
+      Gen.listOfN(16, Gen.hexChar).map(_.mkString.toLowerCase).map(MovementId)
     }
 
   implicit lazy val arbitraryMessageId: Arbitrary[MessageId] =
     Arbitrary {
-      Gen.listOfN(16, Gen.hexChar).map(_.mkString).map(MessageId)
+      Gen.listOfN(16, Gen.hexChar).map(_.mkString.toLowerCase).map(MessageId)
+    }
+
+  implicit lazy val arbitraryConversationId: Arbitrary[ConversationId] =
+    Arbitrary {
+      for {
+        movementId <- arbitraryMovementId.arbitrary
+        messageId  <- arbitraryMessageId.arbitrary
+      } yield ConversationId(movementId, messageId)
     }
 
   implicit lazy val arbitraryMessageType: Arbitrary[MessageType] =
@@ -91,14 +112,19 @@ trait TestModelGenerators extends BaseGenerators {
     } yield FailureDetails(failureReason, message)
   }
 
-  implicit def arbitraryUpscanResponse(isSuccess: Boolean): Arbitrary[UpscanResponse] = Arbitrary {
+  implicit val arbitraryUpscanSuccessResponse: Arbitrary[UpscanSuccessResponse] = Arbitrary {
     for {
-      reference  <- Gen.alphaNumStr
-      fileStatus <- Gen.oneOf(FileStatus.values)
-      downloadUrl    = if (isSuccess) Gen.alphaNumStr.sample.map(DownloadUrl(_)) else None
-      uploadDetails  = if (isSuccess) arbitraryUploadDetails.arbitrary.sample else None
-      failureDetails = if (!isSuccess) arbitraryFailureDetails.arbitrary.sample else None
-    } yield UpscanResponse(Reference(reference), fileStatus, downloadUrl, uploadDetails, failureDetails)
+      reference     <- Gen.alphaNumStr.map(Reference.apply)
+      downloadUrl   <- Gen.alphaNumStr.map(DownloadUrl.apply)
+      uploadDetails <- arbitraryUploadDetails.arbitrary
+    } yield UpscanSuccessResponse(reference, downloadUrl, uploadDetails)
+  }
+
+  implicit val arbitraryUpscanFailedResponse: Arbitrary[UpscanFailedResponse] = Arbitrary {
+    for {
+      reference      <- Gen.alphaNumStr.map(Reference.apply)
+      failureDetails <- arbitraryFailureDetails.arbitrary
+    } yield UpscanFailedResponse(reference, failureDetails)
   }
 
   private def md5hashbase64(string: String): String =

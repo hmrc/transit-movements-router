@@ -39,7 +39,7 @@ import uk.gov.hmrc.transitmovementsrouter.config.EISInstanceConfig
 import uk.gov.hmrc.transitmovementsrouter.models.ConversationId
 import uk.gov.hmrc.transitmovementsrouter.models.MessageId
 import uk.gov.hmrc.transitmovementsrouter.models.MovementId
-import uk.gov.hmrc.transitmovementsrouter.services.error.RoutingError
+import uk.gov.hmrc.transitmovementsrouter.models.errors.RoutingError
 import uk.gov.hmrc.transitmovementsrouter.utils.RouterHeaderNames
 
 import java.time.Clock
