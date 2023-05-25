@@ -190,7 +190,11 @@ class MessagesController @Inject() (
       persistenceResponse <- persistenceConnector
         .postBody(movementId, triggerId, messageType, source)
         .asPresentation
-      _ = pushNotificationsConnector.postXML(movementId, persistenceResponse.messageId, source).asPresentation
+      // We suppress this as we do want to fire and forget, but if we don't make it part of the flatmap,
+      // our system might delete the file before we use it in the stream.
+      //
+      // suppress drops any errors (as far as this flatmap chain is concerned) and then returns unit, always.
+      _ <- pushNotificationsConnector.postXML(movementId, persistenceResponse.messageId, source).suppress
     } yield persistenceResponse
 
   private def handleUpscanSuccessResponse(upscanResponse: UpscanResponse): EitherT[Future, PresentationError, DownloadUrl] =
