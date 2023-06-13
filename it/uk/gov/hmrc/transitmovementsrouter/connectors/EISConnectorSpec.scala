@@ -92,6 +92,8 @@ class EISConnectorSpec
       RetryPolicies.limitRetries[Future](1)(cats.implicits.catsStdInstancesForFuture(ec))
   }
 
+  val defaultMessageID = MessageId("0000000000000000")
+
   val uriStub = "/transit-movements-eis-stub/movements/messages"
 
   val connectorConfig: EISInstanceConfig = EISInstanceConfig(
@@ -148,7 +150,8 @@ class EISConnectorSpec
         // If a 500 error is returned, this most likely means a retry happened, the first place to look
         // should be the code the determines if a result is successful.
 
-        val expectedConversationId = ConversationId(movementId, messageId)
+        // val expectedConversationId = ConversationId(movementId, messageId)
+        val expectedConversationId = ConversationId(movementId, defaultMessageID)
         val requestId              = UUID.randomUUID().toString
 
         def stub(currentState: String, targetState: String, codeToReturn: Int) =
@@ -202,7 +205,8 @@ class EISConnectorSpec
         // If a 500 error is returned, this most likely means a retry happened, the first place to look
         // should be the code the determines if a result is successful.
 
-        val expectedConversationId = ConversationId(movementId, messageId)
+        // val expectedConversationId = ConversationId(movementId, messageId)
+        val expectedConversationId = ConversationId(movementId, defaultMessageID)
 
         def stub(currentState: String, targetState: String, codeToReturn: Int) =
           server.stubFor(
@@ -236,7 +240,8 @@ class EISConnectorSpec
       (connector, movementId, messageId) =>
         server.resetAll() // Need to reset due to the forAll - it's technically the same test
 
-        val expectedConversationId = ConversationId(movementId, messageId)
+        // val expectedConversationId = ConversationId(movementId, messageId)
+        val expectedConversationId = ConversationId(movementId, defaultMessageID)
 
         def stub(currentState: String, targetState: String, codeToReturn: Int) =
           server.stubFor(
@@ -270,7 +275,8 @@ class EISConnectorSpec
       (movementId, messageId) =>
         server.resetAll() // Need to reset due to the forAll - it's technically the same test
 
-        val expectedConversationId = ConversationId(movementId, messageId)
+        // val expectedConversationId = ConversationId(movementId, messageId)
+        val expectedConversationId = ConversationId(movementId, defaultMessageID)
 
         def stub(currentState: String, codeToReturn: Int) =
           server.stubFor(
@@ -301,7 +307,8 @@ class EISConnectorSpec
 
     "return unit when post is successful on retry if there is an initial failure" in forAll(arbitrary[MovementId], arbitrary[MessageId]) {
       (movementId, messageId) =>
-        val expectedConversationId = ConversationId(movementId, messageId)
+        // val expectedConversationId = ConversationId(movementId, messageId)
+        val expectedConversationId = ConversationId(movementId, defaultMessageID)
 
         def stub(currentState: String, targetState: String, codeToReturn: Int) =
           server.stubFor(
@@ -346,7 +353,8 @@ class EISConnectorSpec
       (statusCode, connector, movementId, messageId) =>
         server.resetAll() // Need to reset due to the forAll - it's technically the same test
 
-        val expectedConversationId = ConversationId(movementId, messageId)
+        // val expectedConversationId = ConversationId(movementId, messageId)
+        val expectedConversationId = ConversationId(movementId, defaultMessageID)
 
         server.stubFor(
           post(

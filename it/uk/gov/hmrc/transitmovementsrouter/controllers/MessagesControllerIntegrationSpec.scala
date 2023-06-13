@@ -61,6 +61,7 @@ import uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuiteWithGuice
 import uk.gov.hmrc.transitmovementsrouter.models.ConversationId
 import uk.gov.hmrc.transitmovementsrouter.models.EoriNumber
 import uk.gov.hmrc.transitmovementsrouter.models.MessageId
+import uk.gov.hmrc.transitmovementsrouter.models.MovementId
 import uk.gov.hmrc.transitmovementsrouter.models.MovementType
 import uk.gov.hmrc.transitmovementsrouter.utils.UUIDGenerator
 
@@ -79,6 +80,8 @@ class MessagesControllerIntegrationSpec
     with Matchers
     with WiremockSuiteWithGuice
     with ScalaCheckDrivenPropertyChecks {
+
+  private val defaultMessageId = MessageId("0000000000000000")
 
   // We don't care about the content in this XML fragment, only the root tag and its child.
   val sampleIncomingXml: String =
@@ -246,9 +249,12 @@ class MessagesControllerIntegrationSpec
         // We do this instead of using the standard "app" because we otherwise get the error
         // "Trying to materialize stream after materializer has been shutdown".
         // We suspect it's due to nested tests.
-        val newApp                  = appBuilder.build()
-        val conversationId          = ConversationId(UUID.randomUUID())
-        val (movementId, messageId) = conversationId.toMovementAndMessageId
+        val newApp = appBuilder.build()
+        //        val conversationId          = ConversationId(UUID.randomUUID())
+        //        val (movementId, messageId) = conversationId.toMovementAndMessageId
+        val movementId     = Gen.stringOfN(16, Gen.hexChar).map(MovementId.apply).sample.get
+        val messageId      = defaultMessageId
+        val conversationId = ConversationId(movementId, defaultMessageId)
 
         server.stubFor(
           post(
@@ -289,9 +295,12 @@ class MessagesControllerIntegrationSpec
         // We do this instead of using the standard "app" because we otherwise get the error
         // "Trying to materialize stream after materializer has been shutdown".
         // We suspect it's due to nested tests.
-        val newApp                  = appBuilder.build()
-        val conversationId          = ConversationId(UUID.randomUUID())
-        val (movementId, messageId) = conversationId.toMovementAndMessageId
+        val newApp = appBuilder.build()
+//        val conversationId          = ConversationId(UUID.randomUUID())
+//        val (movementId, messageId) = conversationId.toMovementAndMessageId
+        val movementId     = Gen.stringOfN(16, Gen.hexChar).map(MovementId.apply).sample.get
+        val messageId      = defaultMessageId
+        val conversationId = ConversationId(movementId, defaultMessageId)
 
         val time      = OffsetDateTime.of(2023, 2, 14, 15, 55, 28, 0, ZoneOffset.UTC)
         val formatted = DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss z", Locale.ENGLISH).withZone(ZoneOffset.UTC).format(time)
@@ -336,9 +345,12 @@ class MessagesControllerIntegrationSpec
         // We do this instead of using the standard "app" because we otherwise get the error
         // "Trying to materialize stream after materializer has been shutdown".
         // We suspect it's due to nested tests.
-        val newApp                  = appBuilder.build()
-        val conversationId          = ConversationId(UUID.randomUUID())
-        val (movementId, messageId) = conversationId.toMovementAndMessageId
+        val newApp = appBuilder.build()
+        //        val conversationId          = ConversationId(UUID.randomUUID())
+        //        val (movementId, messageId) = conversationId.toMovementAndMessageId
+        val movementId     = Gen.stringOfN(16, Gen.hexChar).map(MovementId.apply).sample.get
+        val messageId      = defaultMessageId
+        val conversationId = ConversationId(movementId, defaultMessageId)
 
         server.stubFor(
           post(
@@ -382,9 +394,12 @@ class MessagesControllerIntegrationSpec
         // We do this instead of using the standard "app" because we otherwise get the error
         // "Trying to materialize stream after materializer has been shutdown".
         // We suspect it's due to nested tests.
-        val newApp                  = appBuilder.build()
-        val conversationId          = ConversationId(UUID.randomUUID())
-        val (movementId, messageId) = conversationId.toMovementAndMessageId
+        val newApp = appBuilder.build()
+        //        val conversationId          = ConversationId(UUID.randomUUID())
+        //        val (movementId, messageId) = conversationId.toMovementAndMessageId
+        val movementId     = Gen.stringOfN(16, Gen.hexChar).map(MovementId.apply).sample.get
+        val messageId      = defaultMessageId
+        val conversationId = ConversationId(movementId, defaultMessageId)
 
         server.stubFor(
           post(
