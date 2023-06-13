@@ -143,7 +143,7 @@ class EISConnectorImpl(
       val requestId      = hc.requestId.map(_.value)
       val correlationId  = UUID.randomUUID().toString
       val accept         = MimeTypes.XML
-      val conversationId = ConversationId(movementId, MessageId("0000000000000000")) // ConversationId(movementId, messageId)
+      val conversationId = ConversationId(movementId, messageId)
       val date           = HTTP_DATE_FORMATTER.format(OffsetDateTime.now())
 
       val messageType =
@@ -164,15 +164,12 @@ class EISConnectorImpl(
           .post(url"${eisInstanceConfig.url}")
           .withBody(body)
           .setHeader(
-            HMRCHeaderNames.xRequestId       -> requestId.getOrElse(""),
-            HeaderNames.AUTHORIZATION        -> authorization,
-            RouterHeaderNames.CORRELATION_ID -> correlationId,
-            HeaderNames.ACCEPT               -> MimeTypes.XML,
-            RouterHeaderNames.CONVERSATION_ID -> ConversationId(
-              movementId,
-              MessageId("0000000000000000")
-            ).value.toString, // ConversationId(movementId, messageId).value.toString,
-            HeaderNames.DATE -> nowFormatted()
+            HMRCHeaderNames.xRequestId        -> requestId.getOrElse(""),
+            HeaderNames.AUTHORIZATION         -> authorization,
+            RouterHeaderNames.CORRELATION_ID  -> correlationId,
+            HeaderNames.ACCEPT                -> MimeTypes.XML,
+            RouterHeaderNames.CONVERSATION_ID -> ConversationId(movementId, messageId).value.toString,
+            HeaderNames.DATE                  -> nowFormatted()
           )
           .execute[HttpResponse]
           .flatMap[Either[RoutingError, Unit]] {
