@@ -64,4 +64,6 @@ class AppConfig @Inject() (config: Configuration, servicesConfig: CTCServicesCon
         .split("/")
         .filter(_.nonEmpty)
     )
+
+  lazy val internalAuthToken: String = config.get[String]("internal-auth.token")
 }

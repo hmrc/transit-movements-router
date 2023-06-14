@@ -92,7 +92,6 @@ class MessagesController @Inject() (
     with StreamingParsers
     with ConvertError
     with UpscanResponseParser
-    with ObjectStoreURIExtractor
     with ContentTypeRouting
     with SdesResponseParser
     with Logging
