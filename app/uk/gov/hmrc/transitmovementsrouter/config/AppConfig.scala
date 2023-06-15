@@ -65,5 +65,6 @@ class AppConfig @Inject() (config: Configuration, servicesConfig: CTCServicesCon
         .filter(_.nonEmpty)
     )
 
-  lazy val internalAuthToken: String = config.get[String]("internal-auth.token")
+  lazy val internalAuthEnabled: Boolean = config.get[Boolean]("microservice.services.internal-auth.enabled")
+  lazy val internalAuthToken: String    = config.get[String]("internal-auth.token")
 }

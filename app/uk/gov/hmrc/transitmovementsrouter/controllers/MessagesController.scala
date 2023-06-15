@@ -31,6 +31,11 @@ import play.api.mvc.Request
 import play.api.mvc.Result
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.HeaderNames
+import uk.gov.hmrc.internalauth.client.IAAction
+import uk.gov.hmrc.internalauth.client.Predicate
+import uk.gov.hmrc.internalauth.client.Resource
+import uk.gov.hmrc.internalauth.client.ResourceLocation
+import uk.gov.hmrc.internalauth.client.ResourceType
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
 import uk.gov.hmrc.play.http.HeaderCarrierConverter
 import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
@@ -38,6 +43,7 @@ import uk.gov.hmrc.transitmovementsrouter.connectors.PersistenceConnector
 import uk.gov.hmrc.transitmovementsrouter.connectors.PushNotificationsConnector
 import uk.gov.hmrc.transitmovementsrouter.connectors.UpscanConnector
 import uk.gov.hmrc.transitmovementsrouter.controllers.actions.AuthenticateEISToken
+import uk.gov.hmrc.transitmovementsrouter.controllers.actions.InternalAuthActionProvider
 import uk.gov.hmrc.transitmovementsrouter.controllers.errors.ConvertError
 import uk.gov.hmrc.transitmovementsrouter.controllers.errors.PresentationError
 import uk.gov.hmrc.transitmovementsrouter.controllers.stream.StreamingParsers
@@ -84,6 +90,7 @@ class MessagesController @Inject() (
   upscanConnector: UpscanConnector,
   customOfficeExtractorService: CustomOfficeExtractorService,
   sdesService: SDESService,
+  internalAuth: InternalAuthActionProvider,
   val config: AppConfig
 )(implicit
   val materializer: Materializer,
@@ -97,6 +104,9 @@ class MessagesController @Inject() (
     with Logging
     with StreamWithFile {
 
+  private val predicate: Predicate.Permission =
+    Predicate.Permission(Resource(ResourceType("transit-movements-router"), ResourceLocation("message")), IAAction("WRITE"))
+
   def outgoing(@unused eori: EoriNumber, movementType: MovementType, movementId: MovementId, messageId: MessageId): Action[Source[ByteString, _]] = {
     def viaEIS(customsOffice: CustomsOffice, source: Source[ByteString, _])(implicit hc: HeaderCarrier): EitherT[Future, PresentationError, Status] =
       for {
@@ -109,7 +119,7 @@ class MessagesController @Inject() (
         _               <- sdesService.send(movementId, messageId, objectStoreFile).asPresentation
       } yield Accepted
 
-    DefaultActionBuilder.apply(cc.parsers.anyContent).stream {
+    internalAuth(predicate).stream {
       implicit request => size =>
         (for {
           messageType        <- messageTypeExtractor.extractFromHeaders(request.headers).asPresentation

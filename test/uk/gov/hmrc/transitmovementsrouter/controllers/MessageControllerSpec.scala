@@ -55,6 +55,11 @@ import play.api.test.Helpers.status
 import play.api.test.Helpers.stubControllerComponents
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.HttpVerbs.POST
+import uk.gov.hmrc.internalauth.client.IAAction
+import uk.gov.hmrc.internalauth.client.Predicate
+import uk.gov.hmrc.internalauth.client.Resource
+import uk.gov.hmrc.internalauth.client.ResourceLocation
+import uk.gov.hmrc.internalauth.client.ResourceType
 import uk.gov.hmrc.objectstore.client.ObjectSummaryWithMd5
 import uk.gov.hmrc.transitmovementsrouter.base.StreamTestHelpers.createStream
 import uk.gov.hmrc.transitmovementsrouter.base.TestActorSystem
@@ -64,6 +69,8 @@ import uk.gov.hmrc.transitmovementsrouter.connectors.PersistenceConnector
 import uk.gov.hmrc.transitmovementsrouter.connectors.PushNotificationsConnector
 import uk.gov.hmrc.transitmovementsrouter.connectors.UpscanConnector
 import uk.gov.hmrc.transitmovementsrouter.controllers.actions.AuthenticateEISToken
+import uk.gov.hmrc.transitmovementsrouter.controllers.actions.InternalAuthActionProvider
+import uk.gov.hmrc.transitmovementsrouter.controllers.actions.InternalAuthActionProvider
 import uk.gov.hmrc.transitmovementsrouter.controllers.errors.PresentationError
 import uk.gov.hmrc.transitmovementsrouter.fakes.actions.FakeXmlTransformer
 import uk.gov.hmrc.transitmovementsrouter.generators.TestModelGenerators
@@ -139,6 +146,7 @@ class MessageControllerSpec
     override protected def executionContext: ExecutionContext = scala.concurrent.ExecutionContext.global
   }
 
+  val mockInternalAuthActionProvider                 = mock[InternalAuthActionProvider]
   val mockMessageTypeExtractor: MessageTypeExtractor = mock[MessageTypeExtractor]
   val config: AppConfig                              = mock[AppConfig]
 
@@ -155,6 +163,7 @@ class MessageControllerSpec
       mockUpscanConnector,
       mockCustomOfficeExtractorService,
       mockSDESService,
+      mockInternalAuthActionProvider,
       config
     ) {
       // suppress logging
@@ -191,6 +200,16 @@ class MessageControllerSpec
       body = body
     )
 
+  private def resetAuthAction() = {
+    reset(mockInternalAuthActionProvider)
+    when(
+      mockInternalAuthActionProvider(
+        eqTo(Predicate.Permission(Resource(ResourceType("transit-movements-router"), ResourceLocation("message")), IAAction("WRITE")))
+      )(any())
+    )
+      .thenReturn(DefaultActionBuilder.apply(stubControllerComponents().parsers.defaultBodyParser))
+  }
+
   override def beforeEach(): Unit = {
     reset(mockRoutingService)
     reset(mockMessageTypeExtractor)
@@ -203,6 +222,8 @@ class MessageControllerSpec
     reset(config)
     when(config.logIncoming).thenReturn(true)
     when(config.eisSizeLimit).thenReturn(5000000) // TODO: vary per test
+
+    resetAuthAction()
     super.afterEach()
   }
 
@@ -232,6 +253,10 @@ class MessageControllerSpec
       val result = controller().outgoing(eori, movementType, movementId, messageId)(fakeRequest(cc015cOfficeOfDepartureGB, outgoing, messageTypeHeader))
 
       status(result) mustBe CREATED
+
+      verify(mockInternalAuthActionProvider, times(1)).apply(
+        eqTo(Predicate.Permission(Resource(ResourceType("transit-movements-router"), ResourceLocation("message")), IAAction("WRITE")))
+      )(any())
     }
 
     "must return ACCEPTED when declaration is submitted successfully via the SDES route" in forAll(
@@ -243,6 +268,7 @@ class MessageControllerSpec
       arbitrary[RequestMessageType]
     ) {
       (eori, movementType, movementId, messageId, summary, messageType) =>
+        resetAuthAction()
         val expectedConversationId = ConversationId(movementId, messageId)
 
         when(config.eisSizeLimit).thenReturn(-1)
@@ -278,12 +304,17 @@ class MessageControllerSpec
           MessageId(eqTo(messageId.value)),
           eqTo(summary)
         )(any[ExecutionContext], any[HeaderCarrier])
+
+        verify(mockInternalAuthActionProvider, times(1)).apply(
+          eqTo(Predicate.Permission(Resource(ResourceType("transit-movements-router"), ResourceLocation("message")), IAAction("WRITE")))
+        )(any())
     }
 
     "must return BAD_REQUEST when declaration submission fails" - {
 
       "returns INVALID_OFFICE when an invalid custom office supplied in payload" in forAll(Gen.alphaNumStr, Gen.alphaStr) {
         (office, field) =>
+          resetAuthAction()
           when(mockCustomOfficeExtractorService.extractCustomOffice(any(), any()))
             .thenReturn(
               EitherT[Future, CustomOfficeExtractorError, CustomsOffice](
@@ -302,6 +333,10 @@ class MessageControllerSpec
             "office"  -> office,
             "field"   -> field
           )
+
+          verify(mockInternalAuthActionProvider, times(1)).apply(
+            eqTo(Predicate.Permission(Resource(ResourceType("transit-movements-router"), ResourceLocation("message")), IAAction("WRITE")))
+          )(any())
       }
 
       "returns message to indicate element not found" in {
@@ -320,6 +355,10 @@ class MessageControllerSpec
           "code"    -> "BAD_REQUEST",
           "message" -> "Element messageSender not found"
         )
+
+        verify(mockInternalAuthActionProvider, times(1)).apply(
+          eqTo(Predicate.Permission(Resource(ResourceType("transit-movements-router"), ResourceLocation("message")), IAAction("WRITE")))
+        )(any())
       }
 
       "returns message to indicate too many elements" in {
@@ -338,6 +377,10 @@ class MessageControllerSpec
           "code"    -> "BAD_REQUEST",
           "message" -> "Found too many elements of type eori"
         )
+
+        verify(mockInternalAuthActionProvider, times(1)).apply(
+          eqTo(Predicate.Permission(Resource(ResourceType("transit-movements-router"), ResourceLocation("message")), IAAction("WRITE")))
+        )(any())
       }
 
       "returns message to inform that the X-Message-Type header is not present" in {
@@ -352,6 +395,10 @@ class MessageControllerSpec
           "code"    -> "BAD_REQUEST",
           "message" -> "Missing header: X-Message-Type"
         )
+
+        verify(mockInternalAuthActionProvider, times(1)).apply(
+          eqTo(Predicate.Permission(Resource(ResourceType("transit-movements-router"), ResourceLocation("message")), IAAction("WRITE")))
+        )(any())
       }
 
       "returns message to inform that the X-Message-Type header value is invalid" in {
@@ -368,6 +415,10 @@ class MessageControllerSpec
           "code"    -> "BAD_REQUEST",
           "message" -> "Invalid message type: invalid"
         )
+
+        verify(mockInternalAuthActionProvider, times(1)).apply(
+          eqTo(Predicate.Permission(Resource(ResourceType("transit-movements-router"), ResourceLocation("message")), IAAction("WRITE")))
+        )(any())
       }
 
       "returns message is not a request message" in {
@@ -381,6 +432,10 @@ class MessageControllerSpec
           "code"    -> "BAD_REQUEST",
           "message" -> s"${MessageType.Discrepancies.code} is not valid for requests"
         )
+
+        verify(mockInternalAuthActionProvider, times(1)).apply(
+          eqTo(Predicate.Permission(Resource(ResourceType("transit-movements-router"), ResourceLocation("message")), IAAction("WRITE")))
+        )(any())
       }
     }
 
@@ -412,6 +467,10 @@ class MessageControllerSpec
         "code"    -> "INTERNAL_SERVER_ERROR",
         "message" -> "Internal server error"
       )
+
+      verify(mockInternalAuthActionProvider, times(1)).apply(
+        eqTo(Predicate.Permission(Resource(ResourceType("transit-movements-router"), ResourceLocation("message")), IAAction("WRITE")))
+      )(any())
     }
 
   }
@@ -438,6 +497,8 @@ class MessageControllerSpec
 
         status(result) mustBe CREATED
         header("X-Message-Id", result) mustBe Some(messageId.value)
+
+        verifyNoInteractions(mockInternalAuthActionProvider)
     }
 
     "must return BAD_REQUEST when the X-Message-Type header is missing or body seems to not contain an appropriate root tag" in {
@@ -446,6 +507,7 @@ class MessageControllerSpec
       val result = controller().incomingViaEIS(ConversationId(movementId, messageId))(fakeRequest(incomingXml, incoming))
 
       status(result) mustBe BAD_REQUEST
+      verifyNoInteractions(mockInternalAuthActionProvider)
 
     }
 
@@ -459,6 +521,7 @@ class MessageControllerSpec
       val result = controller().incomingViaEIS(ConversationId(movementId, messageId))(request)
 
       status(result) mustBe BAD_REQUEST
+      verifyNoInteractions(mockInternalAuthActionProvider)
     }
 
     "must return NOT_FOUND when target movement is invalid or archived" in {
@@ -473,6 +536,7 @@ class MessageControllerSpec
       val result = controller().incomingViaEIS(ConversationId(movementId, messageId))(request)
 
       status(result) mustBe NOT_FOUND
+      verifyNoInteractions(mockInternalAuthActionProvider)
     }
 
     "must return INTERNAL_SERVER_ERROR when persistence service fails unexpected" in {
@@ -487,6 +551,7 @@ class MessageControllerSpec
       val result = controller().incomingViaEIS(ConversationId(movementId, messageId))(request)
 
       status(result) mustBe INTERNAL_SERVER_ERROR
+      verifyNoInteractions(mockInternalAuthActionProvider)
     }
 
   }
@@ -525,6 +590,7 @@ class MessageControllerSpec
 
         status(result) mustBe CREATED
         header("X-Message-Id", result) mustBe Some(messageId.value)
+        verifyNoInteractions(mockInternalAuthActionProvider)
     }
 
     "must return NOT_FOUND when target movement is invalid or archived" in forAll(
@@ -551,6 +617,7 @@ class MessageControllerSpec
         status(result) mustBe NOT_FOUND
 
         verifyNoInteractions(mockPushNotificationsConnector)
+        verifyNoInteractions(mockInternalAuthActionProvider)
     }
 
     "must return BAD_REQUEST when malformed json received from callback" in forAll(
@@ -573,6 +640,7 @@ class MessageControllerSpec
         verifyNoInteractions(mockMessageTypeExtractor)
         verifyNoInteractions(mockPersistenceConnector)
         verifyNoInteractions(mockPushNotificationsConnector)
+        verifyNoInteractions(mockInternalAuthActionProvider)
     }
 
     "must return BAD_REQUEST when body seems to not contain an appropriate root tag" in forAll(
@@ -596,6 +664,7 @@ class MessageControllerSpec
 
         verifyNoInteractions(mockPersistenceConnector)
         verifyNoInteractions(mockPushNotificationsConnector)
+        verifyNoInteractions(mockInternalAuthActionProvider)
     }
 
     "must return BAD_REQUEST when message type is invalid" in forAll(
@@ -620,6 +689,7 @@ class MessageControllerSpec
 
         verifyNoInteractions(mockPersistenceConnector)
         verifyNoInteractions(mockPushNotificationsConnector)
+        verifyNoInteractions(mockInternalAuthActionProvider)
     }
 
     "must return INTERNAL_SERVER_ERROR when persistence service fails unexpectedly" in forAll(
@@ -645,6 +715,7 @@ class MessageControllerSpec
         status(result) mustBe INTERNAL_SERVER_ERROR
 
         verifyNoInteractions(mockPushNotificationsConnector)
+        verifyNoInteractions(mockInternalAuthActionProvider)
     }
   }
 
@@ -704,6 +775,8 @@ class MessageControllerSpec
         any[HeaderCarrier],
         any[ExecutionContext]
       )
+
+      verifyNoInteractions(mockInternalAuthActionProvider)
     }
 
     "must return OK when status is updated successfully but push notification got failed for SDES callback" in {
@@ -755,6 +828,8 @@ class MessageControllerSpec
         any[HeaderCarrier],
         any[ExecutionContext]
       )
+
+      verifyNoInteractions(mockInternalAuthActionProvider)
     }
 
     "must return INTERNAL_SERVER_ERROR when status is not updated for SDES callback" in {
@@ -812,6 +887,8 @@ class MessageControllerSpec
         any[HeaderCarrier],
         any[ExecutionContext]
       )
+
+      verifyNoInteractions(mockInternalAuthActionProvider)
     }
 
     "must return BAD_REQUEST for SDES malformed callback" in {
@@ -820,6 +897,8 @@ class MessageControllerSpec
       val result = controller().handleSdesResponse()(request)
 
       status(result) mustBe BAD_REQUEST
+
+      verifyNoInteractions(mockInternalAuthActionProvider)
     }
   }
 
