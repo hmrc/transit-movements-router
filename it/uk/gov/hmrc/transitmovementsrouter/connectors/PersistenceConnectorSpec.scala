@@ -19,6 +19,7 @@ package uk.gov.hmrc.transitmovementsrouter.connectors
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import com.github.tomakehurst.wiremock.client.WireMock._
+import com.github.tomakehurst.wiremock.stubbing.StubMapping
 import io.lemonlabs.uri.QueryString
 import io.lemonlabs.uri.Url
 import org.mockito.Mockito.when
@@ -75,15 +76,17 @@ class PersistenceConnectorSpec
     path = s"/transit-movements/traders/movements/${movementId.value}/messages/${messageId.value}"
   ).toStringRaw
 
-  val appConfig = mock[AppConfig]
+  val token = Gen.alphaNumStr.sample.get
 
+  implicit val appConfig = mock[AppConfig]
+  when(appConfig.internalAuthToken).thenReturn(token)
   when(appConfig.persistenceServiceBaseUrl).thenAnswer {
     _ =>
       Url.parse(server.baseUrl())
   }
 
   implicit val hc    = HeaderCarrier()
-  lazy val connector = new PersistenceConnectorImpl(httpClientV2, appConfig)
+  lazy val connector = new PersistenceConnectorImpl(httpClientV2)
 
   val errorCodes = Gen.oneOf(
     Seq(
@@ -95,10 +98,11 @@ class PersistenceConnectorSpec
 
   def source: Source[ByteString, _] = Source.single(ByteString.fromString("<TraderChannelResponse><CC013C></CC013C></TraderChannelResponse>"))
 
-  def stubForPostBody(codeToReturn: Int, body: Option[String] = None) = server.stubFor(
+  def stubForPostBody(codeToReturn: Int, body: Option[String] = None): StubMapping = server.stubFor(
     post(
       urlEqualTo(uriPersistence)
     ).withHeader("X-Message-Type", equalTo(MessageType.DeclarationAmendment.code))
+      .withHeader(HeaderNames.AUTHORIZATION, equalTo(token))
       .withHeader(HeaderNames.CONTENT_TYPE, equalTo(MimeTypes.XML))
       .withRequestBody(equalToXml("<TraderChannelResponse><CC013C></CC013C></TraderChannelResponse>"))
       .willReturn(
@@ -107,21 +111,12 @@ class PersistenceConnectorSpec
       )
   )
 
-  def stubForPostObjectStoreUri(codeToReturn: Int, body: Option[String] = None) = server.stubFor(
-    post(
-      urlEqualTo(uriPersistence)
-    ).withHeader("X-Message-Type", equalTo(MessageType.DeclarationAmendment.code))
-      .withHeader("X-Object-Store-Uri", equalTo(ObjectStoreURI(objectStoreURI).value))
-      .willReturn(
-        if (body.isEmpty) aResponse().withStatus(codeToReturn)
-        else aResponse().withStatus(codeToReturn).withBody(body.get)
-      )
-  )
-
-  def stubForPatchMessageStatus(codeToReturn: Int) = server.stubFor(
+  def stubForPatchMessageStatus(codeToReturn: Int): StubMapping = server.stubFor(
     patch(
       urlEqualTo(uriStatus)
-    ).withHeader(HeaderNames.CONTENT_TYPE, equalTo(MimeTypes.JSON))
+    )
+      .withHeader(HeaderNames.AUTHORIZATION, equalTo(token))
+      .withHeader(HeaderNames.CONTENT_TYPE, equalTo(MimeTypes.JSON))
       .withRequestBody(
         equalToJson(
           Json
@@ -177,51 +172,6 @@ class PersistenceConnectorSpec
       val failingSource = Source.single(ByteString.fromString("<abc>asdadsadads")).via(new EISMessageTransformersImpl().unwrap)
 
       whenReady(connector.postBody(movementId, messageId, DeclarationAmendment, failingSource).value) {
-        res =>
-          res mustBe a[Left[Unexpected, _]]
-          res.left.toOption.get.asInstanceOf[Unexpected].thr.isDefined
-      }
-    }
-
-  }
-
-  "post for Large Message" should {
-    "return messageId when post is successful" in {
-      val body = Json.obj("messageId" -> messageId.value).toString()
-      stubForPostObjectStoreUri(OK, Some(body))
-
-      whenReady(connector.postObjectStoreUri(movementId, messageId, DeclarationAmendment, ObjectStoreURI(objectStoreURI)).value) {
-        x =>
-          x.isRight mustBe true
-          x mustBe Right(PersistenceResponse(messageId))
-      }
-    }
-
-    "return a PersistenceError when unsuccessful" in forAll(errorCodes) {
-      statusCode =>
-        server.resetAll()
-        stubForPostObjectStoreUri(statusCode)
-
-        whenReady(connector.postObjectStoreUri(movementId, messageId, DeclarationAmendment, ObjectStoreURI(objectStoreURI)).value) {
-          x =>
-            x.isLeft mustBe true
-
-            statusCode match {
-              case BAD_REQUEST           => x mustBe a[Left[Unexpected, _]]
-              case NOT_FOUND             => x mustBe a[Left[MovementNotFound, _]]
-              case INTERNAL_SERVER_ERROR => x mustBe a[Left[Unexpected, _]]
-              case _                     => fail()
-            }
-
-        }
-    }
-
-    "return Unexpected(throwable) when NonFatal exception is thrown" in {
-      server.resetAll()
-
-      stubForPostObjectStoreUri(OK)
-
-      whenReady(connector.postObjectStoreUri(movementId, messageId, DeclarationAmendment, ObjectStoreURI(objectStoreURI)).value) {
         res =>
           res mustBe a[Left[Unexpected, _]]
           res.left.toOption.get.asInstanceOf[Unexpected].thr.isDefined

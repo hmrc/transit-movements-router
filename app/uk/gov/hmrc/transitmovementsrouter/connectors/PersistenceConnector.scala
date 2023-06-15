@@ -65,16 +65,6 @@ trait PersistenceConnector {
     ec: ExecutionContext
   ): EitherT[Future, PersistenceError, PersistenceResponse]
 
-  def postObjectStoreUri(
-    movementId: MovementId,
-    messageId: MessageId,
-    messageType: MessageType,
-    objectStoreURI: ObjectStoreURI
-  )(implicit
-    hc: HeaderCarrier,
-    ec: ExecutionContext
-  ): EitherT[Future, PersistenceError, PersistenceResponse]
-
   def patchMessageStatus(
     movementId: MovementId,
     messageId: MessageId,
@@ -86,7 +76,7 @@ trait PersistenceConnector {
 }
 
 @Singleton
-class PersistenceConnectorImpl @Inject() (httpClientV2: HttpClientV2, appConfig: AppConfig) extends PersistenceConnector {
+class PersistenceConnectorImpl @Inject() (httpClientV2: HttpClientV2)(implicit appConfig: AppConfig) extends PersistenceConnector with BaseConnector {
 
   val baseUrl           = appConfig.persistenceServiceBaseUrl
   val baseRoute: String = "/transit-movements"
@@ -105,20 +95,6 @@ class PersistenceConnectorImpl @Inject() (httpClientV2: HttpClientV2, appConfig:
       val request = createRequest(movementId, triggerId)
         .transform(_.addHttpHeaders(HeaderNames.CONTENT_TYPE -> MimeTypes.XML, RouterHeaderNames.MESSAGE_TYPE -> messageType.code))
         .withBody(source)
-      execute(request, movementId)
-    }
-
-  override def postObjectStoreUri(movementId: MovementId, triggerId: MessageId, messageType: MessageType, objectStoreURI: ObjectStoreURI)(implicit
-    hc: HeaderCarrier,
-    ec: ExecutionContext
-  ): EitherT[Future, PersistenceError, PersistenceResponse] =
-    EitherT {
-      val request = createRequest(movementId, triggerId).transform(
-        _.addHttpHeaders(
-          RouterHeaderNames.MESSAGE_TYPE     -> messageType.code,
-          RouterHeaderNames.OBJECT_STORE_URI -> objectStoreURI.value
-        )
-      )
       execute(request, movementId)
     }
 
@@ -141,7 +117,7 @@ class PersistenceConnectorImpl @Inject() (httpClientV2: HttpClientV2, appConfig:
     )
 
   private def execute(requestBuilder: RequestBuilder, movementId: MovementId)(implicit ec: ExecutionContext) =
-    requestBuilder
+    requestBuilder.withInternalAuthToken
       .execute[Either[UpstreamErrorResponse, HttpResponse]]
       .map {
         case Right(res) =>
@@ -163,7 +139,7 @@ class PersistenceConnectorImpl @Inject() (httpClientV2: HttpClientV2, appConfig:
       }
 
   private def executeAndExpect(requestBuilder: RequestBuilder, expected: Int)(implicit ec: ExecutionContext) =
-    requestBuilder
+    requestBuilder.withInternalAuthToken
       .execute[HttpResponse]
       .flatMap {
         response =>
@@ -178,7 +154,7 @@ class PersistenceConnectorImpl @Inject() (httpClientV2: HttpClientV2, appConfig:
     httpClientV2.post(url"$url")
   }
 
-  private def updateStatusRequest(movementId: MovementId, messageId: MessageId)(implicit hc: HeaderCarrier, ec: ExecutionContext) = {
+  private def updateStatusRequest(movementId: MovementId, messageId: MessageId)(implicit hc: HeaderCarrier) = {
     val url = baseUrl.withPath(persistenceUpdateStatus(movementId, messageId))
     httpClientV2.patch(url"$url")
   }

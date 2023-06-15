@@ -119,7 +119,6 @@ class MessageControllerSpec
   val mockPushNotificationsConnector: PushNotificationsConnector     = mock[PushNotificationsConnector]
   val mockUpscanResponseParser: UpscanResponseParser                 = mock[UpscanResponseParser]
   val mockObjectStoreService: ObjectStoreService                     = mock[ObjectStoreService]
-  val mockObjectStoreURIExtractor: ObjectStoreURIExtractor           = mock[ObjectStoreURIExtractor]
   val mockCustomOfficeExtractorService: CustomOfficeExtractorService = mock[CustomOfficeExtractorService]
   val mockSDESService: SDESService                                   = mock[SDESService]
   val mockSdesResponseParser: SdesResponseParser                     = mock[SdesResponseParser]

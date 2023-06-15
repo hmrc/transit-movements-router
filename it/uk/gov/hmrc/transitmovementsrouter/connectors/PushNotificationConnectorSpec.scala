@@ -24,6 +24,7 @@ import com.github.tomakehurst.wiremock.client.WireMock.equalToJson
 import com.github.tomakehurst.wiremock.client.WireMock.equalToXml
 import com.github.tomakehurst.wiremock.client.WireMock.post
 import com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo
+import com.github.tomakehurst.wiremock.stubbing.StubMapping
 import io.lemonlabs.uri.Url
 import io.lemonlabs.uri.UrlPath
 import org.mockito.Mockito.when
@@ -70,8 +71,10 @@ class PushNotificationConnectorSpec
   val uriPushNotifications =
     UrlPath.parse(s"/transit-movements-push-notifications/traders/movements/${movementId.value}/messages/${messageId.value}").toString()
 
-  val mockAppConfig = mock[AppConfig]
+  val token = Gen.alphaNumStr.sample.get
 
+  implicit val mockAppConfig = mock[AppConfig]
+  when(mockAppConfig.internalAuthToken).thenReturn(token)
   when(mockAppConfig.transitMovementsPushNotificationsUrl).thenAnswer {
     _ =>
       Url.parse(server.baseUrl())
@@ -79,7 +82,7 @@ class PushNotificationConnectorSpec
 
   implicit val hc = HeaderCarrier()
 
-  lazy val connector = new PushNotificationsConnectorImpl(httpClientV2, mockAppConfig)
+  lazy val connector = new PushNotificationsConnectorImpl(httpClientV2)
 
   val errorCodes = Gen.oneOf(
     Seq(
@@ -91,26 +94,29 @@ class PushNotificationConnectorSpec
   val source: Source[ByteString, _] = Source.single(ByteString.fromString("<CC029C></CC029C>"))
   val body                          = Json.obj("messageId" -> messageId.value)
 
-  def xmlStub(codeToReturn: Int) = server.stubFor(
+  def xmlStub(codeToReturn: Int): StubMapping = server.stubFor(
     post(
       urlEqualTo(uriPushNotifications)
-    ).withHeader(HeaderNames.CONTENT_TYPE, equalTo(MimeTypes.XML))
+    ).withHeader(HeaderNames.AUTHORIZATION, equalTo(token))
+      .withHeader(HeaderNames.CONTENT_TYPE, equalTo(MimeTypes.XML))
       .withRequestBody(equalToXml("<CC029C></CC029C>"))
       .willReturn(aResponse().withStatus(codeToReturn))
   )
 
-  def jsonStub(codeToReturn: Int) = server.stubFor(
+  def jsonStub(codeToReturn: Int): StubMapping = server.stubFor(
     post(
       urlEqualTo(uriPushNotifications)
-    ).withHeader(HeaderNames.CONTENT_TYPE, equalTo(MimeTypes.JSON))
+    ).withHeader(HeaderNames.AUTHORIZATION, equalTo(token))
+      .withHeader(HeaderNames.CONTENT_TYPE, equalTo(MimeTypes.JSON))
       .withRequestBody(equalToJson(Json.obj("messageId" -> messageId.value).toString()))
       .willReturn(aResponse().withStatus(codeToReturn))
   )
 
-  def noBodyStub(codeToReturn: Int) = server.stubFor(
+  def noBodyStub(codeToReturn: Int): StubMapping = server.stubFor(
     post(
       urlEqualTo(uriPushNotifications)
     )
+      .withHeader(HeaderNames.AUTHORIZATION, equalTo(token))
       .willReturn(aResponse().withStatus(codeToReturn))
   )
 

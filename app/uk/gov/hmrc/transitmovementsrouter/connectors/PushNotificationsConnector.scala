@@ -65,7 +65,9 @@ trait PushNotificationsConnector {
 }
 
 @Singleton
-class PushNotificationsConnectorImpl @Inject() (httpClientV2: HttpClientV2, appConfig: AppConfig) extends PushNotificationsConnector {
+class PushNotificationsConnectorImpl @Inject() (httpClientV2: HttpClientV2)(implicit appConfig: AppConfig)
+    extends PushNotificationsConnector
+    with BaseConnector {
 
   val baseUrl           = appConfig.transitMovementsPushNotificationsUrl
   val baseRoute: String = "/transit-movements-push-notifications"
@@ -135,7 +137,7 @@ class PushNotificationsConnectorImpl @Inject() (httpClientV2: HttpClientV2, appC
     }
 
   private def executeAndExpect(requestBuilder: RequestBuilder, expected: Int)(implicit ec: ExecutionContext) =
-    requestBuilder
+    requestBuilder.withInternalAuthToken
       .execute[HttpResponse]
       .flatMap {
         response =>
