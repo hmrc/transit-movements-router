@@ -199,7 +199,8 @@ class MessagesControllerIntegrationSpec
       "microservice.services.eis.gb.uri"                                -> "/gb",
       "microservice.services.eis.xi.uri"                                -> "/xi",
       "microservice.services.eis.gb.retry.max-retries"                  -> 0,
-      "microservice.services.eis.message-size-limit"                    -> s"${sampleOutgoingLargeXmlSize}B"
+      "microservice.services.eis.message-size-limit"                    -> s"${sampleOutgoingLargeXmlSize}B",
+      "microservice.services.internal-auth.enabled"                     -> false
     )
 
   private val clock   = Clock.fixed(OffsetDateTime.of(2023, 4, 13, 10, 34, 41, 500, ZoneOffset.UTC).toInstant, ZoneOffset.UTC)
