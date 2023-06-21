@@ -37,8 +37,10 @@ import uk.gov.hmrc.http.client.HttpClientV2
 import uk.gov.hmrc.http.{HeaderNames => HMRCHeaderNames}
 import uk.gov.hmrc.transitmovementsrouter.config.EISInstanceConfig
 import uk.gov.hmrc.transitmovementsrouter.models.ConversationId
+import uk.gov.hmrc.transitmovementsrouter.models.LocalReferenceNumber
 import uk.gov.hmrc.transitmovementsrouter.models.MessageId
 import uk.gov.hmrc.transitmovementsrouter.models.MovementId
+import uk.gov.hmrc.transitmovementsrouter.models.errors.ErrorCode
 import uk.gov.hmrc.transitmovementsrouter.models.errors.RoutingError
 import uk.gov.hmrc.transitmovementsrouter.utils.RouterHeaderNames
 
@@ -89,8 +91,9 @@ class EISConnectorImpl(
 
   def onFailure(response: Either[RoutingError, Unit], retryDetails: RetryDetails): Future[Unit] =
     response.left.toOption.get match {
-      case RoutingError.Upstream(upstreamErrorResponse) => attemptRetry(s"with status code ${upstreamErrorResponse.statusCode}", retryDetails)
-      case RoutingError.Unexpected(message, _)          => attemptRetry(s"with error $message", retryDetails)
+      case RoutingError.Upstream(upstreamErrorResponse)       => attemptRetry(s"with status code ${upstreamErrorResponse.statusCode}", retryDetails)
+      case RoutingError.DuplicateLRNError(message, code, lrn) => attemptRetry(s"with status code $code and error $message", retryDetails)
+      case RoutingError.Unexpected(message, _)                => attemptRetry(s"with error $message", retryDetails)
       case x: RoutingError =>
         logger.error(s"An unexpected error occurred - got a ${x.getClass}")
         Future.failed(new IllegalStateException(s"An unexpected error occurred - got a ${x.getClass}"))
@@ -108,11 +111,12 @@ class EISConnectorImpl(
           HeaderCarrier(requestChain = hc.requestChain, extraHeaders = hc.headers(Seq("X-Client-Id")))
         else HeaderCarrier(requestChain = hc.requestChain)
 
-      val requestId      = hc.requestId.map(_.value)
-      val correlationId  = UUID.randomUUID().toString
-      val accept         = MimeTypes.XML
-      val conversationId = ConversationId(movementId, MessageId("0000000000000000")) // ConversationId(movementId, messageId)
-      val date           = HTTP_DATE_FORMATTER.format(OffsetDateTime.now())
+      val requestId       = hc.requestId.map(_.value)
+      val correlationId   = UUID.randomUUID().toString
+      val accept          = MimeTypes.XML
+      val conversationId  = ConversationId(movementId, MessageId("0000000000000000")) // ConversationId(movementId, messageId)
+      val date            = HTTP_DATE_FORMATTER.format(OffsetDateTime.now())
+      val lrnRegexPattern = "The supplied LRN: ([a-zA-Z0-9]+) has already been used by submitter: ([a-zA-Z0-9]+)".r
 
       val messageType =
         hc.headersForUrl(headerCarrierConfig)(eisInstanceConfig.url).find(_._1 equalsIgnoreCase RouterHeaderNames.MESSAGE_TYPE).map(_._2).getOrElse("undefined")
@@ -157,7 +161,30 @@ class EISConnectorImpl(
                 } else s"Response status: ${error.statusCode}"
 
               logger.warn(logMessage + status)
-              Left(RoutingError.Upstream(UpstreamErrorResponse(s"Request Error: Routing to $code returned status code ${error.statusCode}", error.statusCode)))
+
+              error.statusCode match {
+                case ErrorCode.Forbidden.statusCode | ErrorCode.InternalServerError.statusCode =>
+                  val lrnMatch = lrnRegexPattern.findFirstMatchIn(error.message)
+                  lrnMatch match {
+                    case Some(message) =>
+                      val lrn: LocalReferenceNumber =
+                        Some(message)
+                          .map(_.group(1))
+                          .map(LocalReferenceNumber.apply)
+                          .get
+                      Left(RoutingError.DuplicateLRNError(s"LRN ${lrn.value} has previously been used and cannot be reused", ErrorCode.Conflict, lrn))
+                    case None =>
+                      Left(
+                        RoutingError.Upstream(
+                          UpstreamErrorResponse(s"Request Error: Routing to $code returned status code ${error.statusCode}", error.statusCode)
+                        )
+                      )
+                  }
+                case _ =>
+                  Left(
+                    RoutingError.Upstream(UpstreamErrorResponse(s"Request Error: Routing to $code returned status code ${error.statusCode}", error.statusCode))
+                  )
+              }
           }
           .recover {
             case NonFatal(e) =>

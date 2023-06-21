@@ -25,13 +25,16 @@ import org.scalatest.matchers.must.Matchers
 import org.scalatestplus.mockito.MockitoSugar
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 import uk.gov.hmrc.http.UpstreamErrorResponse
+import uk.gov.hmrc.transitmovementsrouter.controllers.errors.PresentationError.duplicateLRNError
 import uk.gov.hmrc.transitmovementsrouter.models.CustomsOffice
+import uk.gov.hmrc.transitmovementsrouter.models.LocalReferenceNumber
 import uk.gov.hmrc.transitmovementsrouter.models.MessageId
 import uk.gov.hmrc.transitmovementsrouter.models.MovementId
 import uk.gov.hmrc.transitmovementsrouter.models.errors.CustomOfficeExtractorError.NoElementFound
 import uk.gov.hmrc.transitmovementsrouter.models.errors.CustomOfficeExtractorError.TooManyElementsFound
 import uk.gov.hmrc.transitmovementsrouter.models.errors.CustomOfficeExtractorError.UnrecognisedOffice
 import uk.gov.hmrc.transitmovementsrouter.models.errors.ErrorCode.BadRequest
+import uk.gov.hmrc.transitmovementsrouter.models.errors.ErrorCode.Conflict
 import uk.gov.hmrc.transitmovementsrouter.models.errors.ErrorCode.InternalServerError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.ErrorCode.InvalidOffice
 import uk.gov.hmrc.transitmovementsrouter.models.errors.ErrorCode.NotFound
@@ -92,6 +95,13 @@ class ConvertErrorSpec extends AnyFreeSpec with Matchers with OptionValues with 
       val input = Left[RoutingError, Unit](BadDateTime("test", new DateTimeParseException("parse error", new StringBuilder("error"), 0))).toEitherT[Future]
       whenReady(input.asPresentation.value) {
         _ mustBe Left(StandardError("Could not parse datetime for test: parse error", BadRequest))
+      }
+    }
+
+    "a DuplicateLRNError should result Conflict error" in {
+      val input = Left[RoutingError, Unit](DuplicateLRNError("LRN 1234 already used", Conflict, LocalReferenceNumber("1234"))).toEitherT[Future]
+      whenReady(input.asPresentation.value) {
+        _ mustBe Left(duplicateLRNError("LRN 1234 already used", LocalReferenceNumber("1234")))
       }
     }
 

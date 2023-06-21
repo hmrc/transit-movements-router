@@ -17,6 +17,7 @@
 package uk.gov.hmrc.transitmovementsrouter.models.errors
 
 import play.api.http.Status.BAD_REQUEST
+import play.api.http.Status.CONFLICT
 import play.api.http.Status.FORBIDDEN
 import play.api.http.Status.GATEWAY_TIMEOUT
 import play.api.http.Status.INTERNAL_SERVER_ERROR
@@ -45,6 +46,7 @@ object ErrorCode {
   case object UnsupportedMediaType extends ErrorCode("UNSUPPORTED_MEDIA_TYPE", UNSUPPORTED_MEDIA_TYPE)
   case object Unauthorized         extends ErrorCode("UNAUTHORIZED", UNAUTHORIZED)
   case object NotImplemented       extends ErrorCode("NOT_IMPLEMENTED", NOT_IMPLEMENTED)
+  case object Conflict             extends ErrorCode("CONFLICT", CONFLICT)
 
   lazy val errorCodes: Seq[ErrorCode] = Seq(
     BadRequest,
@@ -57,7 +59,8 @@ object ErrorCode {
     EntityTooLarge,
     UnsupportedMediaType,
     Unauthorized,
-    NotImplemented
+    NotImplemented,
+    Conflict
   )
 
   implicit val errorCodeWrites: Writes[ErrorCode] = Writes {
