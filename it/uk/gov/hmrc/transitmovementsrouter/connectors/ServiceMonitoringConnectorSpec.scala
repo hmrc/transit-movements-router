@@ -76,6 +76,7 @@ class ServiceMonitoringConnectorSpec
         server.stubFor(
           post("/outgoing")
             .withHeader("X-Message-Sender", equalTo(expectedConversationId.value.toString))
+            .withHeader("Content-Type", equalTo("text/plain; charset=UTF-8"))
             .withRequestBody(
               equalToJson(
                 s"""{
@@ -104,6 +105,7 @@ class ServiceMonitoringConnectorSpec
 
         server.stubFor(
           post("/outgoing")
+            .withHeader("Content-Type", equalTo("text/plain; charset=UTF-8"))
             .withRequestBody(
               equalToJson(
                 s"""{
@@ -143,6 +145,7 @@ class ServiceMonitoringConnectorSpec
 
         server.stubFor(
           post("/incoming")
+            .withHeader("Content-Type", equalTo("text/plain; charset=UTF-8"))
             .withRequestBody(
               equalToJson(
                 s"""{
@@ -170,6 +173,7 @@ class ServiceMonitoringConnectorSpec
 
         server.stubFor(
           post("/incoming")
+            .withHeader("Content-Type", equalTo("text/plain; charset=UTF-8"))
             .withRequestBody(
               equalToJson(
                 s"""{

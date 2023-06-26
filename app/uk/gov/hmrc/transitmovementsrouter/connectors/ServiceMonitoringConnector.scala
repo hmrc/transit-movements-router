@@ -18,7 +18,11 @@ package uk.gov.hmrc.transitmovementsrouter.connectors
 
 import com.google.inject.ImplementedBy
 import com.google.inject.Inject
+import play.api.libs.json.JsValue
 import play.api.libs.json.Json
+import play.api.libs.ws.BodyWritable
+import play.api.libs.ws.JsonBodyWritables
+import play.mvc.Http.MimeTypes
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.HttpReadsInstances._
 import uk.gov.hmrc.http.UpstreamErrorResponse
@@ -38,6 +42,7 @@ import java.net.URL
 import java.time.Clock
 import java.time.LocalDateTime
 import java.time.ZoneOffset
+import javax.activation.MimeType
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 
@@ -57,6 +62,9 @@ class ServiceMonitoringConnectorImpl @Inject() (appConfig: AppConfig, httpClient
 
   private lazy val outgoingUrl = new URL(s"${appConfig.serviceMonitoringUrl}${appConfig.serviceMonitoringOutgoingUri}")
   private lazy val incomingUrl = new URL(s"${appConfig.serviceMonitoringUrl}${appConfig.serviceMonitoringIncomingUri}")
+
+  // The NCTS monitoring service expects a content type of text/plain, so this implicit enforces it
+  implicit private val serviceMonitoringBodyWritable: BodyWritable[JsValue] = BodyWritable(JsonBodyWritables.writeableOf_JsValue.transform, MimeTypes.TEXT)
 
   override def outgoing(movementId: MovementId, messageId: MessageId, messageType: MessageType, office: CustomsOffice)(implicit
     hc: HeaderCarrier,
