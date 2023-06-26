@@ -73,7 +73,11 @@ class ObjectStoreServiceImpl @Inject() (clock: Clock, appConfig: AppConfig, clie
         contentMd5 = None
       )
     }.leftMap {
-      case NonFatal(thr) => ObjectStoreError.UnexpectedError(thr = Some(thr))
+      error =>
+        // avoids exhaustivity warnings
+        (error: @unchecked) match {
+          case NonFatal(thr) => ObjectStoreError.UnexpectedError(thr = Some(thr))
+        }
     }
 
   private def dateFormat =

@@ -40,8 +40,8 @@ import play.mvc.Http.MimeTypes
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.test.HttpClientV2Support
 import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
-import uk.gov.hmrc.transitmovementsrouter.generators.ModelGenerators
 import uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuite
+import uk.gov.hmrc.transitmovementsrouter.it.generators.ModelGenerators
 import uk.gov.hmrc.transitmovementsrouter.models.MessageType.DeclarationAmendment
 import uk.gov.hmrc.transitmovementsrouter.models._
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.MessageNotFound
@@ -200,7 +200,7 @@ class PersistenceConnectorSpec
 
         whenReady(connector.patchMessageStatus(movementId, messageId, MessageUpdate(MessageStatus.Success)).value) {
           case Left(error) =>
-            statusCode match {
+            (statusCode: @unchecked) match {
               case BAD_REQUEST           => error mustBe a[Unexpected]
               case NOT_FOUND             => error mustBe a[MessageNotFound]
               case INTERNAL_SERVER_ERROR => error mustBe a[Unexpected]

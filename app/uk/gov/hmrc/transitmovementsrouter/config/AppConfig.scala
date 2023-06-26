@@ -40,8 +40,6 @@ class AppConfig @Inject() (config: Configuration, servicesConfig: CTCServicesCon
 
   val pushNotificationsEnabled = servicesConfig.config("transit-movements-push-notifications").get[Boolean]("enabled")
 
-  lazy val messageSizeLimit: Int = config.get[Int]("messageSizeLimit")
-
   lazy val incomingAuth: IncomingAuthConfig = config.get[IncomingAuthConfig]("incomingRequestAuth")
 
   lazy val objectStoreUrl: String =
@@ -67,4 +65,9 @@ class AppConfig @Inject() (config: Configuration, servicesConfig: CTCServicesCon
 
   lazy val internalAuthEnabled: Boolean = config.get[Boolean]("microservice.services.internal-auth.enabled")
   lazy val internalAuthToken: String    = config.get[String]("internal-auth.token")
+
+  lazy val serviceMonitoringUrl         = servicesConfig.baseUrl("ncts")
+  lazy val serviceMonitoringEnabled     = config.get[Boolean]("microservice.services.ncts.enabled")
+  lazy val serviceMonitoringOutgoingUri = config.get[String]("microservice.services.ncts.outgoing-uri")
+  lazy val serviceMonitoringIncomingUri = config.get[String]("microservice.services.ncts.incoming-uri")
 }
