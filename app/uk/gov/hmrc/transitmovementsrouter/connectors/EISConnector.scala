@@ -83,7 +83,7 @@ class EISConnectorImpl(
 
   private val HTTP_DATE_FORMATTER = DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss", Locale.ENGLISH).withZone(ZoneOffset.UTC)
 
-  private lazy val lrnRegexPattern = "The supplied LRN: ([a-zA-Z0-9]+) has already been used by submitter: ([a-zA-Z0-9]+)".r
+  private lazy val lrnRegexPattern = ".*The supplied LRN: ([a-zA-Z0-9]+) has already been used by submitter: ([a-zA-Z0-9]+).*".r
 
   private def nowFormatted(): String =
     s"${HTTP_DATE_FORMATTER.format(OffsetDateTime.now(clock.withZone(ZoneOffset.UTC)))} UTC"
@@ -165,11 +165,12 @@ class EISConnectorImpl(
 
               error.statusCode match {
                 case ErrorCode.Forbidden.statusCode | ErrorCode.InternalServerError.statusCode =>
-                  lrnRegexPattern.findFirstMatchIn(error.message) match {
-                    case Some(message) =>
-                      val lrn = LocalReferenceNumber(message.group(1))
-                      Left(RoutingError.DuplicateLRNError(s"LRN ${lrn.value} has previously been used and cannot be reused", ErrorCode.Conflict, lrn))
-                    case None =>
+                  error.message match {
+                    case lrnRegexPattern(lrn, _) =>
+                      Left(
+                        RoutingError.DuplicateLRNError(s"LRN $lrn has previously been used and cannot be reused", ErrorCode.Conflict, LocalReferenceNumber(lrn))
+                      )
+                    case _ =>
                       Left(
                         RoutingError.Upstream(
                           UpstreamErrorResponse(s"Request Error: Routing to $code returned status code ${error.statusCode}", error.statusCode)
