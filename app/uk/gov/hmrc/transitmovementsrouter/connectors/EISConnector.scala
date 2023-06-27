@@ -83,6 +83,8 @@ class EISConnectorImpl(
 
   private val HTTP_DATE_FORMATTER = DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss", Locale.ENGLISH).withZone(ZoneOffset.UTC)
 
+  private lazy val lrnRegexPattern = "The supplied LRN: ([a-zA-Z0-9]+) has already been used by submitter: ([a-zA-Z0-9]+)".r
+
   private def nowFormatted(): String =
     s"${HTTP_DATE_FORMATTER.format(OffsetDateTime.now(clock.withZone(ZoneOffset.UTC)))} UTC"
 
@@ -111,12 +113,11 @@ class EISConnectorImpl(
           HeaderCarrier(requestChain = hc.requestChain, extraHeaders = hc.headers(Seq("X-Client-Id")))
         else HeaderCarrier(requestChain = hc.requestChain)
 
-      val requestId       = hc.requestId.map(_.value)
-      val correlationId   = UUID.randomUUID().toString
-      val accept          = MimeTypes.XML
-      val conversationId  = ConversationId(movementId, MessageId("0000000000000000")) // ConversationId(movementId, messageId)
-      val date            = HTTP_DATE_FORMATTER.format(OffsetDateTime.now())
-      val lrnRegexPattern = "The supplied LRN: ([a-zA-Z0-9]+) has already been used by submitter: ([a-zA-Z0-9]+)".r
+      val requestId      = hc.requestId.map(_.value)
+      val correlationId  = UUID.randomUUID().toString
+      val accept         = MimeTypes.XML
+      val conversationId = ConversationId(movementId, MessageId("0000000000000000")) // ConversationId(movementId, messageId)
+      val date           = HTTP_DATE_FORMATTER.format(OffsetDateTime.now())
 
       val messageType =
         hc.headersForUrl(headerCarrierConfig)(eisInstanceConfig.url).find(_._1 equalsIgnoreCase RouterHeaderNames.MESSAGE_TYPE).map(_._2).getOrElse("undefined")
@@ -164,14 +165,9 @@ class EISConnectorImpl(
 
               error.statusCode match {
                 case ErrorCode.Forbidden.statusCode | ErrorCode.InternalServerError.statusCode =>
-                  val lrnMatch = lrnRegexPattern.findFirstMatchIn(error.message)
-                  lrnMatch match {
+                  lrnRegexPattern.findFirstMatchIn(error.message) match {
                     case Some(message) =>
-                      val lrn: LocalReferenceNumber =
-                        Some(message)
-                          .map(_.group(1))
-                          .map(LocalReferenceNumber.apply)
-                          .get
+                      val lrn = LocalReferenceNumber(message.group(1))
                       Left(RoutingError.DuplicateLRNError(s"LRN ${lrn.value} has previously been used and cannot be reused", ErrorCode.Conflict, lrn))
                     case None =>
                       Left(
