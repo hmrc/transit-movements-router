@@ -16,7 +16,6 @@
 
 package uk.gov.hmrc.transitmovementsrouter.services
 
-import akka.event.Logging
 import akka.stream.Attributes
 import akka.stream.Materializer
 import akka.stream.alpakka.xml.StartElement

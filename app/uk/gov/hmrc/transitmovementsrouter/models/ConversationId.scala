@@ -22,7 +22,7 @@ import play.api.libs.json.Json
 import java.util.UUID
 
 object ConversationId {
-  implicit val conversationIdFormat: Format[ConversationId] = Json.format
+  implicit val conversationIdFormat: Format[ConversationId] = Json.valueFormat
 
   def apply(movementId: MovementId, messageId: MessageId): ConversationId = {
     val movementPart = s"${movementId.value.substring(0, 8)}-${movementId.value.substring(8, 12)}-${movementId.value.substring(12)}"
