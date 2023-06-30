@@ -436,4 +436,49 @@ class EISConnectorSpec
       }
   }
 
+  "post should called only once and no retry for Duplicate LRN error" in forAll(arbitrary[MovementId], arbitrary[MessageId]) {
+    (movementId, messageId) =>
+      val hc = HeaderCarrier()
+      server.resetAll()
+      val connector = new EISConnectorImpl("Failure", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, OneRetry, clock, true)
+
+      val expectedConversationId = ConversationId(movementId, defaultMessageID)
+
+      server.stubFor(
+        post(
+          urlEqualTo(uriStub)
+        ).withHeader("Authorization", equalTo("Bearer bearertokenhereGB"))
+          .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
+          .withHeader("Date", equalTo("Thu, 13 Apr 2023 10:34:41 UTC"))
+          .withHeader(HeaderNames.CONTENT_TYPE, equalTo("application/xml"))
+          .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
+          .withHeader("X-Conversation-Id", equalTo(expectedConversationId.value.toString))
+          .willReturn(
+            aResponse()
+              .withStatus(FORBIDDEN)
+              .withBody(
+                Json.stringify(
+                  Json.obj(
+                    "code"    -> "FORBIDDEN",
+                    "message" -> "The supplied LRN: LRN1234 has already been used by submitter: TestSender"
+                  )
+                )
+              )
+          )
+      )
+
+      whenReady(connector.post(movementId, messageId, source, hc)) {
+        case Left(x) if x.isInstanceOf[RoutingError.DuplicateLRNError] =>
+          x.asInstanceOf[RoutingError.DuplicateLRNError].code mustBe Conflict
+        case x =>
+          fail("Left was not a RoutingError.DuplicateLRNError: " + x)
+      }
+
+      server.verify(
+        1,
+        postRequestedFor(
+          urlEqualTo(uriStub)
+        )
+      )
+  }
 }

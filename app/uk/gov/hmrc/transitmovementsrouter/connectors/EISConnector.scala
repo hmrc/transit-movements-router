@@ -42,6 +42,7 @@ import uk.gov.hmrc.transitmovementsrouter.models.MessageId
 import uk.gov.hmrc.transitmovementsrouter.models.MovementId
 import uk.gov.hmrc.transitmovementsrouter.models.errors.ErrorCode
 import uk.gov.hmrc.transitmovementsrouter.models.errors.RoutingError
+import uk.gov.hmrc.transitmovementsrouter.models.errors.RoutingError.DuplicateLRNError
 import uk.gov.hmrc.transitmovementsrouter.utils.RouterHeaderNames
 
 import java.time.Clock
@@ -52,6 +53,7 @@ import java.util.Locale
 import java.util.UUID
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
+import scala.util.Success
 import scala.util.Try
 import scala.util.control.NonFatal
 
@@ -89,13 +91,16 @@ class EISConnectorImpl(
     s"${HTTP_DATE_FORMATTER.format(OffsetDateTime.now(clock.withZone(ZoneOffset.UTC)))} UTC"
 
   def shouldCauseCircuitBreakerStrike(result: Try[Either[RoutingError, Unit]]): Boolean =
-    result.map(_.isLeft).getOrElse(true)
+    result match {
+      //case Success(Left(DuplicateLRNError(_, _, _))) => false
+      case Success(_) => true
+      case _          => false
+    }
 
   def onFailure(response: Either[RoutingError, Unit], retryDetails: RetryDetails): Future[Unit] =
     response.left.toOption.get match {
-      case RoutingError.Upstream(upstreamErrorResponse)       => attemptRetry(s"with status code ${upstreamErrorResponse.statusCode}", retryDetails)
-      case RoutingError.DuplicateLRNError(message, code, lrn) => attemptRetry(s"with status code $code and error $message", retryDetails)
-      case RoutingError.Unexpected(message, _)                => attemptRetry(s"with error $message", retryDetails)
+      case RoutingError.Upstream(upstreamErrorResponse) => attemptRetry(s"with status code ${upstreamErrorResponse.statusCode}", retryDetails)
+      case RoutingError.Unexpected(message, _)          => attemptRetry(s"with error $message", retryDetails)
       case x: RoutingError =>
         logger.error(s"An unexpected error occurred - got a ${x.getClass}")
         Future.failed(new IllegalStateException(s"An unexpected error occurred - got a ${x.getClass}"))
@@ -104,7 +109,11 @@ class EISConnectorImpl(
   override def post(movementId: MovementId, messageId: MessageId, body: Source[ByteString, _], hc: HeaderCarrier): Future[Either[RoutingError, Unit]] =
     retryingOnFailures(
       retries.createRetryPolicy(eisInstanceConfig.retryConfig),
-      (t: Either[RoutingError, Unit]) => Future.successful(t.isRight),
+      (t: Either[RoutingError, Unit]) =>
+        t match {
+          case Left(RoutingError.DuplicateLRNError(_, _, _)) => Future.successful(t.isLeft)
+          case _                                             => Future.successful(t.isRight)
+        },
       onFailure
     ) {
       // blank-ish carrier so that we control what we're sending to EIS, and let the carrier/platform do the rest
