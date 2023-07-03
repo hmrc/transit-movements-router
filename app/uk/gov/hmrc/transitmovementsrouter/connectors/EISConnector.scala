@@ -91,11 +91,7 @@ class EISConnectorImpl(
     s"${HTTP_DATE_FORMATTER.format(OffsetDateTime.now(clock.withZone(ZoneOffset.UTC)))} UTC"
 
   def shouldCauseCircuitBreakerStrike(result: Try[Either[RoutingError, Unit]]): Boolean =
-    result match {
-      case Success(Left(DuplicateLRNError(_, _, _))) => false // Not to open circuit breaker for DuplicateLRN error
-      case Success(_)                                => true
-      case _                                         => false
-    }
+    result.map(_.isLeft).getOrElse(true)
 
   def onFailure(response: Either[RoutingError, Unit], retryDetails: RetryDetails): Future[Unit] =
     response.left.toOption.get match {
