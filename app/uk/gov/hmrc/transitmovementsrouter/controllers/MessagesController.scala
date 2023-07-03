@@ -26,7 +26,6 @@ import play.api.libs.json.JsValue
 import play.api.libs.json.Json
 import play.api.mvc.Action
 import play.api.mvc.ControllerComponents
-import play.api.mvc.DefaultActionBuilder
 import play.api.mvc.Request
 import play.api.mvc.Result
 import uk.gov.hmrc.http.HeaderCarrier
@@ -91,6 +90,7 @@ class MessagesController @Inject() (
   customOfficeExtractorService: CustomOfficeExtractorService,
   sdesService: SDESService,
   internalAuth: InternalAuthActionProvider,
+  statusMonitoringService: ServiceMonitoringService,
   val config: AppConfig
 )(implicit
   val materializer: Materializer,
@@ -108,9 +108,12 @@ class MessagesController @Inject() (
     Predicate.Permission(Resource(ResourceType("transit-movements-router"), ResourceLocation("message")), IAAction("WRITE"))
 
   def outgoing(@unused eori: EoriNumber, movementType: MovementType, movementId: MovementId, messageId: MessageId): Action[Source[ByteString, _]] = {
-    def viaEIS(customsOffice: CustomsOffice, source: Source[ByteString, _])(implicit hc: HeaderCarrier): EitherT[Future, PresentationError, Status] =
+    def viaEIS(messageType: MessageType, customsOffice: CustomsOffice, source: Source[ByteString, _])(implicit
+      hc: HeaderCarrier
+    ): EitherT[Future, PresentationError, Status] =
       for {
         _ <- routingService.submitMessage(movementType, movementId, messageId, source, customsOffice).asPresentation
+        _ = statusMonitoringService.outgoing(movementId, messageId, messageType, customsOffice)
       } yield Created
 
     def viaSDES(source: Source[ByteString, _])(implicit hc: HeaderCarrier): EitherT[Future, PresentationError, Status] =
@@ -125,7 +128,7 @@ class MessagesController @Inject() (
           messageType        <- messageTypeExtractor.extractFromHeaders(request.headers).asPresentation
           requestMessageType <- filterRequestMessageType(messageType)
           customsOffice      <- customOfficeExtractorService.extractCustomOffice(request.body, requestMessageType).asPresentation
-          submitted          <- if (config.eisSizeLimit >= size) viaEIS(customsOffice, request.body) else viaSDES(request.body)
+          submitted          <- if (config.eisSizeLimit >= size) viaEIS(messageType, customsOffice, request.body) else viaSDES(request.body)
         } yield submitted).valueOr(
           error => Status(error.code.statusCode)(Json.toJson(error))
         )
@@ -141,6 +144,7 @@ class MessagesController @Inject() (
 
         (for {
           messageType <- messageTypeExtractor.extract(request.headers, request.body).asPresentationWithMessageType(None)
+          _ = statusMonitoringService.incoming(movementId, triggerId, messageType)
           persistenceResponse <- persistStream(movementId, triggerId, messageType, request.body).leftMap(
             err => (err, Option(messageType))
           )
@@ -187,7 +191,8 @@ class MessagesController @Inject() (
     withReusableSource(source) {
       fileSource =>
         for {
-          messageType         <- messageTypeExtractor.extractFromBody(fileSource).asPresentation
+          messageType <- messageTypeExtractor.extractFromBody(fileSource).asPresentation
+          _ = statusMonitoringService.incoming(movementId, triggerId, messageType)
           persistenceResponse <- persistStream(movementId, triggerId, messageType, fileSource)
         } yield persistenceResponse
     }
