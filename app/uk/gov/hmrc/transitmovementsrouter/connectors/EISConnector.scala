@@ -92,9 +92,9 @@ class EISConnectorImpl(
 
   def shouldCauseCircuitBreakerStrike(result: Try[Either[RoutingError, Unit]]): Boolean =
     result match {
-      //case Success(Left(DuplicateLRNError(_, _, _))) => false
-      case Success(_) => true
-      case _          => false
+      case Success(Left(DuplicateLRNError(_, _, _))) => false // Not to open circuit breaker for DuplicateLRN error
+      case Success(_)                                => true
+      case _                                         => false
     }
 
   def onFailure(response: Either[RoutingError, Unit], retryDetails: RetryDetails): Future[Unit] =
@@ -111,7 +111,7 @@ class EISConnectorImpl(
       retries.createRetryPolicy(eisInstanceConfig.retryConfig),
       (t: Either[RoutingError, Unit]) =>
         t match {
-          case Left(RoutingError.DuplicateLRNError(_, _, _)) => Future.successful(t.isLeft)
+          case Left(RoutingError.DuplicateLRNError(_, _, _)) => Future.successful(t.isLeft) //Not to want retry for DuplicateLRN error
           case _                                             => Future.successful(t.isRight)
         },
       onFailure
