@@ -408,6 +408,26 @@ class MessageControllerSpec
         )(any())
       }
 
+      "returns message to inform that the X-Message-Type header value IE140 is invalid" in {
+
+        when(mockMessageTypeExtractor.extractFromHeaders(any()))
+          .thenReturn(EitherT.leftT[Future, MessageType](MessageTypeExtractionError.InvalidMessageType("IE140")))
+
+        val result = controller().outgoing(eori, movementType, movementId, messageId)(
+          fakeRequest(cc015cOfficeOfDepartureGB, outgoing, FakeHeaders(Seq(("X-Message-Type", "IE140"))))
+        )
+
+        status(result) mustBe BAD_REQUEST
+        contentAsJson(result) mustBe Json.obj(
+          "code"    -> "BAD_REQUEST",
+          "message" -> "Invalid message type: IE140"
+        )
+
+        verify(mockInternalAuthActionProvider, times(1)).apply(
+          eqTo(Predicate.Permission(Resource(ResourceType("transit-movements-router"), ResourceLocation("message")), IAAction("WRITE")))
+        )(any())
+      }
+
       "returns message to inform that the X-Message-Type header is not present" in {
 
         when(mockMessageTypeExtractor.extractFromHeaders(any()))
