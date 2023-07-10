@@ -512,7 +512,7 @@ class MessageControllerSpec
 
         when(
           mockPushNotificationsConnector
-            .postXML(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), any[Source[ByteString, _]])(
+            .postMessageReceived(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(messageType), any[Source[ByteString, _]])(
               any[HeaderCarrier],
               any[ExecutionContext]
             )
@@ -615,7 +615,7 @@ class MessageControllerSpec
 
         when(
           mockPushNotificationsConnector
-            .postXML(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), any[Source[ByteString, _]])(
+            .postMessageReceived(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(messageType), any[Source[ByteString, _]])(
               any(),
               any()
             )
@@ -792,7 +792,7 @@ class MessageControllerSpec
         .thenReturn(EitherT.rightT(()))
 
       when(
-        mockPushNotificationsConnector.postJSON(
+        mockPushNotificationsConnector.postSubmissionNotification(
           MovementId(eqTo(movementId.value)),
           MessageId(eqTo(messageId.value)),
           eqTo(ppnsMessage)
@@ -806,7 +806,7 @@ class MessageControllerSpec
 
       status(result) mustBe OK
 
-      verify(mockPushNotificationsConnector, times(1)).postJSON(
+      verify(mockPushNotificationsConnector, times(1)).postSubmissionNotification(
         MovementId(eqTo(movementId.value)),
         MessageId(eqTo(messageId.value)),
         eqTo(ppnsMessage)
@@ -848,7 +848,7 @@ class MessageControllerSpec
         .thenReturn(EitherT.rightT(()))
       when(
         mockPushNotificationsConnector
-          .postJSON(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(ppnsMessage))(
+          .postSubmissionNotification(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(ppnsMessage))(
             any[HeaderCarrier],
             any[ExecutionContext]
           )
@@ -859,7 +859,7 @@ class MessageControllerSpec
       val result = controller().handleSdesResponse()(request)
 
       status(result) mustBe OK
-      verify(mockPushNotificationsConnector, times(1)).postJSON(
+      verify(mockPushNotificationsConnector, times(1)).postSubmissionNotification(
         MovementId(eqTo(movementId.value)),
         MessageId(eqTo(messageId.value)),
         eqTo(ppnsMessage)
@@ -906,7 +906,7 @@ class MessageControllerSpec
 
       when(
         mockPushNotificationsConnector
-          .postJSON(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(ppnsMessage))(
+          .postSubmissionNotification(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(ppnsMessage))(
             any[HeaderCarrier],
             any[ExecutionContext]
           )
@@ -918,7 +918,7 @@ class MessageControllerSpec
 
       status(result) mustBe INTERNAL_SERVER_ERROR
 
-      verify(mockPushNotificationsConnector, times(1)).postJSON(
+      verify(mockPushNotificationsConnector, times(1)).postSubmissionNotification(
         MovementId(eqTo(movementId.value)),
         MessageId(eqTo(messageId.value)),
         eqTo(ppnsMessage)

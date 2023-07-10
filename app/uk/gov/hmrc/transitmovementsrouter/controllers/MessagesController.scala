@@ -208,7 +208,7 @@ class MessagesController @Inject() (
       // our system might delete the file before we use it in the stream.
       //
       // suppress drops any errors (as far as this flatmap chain is concerned) and then returns unit, always.
-      _ <- pushNotificationsConnector.postXML(movementId, persistenceResponse.messageId, source).suppress
+      _ <- pushNotificationsConnector.postMessageReceived(movementId, persistenceResponse.messageId, messageType, source).suppress
     } yield persistenceResponse
 
   private def handleUpscanSuccessResponse(upscanResponse: UpscanResponse): EitherT[Future, PresentationError, DownloadUrl] =
@@ -241,7 +241,7 @@ class MessagesController @Inject() (
         .patchMessageStatus(movementId, messageId, MessageUpdate(messageStatus))
         .asPresentation
       _ = pushNotificationsConnector
-        .postJSON(
+        .postSubmissionNotification(
           movementId,
           messageId,
           jsonValue
@@ -286,7 +286,7 @@ class MessagesController @Inject() (
               }
             } yield persistenceResponse).fold[Result](
               presentationError => {
-                pushNotificationsConnector.postJSON(movementId, messageId, Json.toJson(PresentationError.internalServiceError()))
+                pushNotificationsConnector.postSubmissionNotification(movementId, messageId, Json.toJson(PresentationError.internalServiceError()))
                 Status(presentationError.code.statusCode)(Json.toJson(presentationError))
               },
               _ => Ok

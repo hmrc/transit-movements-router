@@ -28,8 +28,8 @@ import play.api.http.MimeTypes
 import play.api.http.Status.ACCEPTED
 import play.api.http.Status.NOT_FOUND
 import play.api.libs.json.JsValue
-import uk.gov.hmrc.http.HttpReads.Implicits._
 import uk.gov.hmrc.http.HeaderCarrier
+import uk.gov.hmrc.http.HttpReads.Implicits._
 import uk.gov.hmrc.http.HttpResponse
 import uk.gov.hmrc.http.StringContextOps
 import uk.gov.hmrc.http.UpstreamErrorResponse
@@ -43,22 +43,21 @@ import uk.gov.hmrc.transitmovementsrouter.models.errors.PushNotificationError.Un
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
-import scala.util.control.NonFatal
 
 @ImplementedBy(classOf[PushNotificationsConnectorImpl])
 trait PushNotificationsConnector {
 
-  def postXML(movementId: MovementId, messageId: MessageId, sourceXml: Source[ByteString, _])(implicit
-    hc: HeaderCarrier,
-    ec: ExecutionContext
+  def postMessageReceived(movementId: MovementId, messageId: MessageId, messageType: MessageType, sourceXml: Source[ByteString, _])(implicit
+                                                                                                          hc: HeaderCarrier,
+                                                                                                          ec: ExecutionContext
   ): EitherT[Future, PushNotificationError, Unit]
 
-  def postJSON(movementId: MovementId, messageId: MessageId, sourceJson: JsValue)(implicit
-    hc: HeaderCarrier,
-    ec: ExecutionContext
+  def postSubmissionNotification(movementId: MovementId, messageId: MessageId, sourceJson: JsValue)(implicit
+                                                                                                    hc: HeaderCarrier,
+                                                                                                    ec: ExecutionContext
   ): EitherT[Future, PushNotificationError, Unit]
 
-  def post(movementId: MovementId, messageId: MessageId)(implicit
+  def postMessageReceived(movementId: MovementId, messageId: MessageId, messageType: MessageType)(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): EitherT[Future, PushNotificationError, Unit]
@@ -72,52 +71,41 @@ class PushNotificationsConnectorImpl @Inject() (httpClientV2: HttpClientV2)(impl
   val baseUrl           = appConfig.transitMovementsPushNotificationsUrl
   val baseRoute: String = "/transit-movements-push-notifications"
 
-  private def pushNotificationMessageUpdate(movementId: MovementId, messageId: MessageId): UrlPath =
-    UrlPath.parse(s"$baseRoute/traders/movements/${movementId.value}/messages/${messageId.value}")
+  private def pushNotificationMessageUpdate(movementId: MovementId, messageId: MessageId, notificationType: String): UrlPath =
+    UrlPath.parse(s"$baseRoute/traders/movements/${movementId.value}/messages/${messageId.value}/$notificationType")
 
-  override def postXML(movementId: MovementId, messageId: MessageId, sourceXml: Source[ByteString, _])(implicit
-    hc: HeaderCarrier,
-    ec: ExecutionContext
+  override def postMessageReceived(movementId: MovementId, messageId: MessageId, messageType: MessageType, sourceXml: Source[ByteString, _])(implicit
+                                                                                                                   hc: HeaderCarrier,
+                                                                                                                   ec: ExecutionContext
   ): EitherT[Future, PushNotificationError, Unit] =
     EitherT {
       if (!appConfig.pushNotificationsEnabled) {
         Future.successful(Right(()))
       } else {
-        val request = createRequest(movementId, messageId)
+        val request = createRequest(movementId, messageId, "messageReceived")
           .setHeader(HeaderNames.CONTENT_TYPE -> MimeTypes.XML)
           .withBody(sourceXml)
-        executeAndExpect(request, ACCEPTED)
-          .map(Right(_))
-          .recover {
-            case UpstreamErrorResponse(_, NOT_FOUND, _, _) => Left(MovementNotFound(movementId))
-            case NonFatal(thr)                             => Left(Unexpected(Some(thr)))
-          }
-
+        executeAndExpect(movementId, Option(messageType), request, ACCEPTED)
       }
     }
 
-  override def postJSON(movementId: MovementId, messageId: MessageId, sourceJson: JsValue)(implicit
-    hc: HeaderCarrier,
-    ec: ExecutionContext
+  override def postSubmissionNotification(movementId: MovementId, messageId: MessageId, sourceJson: JsValue)(implicit
+                                                                                                             hc: HeaderCarrier,
+                                                                                                             ec: ExecutionContext
   ): EitherT[Future, PushNotificationError, Unit] =
     EitherT {
       if (!appConfig.pushNotificationsEnabled) {
         Future.successful(Right(()))
       } else {
-        val request = createRequest(movementId, messageId)
+        val request = createRequest(movementId, messageId, "submissionNotification")
           .setHeader(HeaderNames.CONTENT_TYPE -> MimeTypes.JSON)
           .withBody(sourceJson)
-        executeAndExpect(request, ACCEPTED)
-          .map(Right(_))
-          .recover {
-            case UpstreamErrorResponse(_, NOT_FOUND, _, _) => Left(MovementNotFound(movementId))
-            case NonFatal(thr)                             => Left(Unexpected(Some(thr)))
-          }
+        executeAndExpect(movementId, None, request, ACCEPTED)
 
       }
     }
 
-  override def post(movementId: MovementId, messageId: MessageId)(implicit
+  override def postMessageReceived(movementId: MovementId, messageId: MessageId, messageType: MessageType)(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): EitherT[Future, PushNotificationError, Unit] =
@@ -125,30 +113,28 @@ class PushNotificationsConnectorImpl @Inject() (httpClientV2: HttpClientV2)(impl
       if (!appConfig.pushNotificationsEnabled) {
         Future.successful(Right(()))
       } else {
-        val request = createRequest(movementId, messageId)
-        executeAndExpect(request, ACCEPTED)
-          .map(Right(_))
-          .recover {
-            case UpstreamErrorResponse(_, NOT_FOUND, _, _) => Left(MovementNotFound(movementId))
-            case NonFatal(thr)                             => Left(Unexpected(Some(thr)))
-          }
+        executeAndExpect(movementId, Option(messageType), createRequest(movementId, messageId, "messageReceived"), ACCEPTED)
 
       }
     }
 
-  private def executeAndExpect(requestBuilder: RequestBuilder, expected: Int)(implicit ec: ExecutionContext) =
-    requestBuilder.withInternalAuthToken
+
+  private def executeAndExpect(movementId: MovementId, messageType: Option[MessageType], requestBuilder: RequestBuilder, expected: Int)(implicit ec: ExecutionContext): Future[Either[PushNotificationError, Unit]] =
+    requestBuilder
+      .withInternalAuthToken
+      .withMessageType(messageType)
       .execute[HttpResponse]
-      .flatMap {
+      .map {
         response =>
           response.status match {
-            case `expected` => Future.successful(())
-            case _          => Future.failed(UpstreamErrorResponse(response.body, response.status))
+            case `expected` => Right((): Unit)
+            case NOT_FOUND  => Left(MovementNotFound(movementId))
+            case _          => Left(Unexpected(Some(UpstreamErrorResponse(response.body, response.status))))
           }
       }
 
-  private def createRequest(movementId: MovementId, messageId: MessageId)(implicit hc: HeaderCarrier) = {
-    val url = baseUrl.withPath(pushNotificationMessageUpdate(movementId, messageId))
+  private def createRequest(movementId: MovementId, messageId: MessageId, notificationType: String)(implicit hc: HeaderCarrier) = {
+    val url = baseUrl.withPath(pushNotificationMessageUpdate(movementId, messageId, notificationType))
     httpClientV2.post(url"$url")
   }
 }
