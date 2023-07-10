@@ -58,10 +58,10 @@ trait ConvertError {
   implicit val routingErrorConverter = new Converter[RoutingError] {
 
     def convert(routingError: RoutingError): PresentationError = routingError match {
-      case Upstream(upstreamErrorResponse)       => PresentationError.internalServiceError(cause = Some(upstreamErrorResponse.getCause))
-      case Unexpected(_, cause)                  => PresentationError.internalServiceError(cause = cause)
-      case BadDateTime(element, ex)              => PresentationError.badRequestError(s"Could not parse datetime for $element: ${ex.getMessage}")
-      case DuplicateLRNError(message, code, lrn) => PresentationError.duplicateLRNError(message, lrn)
+      case Upstream(upstreamErrorResponse)    => PresentationError.internalServiceError(cause = Some(upstreamErrorResponse.getCause))
+      case Unexpected(_, cause)               => PresentationError.internalServiceError(cause = cause)
+      case BadDateTime(element, ex)           => PresentationError.badRequestError(s"Could not parse datetime for $element: ${ex.getMessage}")
+      case DuplicateLRNError(message, _, lrn) => PresentationError.duplicateLRNError(message, lrn)
 
     }
   }

@@ -172,20 +172,11 @@ class EISConnectorImpl(
 
               logger.warn(logMessage + status)
 
-              error.statusCode match {
-                case ErrorCode.Forbidden.statusCode | ErrorCode.InternalServerError.statusCode =>
-                  error.message match {
-                    case lrnRegexPattern(lrn, _) =>
-                      Left(
-                        RoutingError.DuplicateLRNError(s"LRN $lrn has previously been used and cannot be reused", ErrorCode.Conflict, LocalReferenceNumber(lrn))
-                      )
-                    case _ =>
-                      Left(
-                        RoutingError.Upstream(
-                          UpstreamErrorResponse(s"Request Error: Routing to $code returned status code ${error.statusCode}", error.statusCode)
-                        )
-                      )
-                  }
+              (error.statusCode, error.message) match {
+                case (ErrorCode.Forbidden.statusCode | ErrorCode.InternalServerError.statusCode, lrnRegexPattern(lrn, _)) =>
+                  Left(
+                    RoutingError.DuplicateLRNError(s"LRN $lrn has previously been used and cannot be reused", ErrorCode.Conflict, LocalReferenceNumber(lrn))
+                  )
                 case _ =>
                   Left(
                     RoutingError.Upstream(UpstreamErrorResponse(s"Request Error: Routing to $code returned status code ${error.statusCode}", error.statusCode))
