@@ -82,15 +82,12 @@ object MessageType {
   /** E_PRE_NOT (IE170) */
   final case object PresentationNotification extends DepartureRequestMessageType("IE170", "CC170C")
 
-  final case object InformationAboutNonArrivedMovement extends DepartureRequestMessageType("IE141", "CC141C", "CustomsOfficeOfEnquiryAtDeparture")
-
   val departureRequestValues = Set(
     DeclarationAmendment,
     DeclarationInvalidation,
     DeclarationData,
     RequestOfRelease,
-    PresentationNotification,
-    InformationAboutNonArrivedMovement
+    PresentationNotification
   )
 
   // ********************
@@ -139,8 +136,6 @@ object MessageType {
   /** E_REC_NOT (IE035) */
   case object RecoveryNotification extends DepartureResponseMessageType("IE035", "CC035C")
 
-  case object RequestOnNonArrivedMovement extends DepartureResponseMessageType("IE140", "CC140C")
-
   val departureResponseValues = Set(
     AmendmentAcceptance,
     DepartureOfficeRejection,
@@ -155,8 +150,7 @@ object MessageType {
     ControlDecisionNotification,
     NotificationToAmend,
     IncidentNotification,
-    RecoveryNotification,
-    RequestOnNonArrivedMovement
+    RecoveryNotification
   )
 
   val departureValues = departureRequestValues ++ departureResponseValues
