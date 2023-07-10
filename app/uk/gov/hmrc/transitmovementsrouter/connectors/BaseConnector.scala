@@ -17,7 +17,6 @@
 package uk.gov.hmrc.transitmovementsrouter.connectors
 
 import play.api.http.HeaderNames
-import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.client.RequestBuilder
 import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
 import uk.gov.hmrc.transitmovementsrouter.models.MessageType
@@ -31,7 +30,9 @@ trait BaseConnector {
 
     def withMessageType(messageType: Option[MessageType]): RequestBuilder =
       messageType
-        .map(t => requestBuilder.setHeader("X-Message-Type" -> t.code))
+        .map(
+          t => requestBuilder.setHeader("X-Message-Type" -> t.code)
+        )
         .getOrElse(requestBuilder)
 
   }

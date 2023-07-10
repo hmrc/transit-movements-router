@@ -43,18 +43,19 @@ import uk.gov.hmrc.transitmovementsrouter.models.errors.PushNotificationError.Un
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
+import scala.util.control.NonFatal
 
 @ImplementedBy(classOf[PushNotificationsConnectorImpl])
 trait PushNotificationsConnector {
 
   def postMessageReceived(movementId: MovementId, messageId: MessageId, messageType: MessageType, sourceXml: Source[ByteString, _])(implicit
-                                                                                                          hc: HeaderCarrier,
-                                                                                                          ec: ExecutionContext
+    hc: HeaderCarrier,
+    ec: ExecutionContext
   ): EitherT[Future, PushNotificationError, Unit]
 
   def postSubmissionNotification(movementId: MovementId, messageId: MessageId, sourceJson: JsValue)(implicit
-                                                                                                    hc: HeaderCarrier,
-                                                                                                    ec: ExecutionContext
+    hc: HeaderCarrier,
+    ec: ExecutionContext
   ): EitherT[Future, PushNotificationError, Unit]
 
   def postMessageReceived(movementId: MovementId, messageId: MessageId, messageType: MessageType)(implicit
@@ -75,8 +76,8 @@ class PushNotificationsConnectorImpl @Inject() (httpClientV2: HttpClientV2)(impl
     UrlPath.parse(s"$baseRoute/traders/movements/${movementId.value}/messages/${messageId.value}/$notificationType")
 
   override def postMessageReceived(movementId: MovementId, messageId: MessageId, messageType: MessageType, sourceXml: Source[ByteString, _])(implicit
-                                                                                                                   hc: HeaderCarrier,
-                                                                                                                   ec: ExecutionContext
+    hc: HeaderCarrier,
+    ec: ExecutionContext
   ): EitherT[Future, PushNotificationError, Unit] =
     EitherT {
       if (!appConfig.pushNotificationsEnabled) {
@@ -90,8 +91,8 @@ class PushNotificationsConnectorImpl @Inject() (httpClientV2: HttpClientV2)(impl
     }
 
   override def postSubmissionNotification(movementId: MovementId, messageId: MessageId, sourceJson: JsValue)(implicit
-                                                                                                             hc: HeaderCarrier,
-                                                                                                             ec: ExecutionContext
+    hc: HeaderCarrier,
+    ec: ExecutionContext
   ): EitherT[Future, PushNotificationError, Unit] =
     EitherT {
       if (!appConfig.pushNotificationsEnabled) {
@@ -118,10 +119,10 @@ class PushNotificationsConnectorImpl @Inject() (httpClientV2: HttpClientV2)(impl
       }
     }
 
-
-  private def executeAndExpect(movementId: MovementId, messageType: Option[MessageType], requestBuilder: RequestBuilder, expected: Int)(implicit ec: ExecutionContext): Future[Either[PushNotificationError, Unit]] =
-    requestBuilder
-      .withInternalAuthToken
+  private def executeAndExpect(movementId: MovementId, messageType: Option[MessageType], requestBuilder: RequestBuilder, expected: Int)(implicit
+    ec: ExecutionContext
+  ): Future[Either[PushNotificationError, Unit]] =
+    requestBuilder.withInternalAuthToken
       .withMessageType(messageType)
       .execute[HttpResponse]
       .map {
@@ -131,6 +132,9 @@ class PushNotificationsConnectorImpl @Inject() (httpClientV2: HttpClientV2)(impl
             case NOT_FOUND  => Left(MovementNotFound(movementId))
             case _          => Left(Unexpected(Some(UpstreamErrorResponse(response.body, response.status))))
           }
+      }
+      .recover {
+        case NonFatal(ex) => Left(Unexpected(Some(ex)))
       }
 
   private def createRequest(movementId: MovementId, messageId: MessageId, notificationType: String)(implicit hc: HeaderCarrier) = {

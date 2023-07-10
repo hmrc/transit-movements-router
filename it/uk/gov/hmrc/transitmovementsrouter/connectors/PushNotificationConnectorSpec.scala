@@ -69,8 +69,8 @@ class PushNotificationConnectorSpec
     with ModelGenerators
     with TestActorSystem {
 
-  val movementId: MovementId = arbitraryMovementId.arbitrary.sample.get
-  val messageId: MessageId = arbitraryMessageId.arbitrary.sample.get
+  val movementId: MovementId   = arbitraryMovementId.arbitrary.sample.get
+  val messageId: MessageId     = arbitraryMessageId.arbitrary.sample.get
   val messageType: MessageType = arbitraryMessageType.arbitrary.sample.get
 
   val messageReceivedUri: String =
@@ -100,7 +100,7 @@ class PushNotificationConnectorSpec
   )
 
   val source: Source[ByteString, _] = Source.single(ByteString.fromString("<CC029C></CC029C>"))
-  val body: JsObject = Json.obj("messageId" -> messageId.value)
+  val body: JsObject                = Json.obj("messageId" -> messageId.value)
 
   def xmlStub(codeToReturn: Int): StubMapping = server.stubFor(
     post(
@@ -114,7 +114,7 @@ class PushNotificationConnectorSpec
 
   def jsonStub(codeToReturn: Int): StubMapping = server.stubFor(
     post(
-      urlEqualTo(messageReceivedUri)
+      urlEqualTo(submissionNotificationUri)
     ).withHeader(HeaderNames.AUTHORIZATION, equalTo(token))
       .withHeader(HeaderNames.CONTENT_TYPE, equalTo(MimeTypes.JSON))
       .withRequestBody(equalToJson(Json.obj("messageId" -> messageId.value).toString()))
@@ -130,7 +130,7 @@ class PushNotificationConnectorSpec
       .willReturn(aResponse().withStatus(codeToReturn))
   )
 
-  "post with xml body" should {
+  "POST messageReceived notification with body" should {
     "return unit when post is successful with body" in {
       when(mockAppConfig.pushNotificationsEnabled).thenReturn(true)
 
@@ -192,7 +192,7 @@ class PushNotificationConnectorSpec
 
   }
 
-  "post with json body" should {
+  "POST submissionNotification with body" should {
     "return unit when post is successful with body" in {
       when(mockAppConfig.pushNotificationsEnabled).thenReturn(true)
 
@@ -227,7 +227,7 @@ class PushNotificationConnectorSpec
 
   }
 
-  "post with no body" should {
+  "POST messageReceived notification without body" should {
     "successfully post a push notification with no body" in {
       when(mockAppConfig.pushNotificationsEnabled).thenReturn(true)
 
