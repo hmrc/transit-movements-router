@@ -72,6 +72,8 @@ class PushNotificationsConnectorImpl @Inject() (httpClientV2: HttpClientV2)(impl
   val baseUrl           = appConfig.transitMovementsPushNotificationsUrl
   val baseRoute: String = "/transit-movements-push-notifications"
 
+  private val messageReceivedPath: String = "messageReceived"
+
   private def pushNotificationMessageUpdate(movementId: MovementId, messageId: MessageId, notificationType: String): UrlPath =
     UrlPath.parse(s"$baseRoute/traders/movements/${movementId.value}/messages/${messageId.value}/$notificationType")
 
@@ -83,7 +85,7 @@ class PushNotificationsConnectorImpl @Inject() (httpClientV2: HttpClientV2)(impl
       if (!appConfig.pushNotificationsEnabled) {
         Future.successful(Right(()))
       } else {
-        val request = createRequest(movementId, messageId, "messageReceived")
+        val request = createRequest(movementId, messageId, messageReceivedPath)
           .setHeader(HeaderNames.CONTENT_TYPE -> MimeTypes.XML)
           .withBody(sourceXml)
         executeAndExpect(movementId, Option(messageType), request, ACCEPTED)
@@ -114,7 +116,7 @@ class PushNotificationsConnectorImpl @Inject() (httpClientV2: HttpClientV2)(impl
       if (!appConfig.pushNotificationsEnabled) {
         Future.successful(Right(()))
       } else {
-        executeAndExpect(movementId, Option(messageType), createRequest(movementId, messageId, "messageReceived"), ACCEPTED)
+        executeAndExpect(movementId, Option(messageType), createRequest(movementId, messageId, messageReceivedPath), ACCEPTED)
 
       }
     }
