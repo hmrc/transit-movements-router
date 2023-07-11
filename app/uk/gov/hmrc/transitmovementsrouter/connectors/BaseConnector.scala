@@ -19,6 +19,7 @@ package uk.gov.hmrc.transitmovementsrouter.connectors
 import play.api.http.HeaderNames
 import uk.gov.hmrc.http.client.RequestBuilder
 import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
+import uk.gov.hmrc.transitmovementsrouter.models.MessageType
 
 trait BaseConnector {
 
@@ -26,6 +27,14 @@ trait BaseConnector {
 
     def withInternalAuthToken(implicit appConfig: AppConfig): RequestBuilder =
       requestBuilder.setHeader(HeaderNames.AUTHORIZATION -> appConfig.internalAuthToken)
+
+    def withMessageType(messageType: Option[MessageType]): RequestBuilder =
+      messageType
+        .map(
+          t => requestBuilder.setHeader("X-Message-Type" -> t.code)
+        )
+        .getOrElse(requestBuilder)
+
   }
 
 }

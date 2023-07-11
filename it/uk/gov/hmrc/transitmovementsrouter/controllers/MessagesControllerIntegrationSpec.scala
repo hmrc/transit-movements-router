@@ -551,7 +551,7 @@ class MessagesControllerIntegrationSpec
           )
 
           server.stubFor(
-            post(s"/transit-movements-push-notifications/traders/movements/${movementId.value}/messages/${outputMessageId.value}")
+            post(s"/transit-movements-push-notifications/traders/movements/${movementId.value}/messages/${outputMessageId.value}/messageReceived")
               .willReturn(
                 aResponse().withStatus(OK)
               )
