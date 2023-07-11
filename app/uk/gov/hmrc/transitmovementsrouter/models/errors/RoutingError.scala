@@ -17,13 +17,15 @@
 package uk.gov.hmrc.transitmovementsrouter.models.errors
 
 import uk.gov.hmrc.http.UpstreamErrorResponse
+import uk.gov.hmrc.transitmovementsrouter.models.LocalReferenceNumber
 
 import java.time.format.DateTimeParseException
 
 object RoutingError {
-  case class Upstream(upstreamErrorResponse: UpstreamErrorResponse)          extends RoutingError
-  case class Unexpected(message: String, cause: Option[Throwable])           extends RoutingError
-  case class BadDateTime(element: String, exception: DateTimeParseException) extends RoutingError
+  case class Upstream(upstreamErrorResponse: UpstreamErrorResponse)                         extends RoutingError
+  case class Unexpected(message: String, cause: Option[Throwable])                          extends RoutingError
+  case class BadDateTime(element: String, exception: DateTimeParseException)                extends RoutingError
+  case class DuplicateLRNError(message: String, code: ErrorCode, lrn: LocalReferenceNumber) extends RoutingError
 }
 
 sealed trait RoutingError

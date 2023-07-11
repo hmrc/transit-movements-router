@@ -18,11 +18,13 @@ package uk.gov.hmrc.transitmovementsrouter.controllers.errors
 
 import play.api.libs.functional.syntax.toFunctionalBuilderOps
 import play.api.libs.functional.syntax.unlift
+import play.api.libs.json.OFormat
 import play.api.libs.json.OWrites
 import play.api.libs.json.Reads
 import play.api.libs.json.__
 import uk.gov.hmrc.http.UpstreamErrorResponse
 import uk.gov.hmrc.transitmovementsrouter.models.CustomsOffice
+import uk.gov.hmrc.transitmovementsrouter.models.LocalReferenceNumber
 import uk.gov.hmrc.transitmovementsrouter.models.errors.ErrorCode
 import uk.gov.hmrc.transitmovementsrouter.models.formats.CommonFormats
 
@@ -30,6 +32,7 @@ object PresentationError extends CommonFormats {
 
   val MessageFieldName = "message"
   val CodeFieldName    = "code"
+  val LrnFieldName     = "lrn"
 
   def forbiddenError(message: String): PresentationError =
     StandardError(message, ErrorCode.Forbidden)
@@ -69,10 +72,14 @@ object PresentationError extends CommonFormats {
   def entityTooLargeError(message: String): PresentationError =
     StandardError(message, ErrorCode.EntityTooLarge)
 
+  def duplicateLRNError(message: String, lrn: LocalReferenceNumber): PresentationError =
+    DuplicateLRNError(message, ErrorCode.Conflict, lrn)
+
   def unapply(error: PresentationError): Option[(String, ErrorCode)] = Some((error.message, error.code))
 
   implicit val presentationErrorWrites: OWrites[PresentationError] = OWrites {
     case invalidOfficeError: InvalidOfficeError => invalidOfficeWrites.writes(invalidOfficeError)
+    case duplicateLRNError: DuplicateLRNError   => duplicateLRNErrorFormat.writes(duplicateLRNError)
     case presentationError: PresentationError   => basePresentationErrorWrites.writes(presentationError)
   }
 
@@ -96,6 +103,13 @@ object PresentationError extends CommonFormats {
         (__ \ CodeFieldName).read[ErrorCode]
     )(StandardError.apply _)
 
+  implicit val duplicateLRNErrorFormat: OFormat[DuplicateLRNError] =
+    (
+      (__ \ MessageFieldName).format[String] and
+        (__ \ CodeFieldName).format[ErrorCode] and
+        (__ \ LrnFieldName).format[LocalReferenceNumber]
+    )(DuplicateLRNError.apply, unlift(DuplicateLRNError.unapply))
+
 }
 
 sealed abstract class PresentationError extends Product with Serializable {
@@ -105,6 +119,7 @@ sealed abstract class PresentationError extends Product with Serializable {
 
 case class StandardError(message: String, code: ErrorCode)                                     extends PresentationError
 case class InvalidOfficeError(message: String, office: String, field: String, code: ErrorCode) extends PresentationError
+case class DuplicateLRNError(message: String, code: ErrorCode, lrn: LocalReferenceNumber)      extends PresentationError
 
 case class UpstreamServiceError(
   message: String = "Internal server error",

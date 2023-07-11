@@ -24,6 +24,7 @@ import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 import play.api.libs.json.Json
 import uk.gov.hmrc.http.UpstreamErrorResponse
 import uk.gov.hmrc.transitmovementsrouter.models.CustomsOffice
+import uk.gov.hmrc.transitmovementsrouter.models.LocalReferenceNumber
 
 class PresentationErrorSpec extends AnyFreeSpec with Matchers with MockitoSugar with ScalaCheckDrivenPropertyChecks {
 
@@ -87,6 +88,13 @@ class PresentationErrorSpec extends AnyFreeSpec with Matchers with MockitoSugar 
 
       // then we should get an expected output
       json mustBe Json.obj("code" -> "INTERNAL_SERVER_ERROR", "message" -> "Internal server error")
+    }
+
+    "for duplicate lrn error" in {
+      val error  = PresentationError.duplicateLRNError("LRN 1234 was previously used", LocalReferenceNumber("1234"))
+      val result = Json.toJson(error)
+
+      result mustBe Json.obj("message" -> "LRN 1234 was previously used", "lrn" -> "1234", "code" -> "CONFLICT")
     }
   }
 

@@ -37,9 +37,12 @@ import uk.gov.hmrc.http.client.HttpClientV2
 import uk.gov.hmrc.http.{HeaderNames => HMRCHeaderNames}
 import uk.gov.hmrc.transitmovementsrouter.config.EISInstanceConfig
 import uk.gov.hmrc.transitmovementsrouter.models.ConversationId
+import uk.gov.hmrc.transitmovementsrouter.models.LocalReferenceNumber
 import uk.gov.hmrc.transitmovementsrouter.models.MessageId
 import uk.gov.hmrc.transitmovementsrouter.models.MovementId
+import uk.gov.hmrc.transitmovementsrouter.models.errors.ErrorCode
 import uk.gov.hmrc.transitmovementsrouter.models.errors.RoutingError
+import uk.gov.hmrc.transitmovementsrouter.models.errors.RoutingError.DuplicateLRNError
 import uk.gov.hmrc.transitmovementsrouter.utils.RouterHeaderNames
 
 import java.time.Clock
@@ -50,6 +53,7 @@ import java.util.Locale
 import java.util.UUID
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
+import scala.util.Success
 import scala.util.Try
 import scala.util.control.NonFatal
 
@@ -81,11 +85,17 @@ class EISConnectorImpl(
 
   private val HTTP_DATE_FORMATTER = DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss", Locale.ENGLISH).withZone(ZoneOffset.UTC)
 
+  private lazy val lrnRegexPattern = ".*The supplied LRN: ([a-zA-Z0-9]+) has already been used by submitter: ([a-zA-Z0-9]+).*".r
+
   private def nowFormatted(): String =
     s"${HTTP_DATE_FORMATTER.format(OffsetDateTime.now(clock.withZone(ZoneOffset.UTC)))} UTC"
 
   def shouldCauseCircuitBreakerStrike(result: Try[Either[RoutingError, Unit]]): Boolean =
-    result.map(_.isLeft).getOrElse(true)
+    result match {
+      case Success(Left(DuplicateLRNError(_, _, _))) => false // Not to trigger circuit breaker for DuplicateLRN error
+      case Success(Left(_))                          => true
+      case _                                         => false
+    }
 
   def onFailure(response: Either[RoutingError, Unit], retryDetails: RetryDetails): Future[Unit] =
     response.left.toOption.get match {
@@ -99,7 +109,11 @@ class EISConnectorImpl(
   override def post(movementId: MovementId, messageId: MessageId, body: Source[ByteString, _], hc: HeaderCarrier): Future[Either[RoutingError, Unit]] =
     retryingOnFailures(
       retries.createRetryPolicy(eisInstanceConfig.retryConfig),
-      (t: Either[RoutingError, Unit]) => Future.successful(t.isRight),
+      (t: Either[RoutingError, Unit]) =>
+        t match {
+          case Left(RoutingError.DuplicateLRNError(_, _, _)) => Future.successful(t.isLeft) //Not to want retry for DuplicateLRN error
+          case _                                             => Future.successful(t.isRight)
+        },
       onFailure
     ) {
       // blank-ish carrier so that we control what we're sending to EIS, and let the carrier/platform do the rest
@@ -157,7 +171,17 @@ class EISConnectorImpl(
                 } else s"Response status: ${error.statusCode}"
 
               logger.warn(logMessage + status)
-              Left(RoutingError.Upstream(UpstreamErrorResponse(s"Request Error: Routing to $code returned status code ${error.statusCode}", error.statusCode)))
+
+              (error.statusCode, error.message) match {
+                case (ErrorCode.Forbidden.statusCode | ErrorCode.InternalServerError.statusCode, lrnRegexPattern(lrn, _)) =>
+                  Left(
+                    RoutingError.DuplicateLRNError(s"LRN $lrn has previously been used and cannot be reused", ErrorCode.Conflict, LocalReferenceNumber(lrn))
+                  )
+                case _ =>
+                  Left(
+                    RoutingError.Upstream(UpstreamErrorResponse(s"Request Error: Routing to $code returned status code ${error.statusCode}", error.statusCode))
+                  )
+              }
           }
           .recover {
             case NonFatal(e) =>
