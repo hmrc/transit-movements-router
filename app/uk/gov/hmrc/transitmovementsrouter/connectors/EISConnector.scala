@@ -16,19 +16,30 @@
 
 package uk.gov.hmrc.transitmovementsrouter.connectors
 
+import akka.NotUsed
+import akka.event.Logging
+import akka.stream.Attributes
+import akka.stream.Attributes.LogLevels
 import akka.stream.Materializer
+import akka.stream.alpakka.xml.ParseEvent
+import akka.stream.alpakka.xml.scaladsl.XmlParsing
+import akka.stream.scaladsl.Flow
+import akka.stream.scaladsl.Sink
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import play.api.Logging
 import play.api.http.HeaderNames
 import play.api.http.MimeTypes
+import play.api.http.Status.FORBIDDEN
 import play.api.http.Status.INTERNAL_SERVER_ERROR
+import play.api.http.Status.isSuccessful
 import play.api.libs.ws.BodyWritable
 import play.api.libs.ws.SourceBody
 import retry.RetryDetails
 import retry.alleycats.instances._
 import retry.retryingOnFailures
 import uk.gov.hmrc.http.HeaderCarrier
+import uk.gov.hmrc.http.HttpErrorFunctions
 import uk.gov.hmrc.http.HttpReads.Implicits._
 import uk.gov.hmrc.http.HttpResponse
 import uk.gov.hmrc.http.StringContextOps
@@ -78,6 +89,13 @@ class EISConnectorImpl(
     with Logging
     with CircuitBreakers {
 
+  private val lrnErrorMaybeExtractor: Flow[ParseEvent, LocalReferenceNumber, NotUsed] =
+    XmlParsing
+      .subtree("lrnDuplicationErrorDetail" :: "sourceFaultDetail" :: "lrn" :: Nil)
+      .collect {
+        case element => LocalReferenceNumber(element.getTextContent.trim)
+      }
+
   private lazy val authorization = s"Bearer ${eisInstanceConfig.headers.bearerToken}"
 
   // Used when setting a stream body -- forces the correct content type (default chooses application/octet-stream)
@@ -85,14 +103,12 @@ class EISConnectorImpl(
 
   private val HTTP_DATE_FORMATTER = DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss", Locale.ENGLISH).withZone(ZoneOffset.UTC)
 
-  private lazy val lrnRegexPattern = ".*The supplied LRN: ([a-zA-Z0-9]+) has already been used by submitter: ([a-zA-Z0-9]+).*".r
-
   private def nowFormatted(): String =
     s"${HTTP_DATE_FORMATTER.format(OffsetDateTime.now(clock.withZone(ZoneOffset.UTC)))} UTC"
 
   def shouldCauseCircuitBreakerStrike(result: Try[Either[RoutingError, Unit]]): Boolean =
     result match {
-      case Success(Left(DuplicateLRNError(_, _, _))) => false // Not to trigger circuit breaker for DuplicateLRN error
+      case Success(Left(DuplicateLRNError(_, _, _))) => false // If we have a duplicate LRN error, we don't trigger a circuit break strike
       case Success(Left(_))                          => true
       case _                                         => false
     }
@@ -111,8 +127,10 @@ class EISConnectorImpl(
       retries.createRetryPolicy(eisInstanceConfig.retryConfig),
       (t: Either[RoutingError, Unit]) =>
         t match {
-          case Left(RoutingError.DuplicateLRNError(_, _, _)) => Future.successful(t.isLeft) //Not to want retry for DuplicateLRN error
-          case _                                             => Future.successful(t.isRight)
+          case Left(RoutingError.DuplicateLRNError(_, _, _)) => Future.successful(true) // Don't retry for duplicate LRN errors
+          case Left(RoutingError.Upstream(UpstreamErrorResponse(_, FORBIDDEN, _, _))) =>
+            Future.successful(true) // Don't retry if we get forbidden, as that error won't change
+          case _ => Future.successful(t.isRight)
         },
       onFailure
     ) {
@@ -156,31 +174,55 @@ class EISConnectorImpl(
             ).value.toString, // ConversationId(movementId, messageId).value.toString,
             HeaderNames.DATE -> nowFormatted()
           )
-          .execute[Either[UpstreamErrorResponse, HttpResponse]]
-          .map {
-            case Right(result) =>
-              logger.info(logMessage + s"Response status: ${result.status}")
-              Right(())
-            case Left(error) =>
-              val status =
-                if (logBodyOn500 && error.statusCode == INTERNAL_SERVER_ERROR) {
-                  s"""Response status: ${error.statusCode}"
-                     |Message:
-                     |
-                     |${error.message}""".stripMargin
-                } else s"Response status: ${error.statusCode}"
+          .execute[HttpResponse]
+          .flatMap[Either[RoutingError, Unit]] {
+            result =>
+              if (isSuccessful(result.status)) {
+                logger.info(logMessage + s"Response status: ${result.status}")
+                Future.successful(Right(()))
+              } else {
+                // We do this manually as we otherwise lose the raw string from the response -- the standard
+                // HttpReads will wrap the response in its own metadata which we don't want if we actually have
+                // an XML document to read.
+                val error = UpstreamErrorResponse(
+                  HttpErrorFunctions.upstreamResponseMessage("POST", eisInstanceConfig.url, result.status, result.body),
+                  result.status,
+                  result.status,
+                  result.headers
+                )
+                val status =
+                  if (logBodyOn500 && error.statusCode == INTERNAL_SERVER_ERROR) {
+                    s"""Response status: ${error.statusCode}"
+                         |Message:
+                         |
+                         |${error.message}""".stripMargin
+                  } else s"Response status: ${error.statusCode}"
 
-              logger.warn(logMessage + status)
+                logger.warn(logMessage + status)
 
-              (error.statusCode, error.message) match {
-                case (ErrorCode.Forbidden.statusCode | ErrorCode.InternalServerError.statusCode, lrnRegexPattern(lrn, _)) =>
-                  Left(
-                    RoutingError.DuplicateLRNError(s"LRN $lrn has previously been used and cannot be reused", ErrorCode.Conflict, LocalReferenceNumber(lrn))
-                  )
-                case _ =>
-                  Left(
-                    RoutingError.Upstream(UpstreamErrorResponse(s"Request Error: Routing to $code returned status code ${error.statusCode}", error.statusCode))
-                  )
+                if (result.status == FORBIDDEN && result.body.nonEmpty) {
+                  // We might have an XML fragment, in which case we try to parse it using Akka streams.
+                  Source
+                    .single(ByteString(result.body))
+                    .via(XmlParsing.parser)
+                    .via(lrnErrorMaybeExtractor)
+                    .withAttributes(
+                      Attributes.logLevels(
+                        onFailure = LogLevels.Off
+                      )
+                    )
+                    .runWith(Sink.headOption)
+                    .recover {
+                      case NonFatal(ex) => None // If we get an error, it's probably a parsing error, so treat it as if we got nothing.
+                    }
+                    .map {
+                      case Some(lrn) =>
+                        Left(RoutingError.DuplicateLRNError(s"LRN $lrn has previously been used and cannot be reused", ErrorCode.Conflict, lrn))
+                      case None =>
+                        createError(error)
+                    }
+
+                } else Future.successful(createError(error))
               }
           }
           .recover {
@@ -191,6 +233,9 @@ class EISConnectorImpl(
           }
       }
     }
+
+  private def createError(error: UpstreamErrorResponse): Either[RoutingError, Unit] =
+    Left(RoutingError.Upstream(UpstreamErrorResponse(s"Request Error: Routing to $code returned status code ${error.statusCode}", error.statusCode)))
 
   private def attemptRetry(message: String, retryDetails: RetryDetails): Future[Unit] = {
     val attemptNumber = retryDetails.retriesSoFar + 1
@@ -213,4 +258,5 @@ class EISConnectorImpl(
     }
     Future.unit
   }
+
 }

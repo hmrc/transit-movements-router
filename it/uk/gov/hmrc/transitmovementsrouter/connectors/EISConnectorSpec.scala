@@ -33,12 +33,13 @@ import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.mockito.MockitoSugar
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import play.api.http.HeaderNames
-import play.api.libs.json.Json
+import play.api.http.MimeTypes
 import play.api.test.Helpers._
 import retry.RetryPolicies
 import retry.RetryPolicy
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.RequestId
+import uk.gov.hmrc.http.UpstreamErrorResponse
 import uk.gov.hmrc.http.client.HttpClientV2
 import uk.gov.hmrc.http.test.HttpClientV2Support
 import uk.gov.hmrc.transitmovementsrouter.config.CircuitBreakerConfig
@@ -51,10 +52,11 @@ import uk.gov.hmrc.transitmovementsrouter.it.base.TestHelpers
 import uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuite
 import uk.gov.hmrc.transitmovementsrouter.it.generators.ModelGenerators
 import uk.gov.hmrc.transitmovementsrouter.models.ConversationId
+import uk.gov.hmrc.transitmovementsrouter.models.LocalReferenceNumber
 import uk.gov.hmrc.transitmovementsrouter.models.MessageId
 import uk.gov.hmrc.transitmovementsrouter.models.MovementId
-import uk.gov.hmrc.transitmovementsrouter.models.errors.ErrorCode.Conflict
 import uk.gov.hmrc.transitmovementsrouter.models.errors.RoutingError
+import uk.gov.hmrc.transitmovementsrouter.models.errors.RoutingError.Upstream
 
 import java.net.URL
 import java.time.Clock
@@ -381,46 +383,6 @@ class EISConnectorSpec
     }
   }
 
-  "should return conflict error for duplicate lrn" in forAll(connectorGen, arbitrary[MovementId], arbitrary[MessageId]) {
-    (connector, movementId, messageId) =>
-      server.resetAll()
-
-      // val expectedConversationId = ConversationId(movementId, messageId)
-      val expectedConversationId = ConversationId(movementId, defaultMessageID)
-
-      server.stubFor(
-        post(
-          urlEqualTo(uriStub)
-        ).withHeader("Authorization", equalTo("Bearer bearertokenhereGB"))
-          .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
-          .withHeader("Date", equalTo("Thu, 13 Apr 2023 10:34:41 UTC"))
-          .withHeader(HeaderNames.CONTENT_TYPE, equalTo("application/xml"))
-          .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
-          .withHeader("X-Conversation-Id", equalTo(expectedConversationId.value.toString))
-          .willReturn(
-            aResponse()
-              .withStatus(FORBIDDEN)
-              .withBody(
-                Json.stringify(
-                  Json.obj(
-                    "code"    -> "FORBIDDEN",
-                    "message" -> "The supplied LRN: LRN1234 has already been used by submitter: TestSender"
-                  )
-                )
-              )
-          )
-      )
-
-      val hc = HeaderCarrier()
-
-      whenReady(connector().post(movementId, messageId, source, hc)) {
-        case Left(x) if x.isInstanceOf[RoutingError.DuplicateLRNError] =>
-          x.asInstanceOf[RoutingError.DuplicateLRNError].code mustBe Conflict
-        case x =>
-          fail("Left was not a RoutingError.DuplicateLRNError: " + x)
-      }
-  }
-
   "handle exceptions by returning an HttpResponse with status code 500" in forAll(arbitrary[MovementId], arbitrary[MessageId]) {
     (movementId, messageId) =>
       val httpClientV2 = mock[HttpClientV2]
@@ -436,8 +398,15 @@ class EISConnectorSpec
       }
   }
 
-  "post should called only once and no retry for Duplicate LRN error" in forAll(arbitrary[MovementId], arbitrary[MessageId]) {
+  "return an Upstream an HttpResponse with status code 403 when the body is not the LRN duplication error, and should only run once" in forAll(
+    arbitrary[MovementId],
+    arbitrary[MessageId]
+  ) {
     (movementId, messageId) =>
+      val errorXml =
+        """<not>a</not>
+          |""".stripMargin
+
       val hc = HeaderCarrier()
       server.resetAll()
       val connector = new EISConnectorImpl("Failure", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, OneRetry, clock, true)
@@ -456,22 +425,67 @@ class EISConnectorSpec
           .willReturn(
             aResponse()
               .withStatus(FORBIDDEN)
-              .withBody(
-                Json.stringify(
-                  Json.obj(
-                    "code"    -> "FORBIDDEN",
-                    "message" -> "The supplied LRN: LRN1234 has already been used by submitter: TestSender"
-                  )
-                )
-              )
+              .withHeader(HeaderNames.CONTENT_TYPE, MimeTypes.XML)
+              .withBody(errorXml)
           )
       )
 
       whenReady(connector.post(movementId, messageId, source, hc)) {
-        case Left(x) if x.isInstanceOf[RoutingError.DuplicateLRNError] =>
-          x.asInstanceOf[RoutingError.DuplicateLRNError].code mustBe Conflict
-        case x =>
-          fail("Left was not a RoutingError.DuplicateLRNError: " + x)
+        case Left(Upstream(UpstreamErrorResponse(_, 403, _, _))) => succeed
+        case x                                                   => fail(s"Left was not a RoutingError.Upstream, instead got $x")
+      }
+
+      server.verify(
+        1,
+        postRequestedFor(
+          urlEqualTo(uriStub)
+        )
+      )
+  }
+
+  "post should called only once and no retry for Duplicate LRN error" in forAll(arbitrary[MovementId], arbitrary[MessageId]) {
+    (movementId, messageId) =>
+      val errorXml =
+        """<?xml version="1.0" encoding="UTF-8"?>
+          |<lrnDuplicationErrorDetail xmlns:eis="http://www.hmrc.gsi.gov.uk/eis">
+          |    <timestamp>Fri, 03 Jul 2020 11:20:25 UTC</timestamp>
+          |    <correlationId>00000000-0000-0000-0000-000000000000</correlationId>
+          |    <errorCode>400</errorCode>
+          |    <errorMessage>The supplied LRN: SIMPL-RQ-2023052301 has already been used by submitter: swp.transit.agent</errorMessage>
+          |    <source>ERMIS</source>
+          |    <sourceFaultDetail>
+          |        <submitter>swp.transit.agent</submitter>
+          |        <lrn>LRN1234</lrn>
+          |    </sourceFaultDetail>
+          |</lrnDuplicationErrorDetail>
+          |""".stripMargin
+
+      val hc = HeaderCarrier()
+      server.resetAll()
+      val connector = new EISConnectorImpl("Failure", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, OneRetry, clock, true)
+
+      val expectedConversationId = ConversationId(movementId, defaultMessageID)
+
+      server.stubFor(
+        post(
+          urlEqualTo(uriStub)
+        ).withHeader("Authorization", equalTo("Bearer bearertokenhereGB"))
+          .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
+          .withHeader("Date", equalTo("Thu, 13 Apr 2023 10:34:41 UTC"))
+          .withHeader(HeaderNames.CONTENT_TYPE, equalTo("application/xml"))
+          .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
+          .withHeader("X-Conversation-Id", equalTo(expectedConversationId.value.toString))
+          .willReturn(
+            aResponse()
+              .withStatus(FORBIDDEN)
+              .withHeader(HeaderNames.CONTENT_TYPE, MimeTypes.XML)
+              .withBody(errorXml)
+          )
+      )
+
+      whenReady(connector.post(movementId, messageId, source, hc)) {
+        case Left(RoutingError.DuplicateLRNError(_, _, LocalReferenceNumber("LRN1234"))) => succeed
+        case x                                                                           => fail(s"Left was not a RoutingError.DuplicateLRNError: instead got $x")
       }
 
       server.verify(
