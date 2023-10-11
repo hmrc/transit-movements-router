@@ -70,4 +70,6 @@ class AppConfig @Inject() (config: Configuration, servicesConfig: CTCServicesCon
   lazy val serviceMonitoringEnabled     = config.get[Boolean]("microservice.services.ncts.enabled")
   lazy val serviceMonitoringOutgoingUri = config.get[String]("microservice.services.ncts.outgoing-uri")
   lazy val serviceMonitoringIncomingUri = config.get[String]("microservice.services.ncts.incoming-uri")
+
+  lazy val auditingUrl = Url.parse(servicesConfig.baseUrl("transit-movements-auditing"))
 }
