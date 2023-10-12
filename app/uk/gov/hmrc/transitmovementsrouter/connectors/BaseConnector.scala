@@ -71,6 +71,7 @@ trait BaseConnector {
   }
 
   implicit class HttpResponseHelpers(response: HttpResponse) {
+
     def error[A]: Future[A] =
       Future.failed(UpstreamErrorResponse(response.body, response.status))
   }
