@@ -28,6 +28,7 @@ import play.api.http.Status.ACCEPTED
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.HttpResponse
 import uk.gov.hmrc.http.StringContextOps
+import uk.gov.hmrc.http.UpstreamErrorResponse
 import uk.gov.hmrc.http.client.HttpClientV2
 import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
 import uk.gov.hmrc.transitmovementsrouter.metrics.HasMetrics
@@ -113,7 +114,7 @@ class AuditingConnectorImpl @Inject() (httpClient: HttpClientV2, val metrics: Me
           response =>
             response.status match {
               case ACCEPTED => Future.successful(())
-              case _        => response.error
+              case _        => Future.failed(UpstreamErrorResponse(response.body, response.status))
             }
         }
         .recover {

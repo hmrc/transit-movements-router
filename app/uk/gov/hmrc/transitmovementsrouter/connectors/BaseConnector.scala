@@ -17,8 +17,6 @@
 package uk.gov.hmrc.transitmovementsrouter.connectors
 
 import play.api.http.HeaderNames
-import uk.gov.hmrc.http.HttpResponse
-import uk.gov.hmrc.http.UpstreamErrorResponse
 import uk.gov.hmrc.http.client.RequestBuilder
 import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
 import uk.gov.hmrc.transitmovementsrouter.models.EoriNumber
@@ -26,8 +24,6 @@ import uk.gov.hmrc.transitmovementsrouter.models.MessageId
 import uk.gov.hmrc.transitmovementsrouter.models.MessageType
 import uk.gov.hmrc.transitmovementsrouter.models.MovementId
 import uk.gov.hmrc.transitmovementsrouter.models.MovementType
-
-import scala.concurrent.Future
 
 trait BaseConnector {
 
@@ -68,12 +64,6 @@ trait BaseConnector {
         requestBuilder.setHeader("X-Audit-Meta-Message-Id" -> messageId.get.value)
       else requestBuilder
 
-  }
-
-  implicit class HttpResponseHelpers(response: HttpResponse) {
-
-    def error[A]: Future[A] =
-      Future.failed(UpstreamErrorResponse(response.body, response.status))
   }
 
 }
