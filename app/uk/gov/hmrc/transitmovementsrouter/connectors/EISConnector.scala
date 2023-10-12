@@ -17,7 +17,6 @@
 package uk.gov.hmrc.transitmovementsrouter.connectors
 
 import akka.NotUsed
-import akka.event.Logging
 import akka.stream.Attributes
 import akka.stream.Attributes.LogLevels
 import akka.stream.Materializer
@@ -77,7 +76,6 @@ trait EISConnector {
 class EISConnectorImpl(
   val code: String,
   val eisInstanceConfig: EISInstanceConfig,
-  headerCarrierConfig: HeaderCarrier.Config,
   httpClientV2: HttpClientV2,
   retries: Retries,
   clock: Clock,
@@ -146,8 +144,9 @@ class EISConnectorImpl(
       val conversationId = ConversationId(movementId, messageId)
       val date           = HTTP_DATE_FORMATTER.format(OffsetDateTime.now())
 
-      val messageType =
-        hc.headersForUrl(headerCarrierConfig)(eisInstanceConfig.url).find(_._1 equalsIgnoreCase RouterHeaderNames.MESSAGE_TYPE).map(_._2).getOrElse("undefined")
+      // The router required this to be supplied so will be in the carrier in "otherHeaders". headersForUrl only seems to care about
+      // "explicitHeaders", so we need to use "headers" here and filter on what's returned.
+      val messageType = hc.headers(Seq(RouterHeaderNames.MESSAGE_TYPE)).headOption.map(_._2).getOrElse("undefined")
       lazy val logMessage =
         s"""|Posting NCTS message, routing to $code
             |${HMRCHeaderNames.xRequestId}: ${requestId.getOrElse("undefined")}
