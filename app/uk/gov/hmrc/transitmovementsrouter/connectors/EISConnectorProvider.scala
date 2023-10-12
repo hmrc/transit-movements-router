@@ -44,9 +44,9 @@ class EISConnectorProviderImpl @Inject() (
     extends EISConnectorProvider {
 
   lazy val gb: EISConnector =
-    new EISConnectorImpl("GB", appConfig.eisGb, appConfig.headerCarrierConfig, httpClientV2, retries, clock, appConfig.logBodyOnEIS500)
+    new EISConnectorImpl("GB", appConfig.eisGb, httpClientV2, retries, clock, appConfig.logBodyOnEIS500)
 
   lazy val xi: EISConnector =
-    new EISConnectorImpl("XI", appConfig.eisXi, appConfig.headerCarrierConfig, httpClientV2, retries, clock, appConfig.logBodyOnEIS500)
+    new EISConnectorImpl("XI", appConfig.eisXi, httpClientV2, retries, clock, appConfig.logBodyOnEIS500)
 
 }

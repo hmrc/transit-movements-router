@@ -48,7 +48,6 @@ import uk.gov.hmrc.transitmovementsrouter.config.Headers
 import uk.gov.hmrc.transitmovementsrouter.config.RetryConfig
 import uk.gov.hmrc.transitmovementsrouter.it.base.RegexPatterns
 import uk.gov.hmrc.transitmovementsrouter.it.base.TestActorSystem
-import uk.gov.hmrc.transitmovementsrouter.it.base.TestHelpers
 import uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuite
 import uk.gov.hmrc.transitmovementsrouter.it.generators.ModelGenerators
 import uk.gov.hmrc.transitmovementsrouter.models.ConversationId
@@ -123,11 +122,11 @@ class EISConnectorSpec
   private val clock = Clock.fixed(OffsetDateTime.of(2023, 4, 13, 10, 34, 41, 500, ZoneOffset.UTC).toInstant, ZoneOffset.UTC)
 
   // We construct the connector each time to avoid issues with the circuit breaker
-  def noRetriesConnector = new EISConnectorImpl("NoRetry", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, NoRetries, clock, true)
-  def oneRetryConnector  = new EISConnectorImpl("OneRetry", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, OneRetry, clock, true)
+  def noRetriesConnector = new EISConnectorImpl("NoRetry", connectorConfig, httpClientV2, NoRetries, clock, true)
+  def oneRetryConnector  = new EISConnectorImpl("OneRetry", connectorConfig, httpClientV2, OneRetry, clock, true)
 
   def forwardClientIdConnector =
-    new EISConnectorImpl("ForwardClient", connectorConfig.copy(forwardClientId = true), TestHelpers.headerCarrierConfig, httpClientV2, NoRetries, clock, true)
+    new EISConnectorImpl("ForwardClient", connectorConfig.copy(forwardClientId = true), httpClientV2, NoRetries, clock, true)
 
   lazy val connectorGen: Gen[() => EISConnector] = Gen.oneOf(() => noRetriesConnector, () => oneRetryConnector)
 
@@ -380,7 +379,7 @@ class EISConnectorSpec
       val httpClientV2 = mock[HttpClientV2]
 
       val hc        = HeaderCarrier()
-      val connector = new EISConnectorImpl("Failure", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, NoRetries, clock, true)
+      val connector = new EISConnectorImpl("Failure", connectorConfig, httpClientV2, NoRetries, clock, true)
 
       when(httpClientV2.post(ArgumentMatchers.any[URL])(ArgumentMatchers.any[HeaderCarrier])).thenReturn(new FakeRequestBuilder)
 
@@ -401,7 +400,7 @@ class EISConnectorSpec
 
       val hc = HeaderCarrier()
       server.resetAll()
-      val connector = new EISConnectorImpl("Failure", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, OneRetry, clock, true)
+      val connector = new EISConnectorImpl("Failure", connectorConfig, httpClientV2, OneRetry, clock, true)
 
       val expectedConversationId = ConversationId(movementId, messageId)
 
@@ -454,7 +453,7 @@ class EISConnectorSpec
 
       val hc = HeaderCarrier()
       server.resetAll()
-      val connector = new EISConnectorImpl("Failure", connectorConfig, TestHelpers.headerCarrierConfig, httpClientV2, OneRetry, clock, true)
+      val connector = new EISConnectorImpl("Failure", connectorConfig, httpClientV2, OneRetry, clock, true)
 
       val expectedConversationId = ConversationId(movementId, messageId)
 
