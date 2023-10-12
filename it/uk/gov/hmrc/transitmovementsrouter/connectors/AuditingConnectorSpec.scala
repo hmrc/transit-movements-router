@@ -233,7 +233,7 @@ class AuditingConnectorSpec
             }
           }
 
-          "return a failed future if the audit message was not accepted" - Seq(INTERNAL_SERVER_ERROR).foreach {
+          "return a failed future if the audit message was not accepted" - Seq(BAD_REQUEST, INTERNAL_SERVER_ERROR).foreach {
             statusCode =>
               s"when a $statusCode is returned" in forAll(
                 arbitrary[EoriNumber],
@@ -243,6 +243,7 @@ class AuditingConnectorSpec
                 arbitrary[MovementType]
               ) {
                 (eori, movementId, messageId, messageType, movementType) =>
+                  server.resetAll()
                   server.stubFor(
                     post(
                       urlEqualTo(targetUrl(AuditType.DeclarationData))

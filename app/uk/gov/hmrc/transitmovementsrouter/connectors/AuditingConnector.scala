@@ -26,6 +26,7 @@ import play.api.Logging
 import play.api.http.HeaderNames
 import play.api.http.Status.ACCEPTED
 import uk.gov.hmrc.http.HeaderCarrier
+import uk.gov.hmrc.http.HttpResponse
 import uk.gov.hmrc.http.StringContextOps
 import uk.gov.hmrc.http.client.HttpClientV2
 import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
@@ -40,6 +41,7 @@ import uk.gov.hmrc.transitmovementsrouter.models.MovementType
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
+import scala.util.control.NonFatal
 
 @ImplementedBy(classOf[AuditingConnectorImpl])
 trait AuditingConnector {
@@ -106,7 +108,17 @@ class AuditingConnectorImpl @Inject() (httpClient: HttpClientV2, val metrics: Me
           "X-Audit-Source"         -> "transit-movements-router"
         )
         .withBody(payload)
-        .executeAndExpect(ACCEPTED)
+        .execute[HttpResponse]
+        .flatMap {
+          response =>
+            response.status match {
+              case ACCEPTED => Future.successful(())
+              case _        => response.error
+            }
+        }
+        .recover {
+          case NonFatal(thr) => Future.failed(thr)
+        }
   }
 
   def auditingRoute(auditType: AuditType): UrlPath = UrlPath.parse(s"$auditingBaseRoute/audit/${auditType.name}")

@@ -27,7 +27,6 @@ import uk.gov.hmrc.transitmovementsrouter.models.MessageType
 import uk.gov.hmrc.transitmovementsrouter.models.MovementId
 import uk.gov.hmrc.transitmovementsrouter.models.MovementType
 
-import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 
 trait BaseConnector {
@@ -69,21 +68,9 @@ trait BaseConnector {
         requestBuilder.setHeader("X-Audit-Meta-Message-Id" -> messageId.get.value)
       else requestBuilder
 
-    def executeAndExpect(expected: Int)(implicit ec: ExecutionContext): Future[Unit] =
-      requestBuilder
-        .execute[HttpResponse]
-        .flatMap {
-          response =>
-            response.status match {
-              case `expected` => Future.successful(())
-              case _          => response.error
-            }
-        }
-
   }
 
   implicit class HttpResponseHelpers(response: HttpResponse) {
-
     def error[A]: Future[A] =
       Future.failed(UpstreamErrorResponse(response.body, response.status))
   }
