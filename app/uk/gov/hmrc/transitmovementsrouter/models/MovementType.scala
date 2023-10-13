@@ -16,4 +16,11 @@
 
 package uk.gov.hmrc.transitmovementsrouter.models
 
+import play.api.libs.json.Format
+import play.api.libs.json.Json
+
 case class MovementType(value: String) extends AnyVal
+
+object MovementType {
+  implicit lazy val movementTypeFormat: Format[MovementType] = Json.valueFormat[MovementType]
+}

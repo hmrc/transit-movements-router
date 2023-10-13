@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovementsrouter.models
+package uk.gov.hmrc.transitmovementsrouter.models.requests
 
-import play.api.libs.json.Format
+import play.api.libs.json.JsObject
 import play.api.libs.json.Json
+import play.api.libs.json.OFormat
 
-case class MovementId(value: String) extends AnyVal
-
-object MovementId {
-  implicit lazy val movementIdFormat: Format[MovementId] = Json.valueFormat[MovementId]
+object Details {
+  implicit lazy val detailsFormat: OFormat[Details] = Json.format[Details]
 }
+case class Details(metadata: Metadata, payload: Option[JsObject])

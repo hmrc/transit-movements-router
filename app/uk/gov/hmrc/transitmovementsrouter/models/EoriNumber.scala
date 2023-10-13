@@ -16,4 +16,11 @@
 
 package uk.gov.hmrc.transitmovementsrouter.models
 
+import play.api.libs.json.Format
+import play.api.libs.json.Json
+
 case class EoriNumber(value: String) extends AnyVal
+
+object EoriNumber {
+  implicit lazy val eoriNumberFormat: Format[EoriNumber] = Json.valueFormat[EoriNumber]
+}

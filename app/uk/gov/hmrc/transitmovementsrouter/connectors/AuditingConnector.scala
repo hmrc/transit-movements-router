@@ -24,7 +24,11 @@ import com.kenshoo.play.metrics.Metrics
 import io.lemonlabs.uri.UrlPath
 import play.api.Logging
 import play.api.http.HeaderNames
+import play.api.http.MimeTypes
 import play.api.http.Status.ACCEPTED
+import play.api.libs.json.JsObject
+import play.api.libs.json.JsValue
+import play.api.libs.json.Json
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.HttpResponse
 import uk.gov.hmrc.http.StringContextOps
@@ -39,6 +43,8 @@ import uk.gov.hmrc.transitmovementsrouter.models.MessageId
 import uk.gov.hmrc.transitmovementsrouter.models.MessageType
 import uk.gov.hmrc.transitmovementsrouter.models.MovementId
 import uk.gov.hmrc.transitmovementsrouter.models.MovementType
+import uk.gov.hmrc.transitmovementsrouter.models.requests.Details
+import uk.gov.hmrc.transitmovementsrouter.models.requests.Metadata
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
@@ -47,14 +53,27 @@ import scala.util.control.NonFatal
 @ImplementedBy(classOf[AuditingConnectorImpl])
 trait AuditingConnector {
 
-  def post(
+  def postMessageType(
     auditType: AuditType,
     contentType: String,
     contentLength: Long,
     payload: Source[ByteString, _],
     movementId: Option[MovementId],
     messageId: Option[MessageId],
-    enrolmentEORI: Option[EoriNumber],
+    enrolmentEori: Option[EoriNumber],
+    movementType: Option[MovementType],
+    messageType: Option[MessageType]
+  )(implicit
+    hc: HeaderCarrier,
+    ec: ExecutionContext
+  ): Future[Unit]
+
+  def postStatus(
+    auditType: AuditType,
+    payload: Option[JsValue],
+    movementId: Option[MovementId],
+    messageId: Option[MessageId],
+    enrolmentEori: Option[EoriNumber],
     movementType: Option[MovementType],
     messageType: Option[MessageType]
   )(implicit
@@ -72,7 +91,7 @@ class AuditingConnectorImpl @Inject() (httpClient: HttpClientV2, val metrics: Me
 
   val auditingBaseRoute: String = "/transit-movements-auditing"
 
-  def post(
+  def postMessageType(
     auditType: AuditType,
     contentType: String,
     contentLength: Long,
@@ -87,13 +106,7 @@ class AuditingConnectorImpl @Inject() (httpClient: HttpClientV2, val metrics: Me
     ec: ExecutionContext
   ): Future[Unit] = withMetricsTimerAsync(MetricsKeys.AuditingBackend.Post) {
     _ =>
-      val url = appConfig.auditingUrl.withPath(auditingRoute(auditType))
-
-      val path = hc.otherHeaders
-        .collectFirst {
-          case ("path", value) => value
-        }
-        .getOrElse("-")
+      val (url: appConfig.auditingUrl.Self, path: String) = getUrlAndPath(auditType, hc)
       httpClient
         .post(url"$url")
         .withInternalAuthToken
@@ -122,6 +135,52 @@ class AuditingConnectorImpl @Inject() (httpClient: HttpClientV2, val metrics: Me
         }
   }
 
-  def auditingRoute(auditType: AuditType): UrlPath = UrlPath.parse(s"$auditingBaseRoute/audit/${auditType.name}")
+  override def postStatus(
+    auditType: AuditType,
+    payload: Option[JsValue],
+    movementId: Option[MovementId],
+    messageId: Option[MessageId],
+    enrolmentEori: Option[EoriNumber],
+    movementType: Option[MovementType],
+    messageType: Option[MessageType]
+  )(implicit
+    hc: HeaderCarrier,
+    ec: ExecutionContext
+  ): Future[Unit] = withMetricsTimerAsync(MetricsKeys.AuditingBackend.Post) {
+    _ =>
+      val (url: appConfig.auditingUrl.Self, path: String) = getUrlAndPath(auditType, hc)
+      val metadata                                        = Metadata(path, movementId, messageId, enrolmentEori, movementType, messageType)
+      val details                                         = Details(metadata, payload.map(_.as[JsObject]))
+      httpClient
+        .post(url"$url")
+        .withInternalAuthToken
+        .setHeader(
+          "X-Audit-Source"         -> "transit-movements-router",
+          HeaderNames.CONTENT_TYPE -> MimeTypes.JSON
+        )
+        .withBody(Json.toJson(details))
+        .execute[HttpResponse]
+        .flatMap {
+          response =>
+            response.status match {
+              case ACCEPTED => Future.successful(())
+              case _        => Future.failed(UpstreamErrorResponse(response.body, response.status))
+            }
+        }
+        .recover {
+          case NonFatal(thr) => Future.failed(thr)
+        }
+  }
+
+  private def getUrlAndPath(auditType: AuditType, hc: HeaderCarrier) = {
+    val auditRoute = UrlPath.parse(s"$auditingBaseRoute/audit/${auditType.name}")
+    val url        = appConfig.auditingUrl.withPath(auditRoute)
+    val path = hc.otherHeaders
+      .collectFirst {
+        case ("path", value) => value
+      }
+      .getOrElse("-")
+    (url, path)
+  }
 
 }

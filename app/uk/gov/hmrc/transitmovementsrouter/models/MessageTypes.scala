@@ -16,6 +16,12 @@
 
 package uk.gov.hmrc.transitmovementsrouter.models
 
+import play.api.libs.json.JsError
+import play.api.libs.json.JsString
+import play.api.libs.json.JsSuccess
+import play.api.libs.json.Reads
+import play.api.libs.json.Writes
+
 sealed trait MessageType extends Product with Serializable {
   def code: String
   def rootNode: String
@@ -213,5 +219,17 @@ object MessageType {
       case _: RequestMessageType => true
       case _                     => false
     }
+
+  def findByCode(code: String): Option[MessageType] =
+    values.find(_.code == code)
+
+  implicit val messageTypeReads: Reads[MessageType] = Reads {
+    case JsString(value) => findByCode(value).map(JsSuccess(_)).getOrElse(JsError())
+    case _               => JsError()
+  }
+
+  implicit val messageTypeWrites: Writes[MessageType] = Writes {
+    obj => JsString(obj.code)
+  }
 
 }

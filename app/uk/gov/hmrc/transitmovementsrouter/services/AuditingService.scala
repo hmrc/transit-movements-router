@@ -21,6 +21,7 @@ import akka.util.ByteString
 import com.google.inject.ImplementedBy
 import com.google.inject.Inject
 import play.api.Logging
+import play.api.libs.json.JsValue
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.transitmovementsrouter.connectors.AuditingConnector
 import uk.gov.hmrc.transitmovementsrouter.models.AuditType
@@ -37,6 +38,19 @@ import scala.util.control.NonFatal
 @ImplementedBy(classOf[AuditingServiceImpl])
 trait AuditingService {
 
+  def auditStatusEvent(
+    auditType: AuditType,
+    payload: Option[JsValue],
+    movementId: Option[MovementId],
+    messageId: Option[MessageId],
+    enrolmentEori: Option[EoriNumber],
+    movementType: Option[MovementType],
+    messageType: Option[MessageType]
+  )(implicit
+    hc: HeaderCarrier,
+    ec: ExecutionContext
+  ): Future[Unit]
+
   def auditMessageEvent(
     auditType: AuditType,
     contentType: String,
@@ -44,7 +58,7 @@ trait AuditingService {
     payload: Source[ByteString, _],
     movementId: Option[MovementId],
     messageId: Option[MessageId],
-    enrolmentEORI: Option[EoriNumber],
+    enrolmentEori: Option[EoriNumber],
     movementType: Option[MovementType],
     messageType: Option[MessageType]
   )(implicit
@@ -63,15 +77,33 @@ class AuditingServiceImpl @Inject() (auditingConnector: AuditingConnector) exten
     payload: Source[ByteString, _],
     movementId: Option[MovementId],
     messageId: Option[MessageId],
-    enrolmentEORI: Option[EoriNumber],
+    enrolmentEori: Option[EoriNumber],
     movementType: Option[MovementType],
     messageType: Option[MessageType]
   )(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Future[Unit] =
-    auditingConnector.post(auditType, contentType, contentLength, payload, movementId, messageId, enrolmentEORI, movementType, messageType).recover {
+    auditingConnector.postMessageType(auditType, contentType, contentLength, payload, movementId, messageId, enrolmentEori, movementType, messageType).recover {
       case NonFatal(e) =>
         logger.warn("Unable to audit payload due to an exception", e)
+    }
+
+  def auditStatusEvent(
+    auditType: AuditType,
+    payload: Option[JsValue],
+    movementId: Option[MovementId],
+    messageId: Option[MessageId],
+    enrolmentEori: Option[EoriNumber],
+    movementType: Option[MovementType],
+    messageType: Option[MessageType]
+  )(implicit
+    hc: HeaderCarrier,
+    ec: ExecutionContext
+  ): Future[Unit] =
+    auditingConnector.postStatus(auditType, payload, movementId, messageId, enrolmentEori, movementType, messageType).recover {
+      case NonFatal(e) =>
+        logger.warn("Unable to audit payload due to an exception", e)
+
     }
 }
