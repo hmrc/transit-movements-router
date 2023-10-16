@@ -73,6 +73,7 @@ import uk.gov.hmrc.transitmovementsrouter.controllers.actions.InternalAuthAction
 import uk.gov.hmrc.transitmovementsrouter.controllers.errors.PresentationError
 import uk.gov.hmrc.transitmovementsrouter.fakes.actions.FakeXmlTransformer
 import uk.gov.hmrc.transitmovementsrouter.generators.TestModelGenerators
+import uk.gov.hmrc.transitmovementsrouter.models.AuditType.NCTSToTraderSubmissionSuccessful
 import uk.gov.hmrc.transitmovementsrouter.models.MessageType.RequestOfRelease
 import uk.gov.hmrc.transitmovementsrouter.models._
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.MovementNotFound
@@ -129,6 +130,7 @@ class MessageControllerSpec
   val mockSDESService: SDESService                                   = mock[SDESService]
   val mockSdesResponseParser: SdesResponseParser                     = mock[SdesResponseParser]
   val mockUpscanConnector: UpscanConnector                           = mock[UpscanConnector]
+  val mockAuditingService: AuditingService                           = mock[AuditingService]
 
   implicit val temporaryFileCreator: Files.SingletonTemporaryFileCreator.type = SingletonTemporaryFileCreator
 
@@ -165,6 +167,7 @@ class MessageControllerSpec
       mockSDESService,
       mockInternalAuthActionProvider,
       mockStatusMonitoringService,
+      mockAuditingService,
       config
     ) {
       // suppress logging
@@ -224,7 +227,7 @@ class MessageControllerSpec
     reset(config)
     when(config.logIncoming).thenReturn(true)
     when(config.eisSizeLimit).thenReturn(5000000) // TODO: vary per test
-
+    reset(mockAuditingService)
     resetAuthActionAndStatusMonitoring()
     super.afterEach()
   }
@@ -531,6 +534,18 @@ class MessageControllerSpec
           .thenReturn(EitherT.fromEither(Right(PersistenceResponse(messageId))))
 
         when(
+          mockAuditingService.auditStatusEvent(
+            eqTo(NCTSToTraderSubmissionSuccessful),
+            eqTo(None),
+            eqTo(Some(movementId)),
+            eqTo(Some(messageId)),
+            eqTo(None),
+            eqTo(None),
+            eqTo(Some(messageType))
+          )(any[HeaderCarrier], any[ExecutionContext])
+        ).thenReturn(Future.successful(()))
+
+        when(
           mockPushNotificationsConnector
             .postMessageReceived(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(messageType), any[Source[ByteString, _]])(
               any[HeaderCarrier],
@@ -551,6 +566,17 @@ class MessageControllerSpec
           MessageId(eqTo(messageId.value)),
           eqTo(messageType)
         )(any(), any())
+
+        verify(mockAuditingService, times(1)).auditStatusEvent(
+          eqTo(NCTSToTraderSubmissionSuccessful),
+          eqTo(None),
+          eqTo(Some(movementId)),
+          eqTo(Some(messageId)),
+          eqTo(None),
+          eqTo(None),
+          eqTo(Some(messageType))
+        )(any[HeaderCarrier], any[ExecutionContext])
+
     }
 
     "must return BAD_REQUEST when the X-Message-Type header is missing or body seems to not contain an appropriate root tag" in {
@@ -581,6 +607,18 @@ class MessageControllerSpec
 
       when(mockPersistenceConnector.postBody(any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId], any(), any())(any(), any()))
         .thenReturn(EitherT.fromEither(Left(MovementNotFound(MovementId("ABC")))))
+      when(
+        mockAuditingService.auditStatusEvent(
+          eqTo(NCTSToTraderSubmissionSuccessful),
+          eqTo(None),
+          eqTo(Some(movementId)),
+          eqTo(Some(messageId)),
+          eqTo(None),
+          eqTo(None),
+          eqTo(Some(MessageType.RequestOfRelease))
+        )(any[HeaderCarrier], any[ExecutionContext])
+      ).thenReturn(Future.successful(()))
+
       when(mockMessageTypeExtractor.extract(any(), any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](MessageType.RequestOfRelease))
 
       val request = fakeRequest(incomingXml, incoming)
@@ -590,12 +628,34 @@ class MessageControllerSpec
 
       status(result) mustBe NOT_FOUND
       verifyNoInteractions(mockInternalAuthActionProvider)
+      verify(mockAuditingService, times(0)).auditStatusEvent(
+        eqTo(NCTSToTraderSubmissionSuccessful),
+        eqTo(None),
+        eqTo(Some(movementId)),
+        eqTo(Some(messageId)),
+        eqTo(None),
+        eqTo(None),
+        eqTo(Some(MessageType.RequestOfRelease))
+      )(any[HeaderCarrier], any[ExecutionContext])
+
     }
 
     "must return INTERNAL_SERVER_ERROR when persistence service fails unexpected" in {
 
       when(mockPersistenceConnector.postBody(any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId], any(), any())(any(), any()))
         .thenReturn(EitherT.fromEither(Left(Unexpected(None))))
+      when(
+        mockAuditingService.auditStatusEvent(
+          eqTo(NCTSToTraderSubmissionSuccessful),
+          eqTo(None),
+          eqTo(Some(movementId)),
+          eqTo(Some(messageId)),
+          eqTo(None),
+          eqTo(None),
+          eqTo(Some(MessageType.RequestOfRelease))
+        )(any[HeaderCarrier], any[ExecutionContext])
+      ).thenReturn(Future.successful(()))
+
       when(mockMessageTypeExtractor.extract(any(), any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](MessageType.RequestOfRelease))
 
       val request = fakeRequest(incomingXml, incoming)
@@ -611,6 +671,15 @@ class MessageControllerSpec
         eqTo(RequestOfRelease)
       )(any(), any())
     }
+    verify(mockAuditingService, times(0)).auditStatusEvent(
+      eqTo(NCTSToTraderSubmissionSuccessful),
+      eqTo(None),
+      eqTo(Some(movementId)),
+      eqTo(Some(messageId)),
+      eqTo(None),
+      eqTo(None),
+      eqTo(Some(MessageType.RequestOfRelease))
+    )(any[HeaderCarrier], any[ExecutionContext])
 
   }
 

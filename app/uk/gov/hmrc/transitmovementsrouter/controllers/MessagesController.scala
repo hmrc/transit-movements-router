@@ -46,6 +46,7 @@ import uk.gov.hmrc.transitmovementsrouter.controllers.actions.InternalAuthAction
 import uk.gov.hmrc.transitmovementsrouter.controllers.errors.ConvertError
 import uk.gov.hmrc.transitmovementsrouter.controllers.errors.PresentationError
 import uk.gov.hmrc.transitmovementsrouter.controllers.stream.StreamingParsers
+import uk.gov.hmrc.transitmovementsrouter.models.AuditType.NCTSToTraderSubmissionSuccessful
 import uk.gov.hmrc.transitmovementsrouter.models._
 import uk.gov.hmrc.transitmovementsrouter.models.requests.MessageUpdate
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanFailedResponse
@@ -91,6 +92,7 @@ class MessagesController @Inject() (
   sdesService: SDESService,
   internalAuth: InternalAuthActionProvider,
   statusMonitoringService: ServiceMonitoringService,
+  auditingService: AuditingService,
   val config: AppConfig
 )(implicit
   val materializer: Materializer,
@@ -147,6 +149,15 @@ class MessagesController @Inject() (
           _ = statusMonitoringService.incoming(movementId, triggerId, messageType)
           persistenceResponse <- persistStream(movementId, triggerId, messageType, request.body).leftMap(
             err => (err, Option(messageType))
+          )
+          _ = auditingService.auditStatusEvent(
+            NCTSToTraderSubmissionSuccessful,
+            None,
+            Some(movementId),
+            Some(persistenceResponse.messageId),
+            None,
+            None,
+            Some(messageType)
           )
           _ = logIncomingSuccess(movementId, triggerId, persistenceResponse.messageId, messageType)
         } yield persistenceResponse)
