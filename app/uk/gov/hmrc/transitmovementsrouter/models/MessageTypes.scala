@@ -35,7 +35,9 @@ sealed trait RequestMessageType extends MessageType {
   val officeNode: String
 }
 
-sealed trait ResponseMessageType extends MessageType
+sealed trait ResponseMessageType extends MessageType {
+  def auditType: AuditType
+}
 
 sealed abstract class DepartureRequestMessageType(
   val code: String,
@@ -46,7 +48,8 @@ sealed abstract class DepartureRequestMessageType(
 
 sealed abstract class DepartureResponseMessageType(
   val code: String,
-  val rootNode: String
+  val rootNode: String,
+  val auditType: AuditType
 ) extends ResponseMessageType
     with DepartureMessageType
 
@@ -59,7 +62,8 @@ sealed abstract class ArrivalRequestMessageType(
 
 sealed abstract class ArrivalResponseMessageType(
   val code: String,
-  val rootNode: String
+  val rootNode: String,
+  val auditType: AuditType
 ) extends ResponseMessageType
     with ArrivalMessageType
 
@@ -101,46 +105,46 @@ object MessageType {
   // ********************
 
   /** E_AMD_ACC (IE004) */
-  case object AmendmentAcceptance extends DepartureResponseMessageType("IE004", "CC004C")
+  case object AmendmentAcceptance extends DepartureResponseMessageType("IE004", "CC004C", AuditType.AmendmentAcceptance)
 
   /** E_DEP_REJ (IE056) */
-  case object DepartureOfficeRejection extends DepartureResponseMessageType("IE056", "CC056C")
+  case object DepartureOfficeRejection extends DepartureResponseMessageType("IE056", "CC056C", AuditType.RejectionFromOfficeOfDeparture)
 
   /** E_INV_DEC (IE009) */
-  case object InvalidationDecision extends DepartureResponseMessageType("IE009", "CC009C")
+  case object InvalidationDecision extends DepartureResponseMessageType("IE009", "CC009C", AuditType.InvalidationDecision)
 
   /** E_GUA_INV (IE055) */
-  case object GuaranteeInvalid extends DepartureResponseMessageType("IE055", "CC055C")
+  case object GuaranteeInvalid extends DepartureResponseMessageType("IE055", "CC055C", AuditType.GuaranteeNotValid)
 
   /** E_DIS_SND (IE019) */
-  case object Discrepancies extends DepartureResponseMessageType("IE019", "CC019C")
+  case object Discrepancies extends DepartureResponseMessageType("IE019", "CC019C", AuditType.Discrepancies)
 
   /** E_POS_ACK (IE928) */
-  case object PositiveAcknowledge extends DepartureResponseMessageType("IE928", "CC928C")
+  case object PositiveAcknowledge extends DepartureResponseMessageType("IE928", "CC928C", AuditType.PositiveAcknowledge)
 
   /** E_MRN_ALL (IE028) */
-  case object MrnAllocated extends DepartureResponseMessageType("IE028", "CC028C")
+  case object MrnAllocated extends DepartureResponseMessageType("IE028", "CC028C", AuditType.MRNAllocated)
 
   /** E_REL_TRA (IE029) */
-  case object ReleaseForTransit extends DepartureResponseMessageType("IE029", "CC029C")
+  case object ReleaseForTransit extends DepartureResponseMessageType("IE029", "CC029C", AuditType.ReleaseForTransit)
 
   /** E_WRT_NOT (IE045) */
-  case object WriteOffNotification extends DepartureResponseMessageType("IE045", "CC045C")
+  case object WriteOffNotification extends DepartureResponseMessageType("IE045", "CC045C", AuditType.WriteOffNotification)
 
   /** E_REL_NOT (IE051) */
-  case object NoReleaseForTransit extends DepartureResponseMessageType("IE051", "CC051C")
+  case object NoReleaseForTransit extends DepartureResponseMessageType("IE051", "CC051C", AuditType.NoReleaseForTransit)
 
   /** E_CTR_DEC (IE060) */
-  case object ControlDecisionNotification extends DepartureResponseMessageType("IE060", "CC060C")
+  case object ControlDecisionNotification extends DepartureResponseMessageType("IE060", "CC060C", AuditType.ControlDecisionNotification)
 
   /** E_AMD_NOT (IE022) */
-  case object NotificationToAmend extends DepartureResponseMessageType("IE022", "CC022C")
+  case object NotificationToAmend extends DepartureResponseMessageType("IE022", "CC022C", AuditType.NotificationToAmendDeclaration)
 
   /** E_INC_NOT (IE182) */
-  case object IncidentNotification extends DepartureResponseMessageType("IE182", "CC182C")
+  case object IncidentNotification extends DepartureResponseMessageType("IE182", "CC182C", AuditType.ForwardedIncidentNotificationToED)
 
   /** E_REC_NOT (IE035) */
-  case object RecoveryNotification extends DepartureResponseMessageType("IE035", "CC035C")
+  case object RecoveryNotification extends DepartureResponseMessageType("IE035", "CC035C", AuditType.RecoveryNotification)
 
   val departureResponseValues = Set(
     AmendmentAcceptance,
@@ -181,13 +185,13 @@ object MessageType {
   // ****************
 
   /** E_DES_REJ (IE057) */
-  case object DestinationOfficeRejection extends ArrivalResponseMessageType("IE057", "CC057C")
+  case object DestinationOfficeRejection extends ArrivalResponseMessageType("IE057", "CC057C", AuditType.RejectionFromOfficeOfDestination)
 
   /** E_GDS_REL (IE025) */
-  case object GoodsReleaseNotification extends ArrivalResponseMessageType("IE025", "CC025C")
+  case object GoodsReleaseNotification extends ArrivalResponseMessageType("IE025", "CC025C", AuditType.GoodsReleaseNotification)
 
   /** E_ULD_PER (IE025) */
-  case object UnloadingPermission extends ArrivalResponseMessageType("IE043", "CC043C")
+  case object UnloadingPermission extends ArrivalResponseMessageType("IE043", "CC043C", AuditType.UnloadingPermission)
 
   val arrivalResponseValues = Set(
     DestinationOfficeRejection,
@@ -197,19 +201,11 @@ object MessageType {
 
   val arrivalValues = arrivalRequestValues ++ arrivalResponseValues
 
-  // ***************
-  // Error Responses
-  // ***************
-
-  case object XmlNack extends ErrorMessageType("IE917", "CC917C", "/xsd/CC917C.xsd")
-
-  val errorValues = Set(XmlNack)
-
   val requestValues = arrivalRequestValues ++ departureRequestValues
 
   val responseValues = arrivalResponseValues ++ departureResponseValues
 
-  val values = arrivalValues ++ departureValues ++ errorValues
+  val values = arrivalValues ++ departureValues
 
   def withCode(name: String): Option[MessageType] =
     values.find(_.code == name)
