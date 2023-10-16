@@ -16,11 +16,16 @@
 
 package uk.gov.hmrc.transitmovementsrouter.models
 
-import play.api.libs.json.Format
-import play.api.libs.json.Json
+import org.scalatest.freespec.AnyFreeSpec
+import org.scalatest.matchers.must.Matchers
 
-case class MovementId(value: String) extends AnyVal
+class AuditTypeSpec extends AnyFreeSpec with Matchers {
 
-object MovementId {
-  implicit lazy val movementIdFormat: Format[MovementId] = Json.valueFormat[MovementId]
+  "every AuditType must match the object name" - AuditType.values.foreach {
+    auditType =>
+      auditType.toString in {
+        auditType.name mustBe auditType.toString // toString prints the case object's identifier, so this is what we want
+      }
+  }
+
 }

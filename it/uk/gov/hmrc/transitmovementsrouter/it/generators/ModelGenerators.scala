@@ -23,9 +23,12 @@ import uk.gov.hmrc.objectstore.client.ObjectSummaryWithMd5
 import uk.gov.hmrc.objectstore.client.Path
 import uk.gov.hmrc.transitmovementsrouter.models.ConversationId
 import uk.gov.hmrc.transitmovementsrouter.models.CustomsOffice
+import uk.gov.hmrc.transitmovementsrouter.models.EoriNumber
 import uk.gov.hmrc.transitmovementsrouter.models.MessageId
 import uk.gov.hmrc.transitmovementsrouter.models.MessageType
 import uk.gov.hmrc.transitmovementsrouter.models.MovementId
+import uk.gov.hmrc.transitmovementsrouter.models.MovementType
+import uk.gov.hmrc.transitmovementsrouter.models.requests.Metadata
 import uk.gov.hmrc.transitmovementsrouter.models.sdes.FileMd5Checksum
 import uk.gov.hmrc.transitmovementsrouter.models.sdes.FileName
 import uk.gov.hmrc.transitmovementsrouter.models.sdes.FileSize
@@ -54,7 +57,7 @@ trait ModelGenerators extends BaseGenerators {
 
   implicit lazy val arbitraryMovementId: Arbitrary[MovementId] =
     Arbitrary {
-      Gen.listOfN(16, Gen.hexChar).map(_.mkString).map(MovementId)
+      Gen.listOfN(16, Gen.hexChar).map(_.mkString).map(MovementId(_))
     }
 
   implicit def arbUUID: Arbitrary[UUID] = Arbitrary {
@@ -63,7 +66,7 @@ trait ModelGenerators extends BaseGenerators {
 
   implicit lazy val arbitraryMessageId: Arbitrary[MessageId] =
     Arbitrary {
-      Gen.listOfN(16, Gen.hexChar).map(_.mkString).map(MessageId)
+      Gen.listOfN(16, Gen.hexChar).map(_.mkString).map(MessageId(_))
     }
 
   implicit lazy val arbitraryMessageType: Arbitrary[MessageType] =
@@ -114,6 +117,27 @@ trait ModelGenerators extends BaseGenerators {
       ),
       SdesAudit(uuid.toString)
     )
+  }
+
+  implicit lazy val arbitraryEoriNumber: Arbitrary[EoriNumber] = Arbitrary {
+    Gen.alphaNumStr.map(
+      alphaNum => if (alphaNum.trim.size == 0) EoriNumber("abc123") else EoriNumber(alphaNum) // guard against the empty string
+    )
+  }
+
+  implicit lazy val arbitraryMovementType: Arbitrary[MovementType] = Arbitrary {
+    Gen.oneOf(Seq(MovementType("departure"), MovementType("arrival")))
+  }
+
+  implicit val arbitraryMetadata: Arbitrary[Metadata] = Arbitrary {
+    for {
+      path          <- Gen.alphaNumStr
+      movementId    <- arbitraryMovementId.arbitrary
+      messageId     <- arbitraryMessageId.arbitrary
+      enrolmentEORI <- arbitraryEoriNumber.arbitrary
+      movementType  <- arbitraryMovementType.arbitrary
+      messageType   <- arbitraryMessageType.arbitrary
+    } yield Metadata(path, Some(movementId), Some(messageId), Some(enrolmentEORI), Some(movementType), Some(messageType))
   }
 
 }

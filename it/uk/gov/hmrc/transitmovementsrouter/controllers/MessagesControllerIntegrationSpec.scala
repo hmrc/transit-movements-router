@@ -523,7 +523,7 @@ class MessagesControllerIntegrationSpec
           val newApp                  = appBuilder.build()
           val conversationId          = ConversationId(UUID.randomUUID())
           val (movementId, messageId) = conversationId.toMovementAndMessageId
-          val outputMessageId         = Gen.stringOfN(16, Gen.hexChar.map(_.toLower)).map(MessageId).sample.get
+          val outputMessageId         = Gen.stringOfN(16, Gen.hexChar.map(_.toLower)).sample.get
 
           // We should hit the persistence layer on /transit-movements/traders/movements/${movementId.value}/messages?triggerId=messageId
           server.stubFor(
@@ -531,12 +531,12 @@ class MessagesControllerIntegrationSpec
               .withQueryParam("triggerId", new EqualToPattern(messageId.value))
               .withHeader("x-message-type", new EqualToPattern("IE004"))
               .willReturn(
-                aResponse().withStatus(OK).withBody(Json.stringify(Json.obj("messageId" -> outputMessageId.value)))
+                aResponse().withStatus(OK).withBody(Json.stringify(Json.obj("messageId" -> outputMessageId)))
               )
           )
 
           server.stubFor(
-            post(s"/transit-movements-push-notifications/traders/movements/${movementId.value}/messages/${outputMessageId.value}/messageReceived")
+            post(s"/transit-movements-push-notifications/traders/movements/${movementId.value}/messages/$outputMessageId/messageReceived")
               .willReturn(
                 aResponse().withStatus(OK)
               )

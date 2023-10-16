@@ -14,13 +14,12 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovementsrouter.models
+package uk.gov.hmrc.transitmovementsrouter.metrics
 
-import play.api.libs.json.Format
-import play.api.libs.json.Json
+object MetricsKeys {
 
-case class MovementId(value: String) extends AnyVal
+  object AuditingBackend {
+    val Post = "auditing-backend-post"
+  }
 
-object MovementId {
-  implicit lazy val movementIdFormat: Format[MovementId] = Json.valueFormat[MovementId]
 }

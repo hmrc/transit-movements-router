@@ -16,4 +16,11 @@
 
 package uk.gov.hmrc.transitmovementsrouter.models
 
+import play.api.libs.json.Format
+import play.api.libs.json.Json
+
 case class MessageId(value: String) extends AnyVal
+
+object MessageId {
+  implicit lazy val messageIdFormat: Format[MessageId] = Json.valueFormat[MessageId]
+}
