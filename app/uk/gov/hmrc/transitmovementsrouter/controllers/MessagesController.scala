@@ -21,6 +21,7 @@ import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import cats.data.EitherT
 import play.api.Logging
+import play.api.http.MimeTypes
 import play.api.libs.Files.TemporaryFileCreator
 import play.api.libs.json.JsValue
 import play.api.libs.json.Json
@@ -47,6 +48,7 @@ import uk.gov.hmrc.transitmovementsrouter.controllers.errors.ConvertError
 import uk.gov.hmrc.transitmovementsrouter.controllers.errors.PresentationError
 import uk.gov.hmrc.transitmovementsrouter.controllers.stream.StreamingParsers
 import uk.gov.hmrc.transitmovementsrouter.models._
+import uk.gov.hmrc.transitmovementsrouter.models.errors.MessageTypeExtractionError
 import uk.gov.hmrc.transitmovementsrouter.models.requests.MessageUpdate
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanFailedResponse
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse
@@ -91,6 +93,7 @@ class MessagesController @Inject() (
   sdesService: SDESService,
   internalAuth: InternalAuthActionProvider,
   statusMonitoringService: ServiceMonitoringService,
+  auditService: AuditingService,
   val config: AppConfig
 )(implicit
   val materializer: Materializer,
@@ -135,18 +138,36 @@ class MessagesController @Inject() (
     }
   }
 
+  private def extractAuditMessage(messageType: MessageType): EitherT[Future, MessageTypeExtractionError, AuditType] = {
+    val auditType: EitherT[Future, MessageTypeExtractionError, AuditType] =
+      EitherT.fromOption[Future](messageType.auditType, MessageTypeExtractionError.InvalidMessageType(s"$messageType is not a ResponseMessageType"))
+    //TODO: or EitherT.fromOption[Future](messageType.auditType, MessageTypeExtractionError.Unexpected(None))
+    auditType
+  }
+
   def incomingViaEIS(ids: ConversationId): Action[Source[ByteString, _]] =
     authenticateEISToken.stream(transformer = eisMessageTransformers.unwrap) {
-      implicit request => _ =>
+      implicit request => size =>
         import MessagesController.PresentationEitherTHelper
 
         val (movementId, triggerId) = ids.toMovementAndMessageId
-
         (for {
           messageType <- messageTypeExtractor.extract(request.headers, request.body).asPresentationWithMessageType(None)
+          auditMsg    <- extractAuditMessage(messageType).asPresentationWithMessageType(None)
           _ = statusMonitoringService.incoming(movementId, triggerId, messageType)
           persistenceResponse <- persistStream(movementId, triggerId, messageType, request.body).leftMap(
             err => (err, Option(messageType))
+          )
+          _ = auditService.auditMessageEvent(
+            auditType = auditMsg,
+            contentType = MimeTypes.XML,
+            contentLength = size,
+            payload = request.body,
+            movementId = Some(movementId),
+            messageId = Some(persistenceResponse.messageId),
+            enrolmentEori = None,
+            movementType = Some(messageType.movementType),
+            messageType = Some(messageType)
           )
           _ = logIncomingSuccess(movementId, triggerId, persistenceResponse.messageId, messageType)
         } yield persistenceResponse)
