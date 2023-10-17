@@ -42,9 +42,7 @@ sealed trait RequestMessageType extends MessageType {
   val officeNode: String
 }
 
-sealed trait ResponseMessageType extends MessageType {
-  override def auditType: Option[AuditType] = None
-}
+sealed trait ResponseMessageType extends MessageType
 
 sealed abstract class DepartureRequestMessageType(
   val code: String,
