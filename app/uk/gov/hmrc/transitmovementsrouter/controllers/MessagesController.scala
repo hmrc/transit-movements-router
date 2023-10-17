@@ -22,30 +22,45 @@ import akka.util.ByteString
 import cats.data.EitherT
 import play.api.Logging
 import play.api.libs.Files.TemporaryFileCreator
-import play.api.libs.json.{JsValue, Json}
-import play.api.mvc.{Action, ControllerComponents, Request, Result}
-import uk.gov.hmrc.http.{HeaderCarrier, HeaderNames}
+import play.api.libs.json.JsValue
+import play.api.libs.json.Json
+import play.api.mvc.Action
+import play.api.mvc.ControllerComponents
+import play.api.mvc.Request
+import play.api.mvc.Result
+import uk.gov.hmrc.http.HeaderCarrier
+import uk.gov.hmrc.http.HeaderNames
 import uk.gov.hmrc.internalauth.client._
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
 import uk.gov.hmrc.play.http.HeaderCarrierConverter
 import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
-import uk.gov.hmrc.transitmovementsrouter.connectors.{PersistenceConnector, PushNotificationsConnector, UpscanConnector}
-import uk.gov.hmrc.transitmovementsrouter.controllers.actions.{AuthenticateEISToken, InternalAuthActionProvider}
-import uk.gov.hmrc.transitmovementsrouter.controllers.errors.{ConvertError, PresentationError}
+import uk.gov.hmrc.transitmovementsrouter.connectors.PersistenceConnector
+import uk.gov.hmrc.transitmovementsrouter.connectors.PushNotificationsConnector
+import uk.gov.hmrc.transitmovementsrouter.connectors.UpscanConnector
+import uk.gov.hmrc.transitmovementsrouter.controllers.actions.AuthenticateEISToken
+import uk.gov.hmrc.transitmovementsrouter.controllers.actions.InternalAuthActionProvider
+import uk.gov.hmrc.transitmovementsrouter.controllers.errors.ConvertError
+import uk.gov.hmrc.transitmovementsrouter.controllers.errors.PresentationError
 import uk.gov.hmrc.transitmovementsrouter.controllers.stream.StreamingParsers
-import uk.gov.hmrc.transitmovementsrouter.models.AuditType.{NCTSRequestedMissingMovement, NCTSToTraderSubmissionSuccessful}
+import uk.gov.hmrc.transitmovementsrouter.models.AuditType.NCTSRequestedMissingMovement
+import uk.gov.hmrc.transitmovementsrouter.models.AuditType.NCTSToTraderSubmissionSuccessful
 import uk.gov.hmrc.transitmovementsrouter.models._
 import uk.gov.hmrc.transitmovementsrouter.models.requests.MessageUpdate
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.DownloadUrl
-import uk.gov.hmrc.transitmovementsrouter.models.responses.{UpscanFailedResponse, UpscanResponse, UpscanSuccessResponse}
-import uk.gov.hmrc.transitmovementsrouter.models.sdes.{SdesNotification, SdesNotificationType}
+import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanFailedResponse
+import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse
+import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanSuccessResponse
+import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesNotification
+import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesNotificationType
 import uk.gov.hmrc.transitmovementsrouter.services._
-import uk.gov.hmrc.transitmovementsrouter.utils.{RouterHeaderNames, StreamWithFile}
+import uk.gov.hmrc.transitmovementsrouter.utils.RouterHeaderNames
+import uk.gov.hmrc.transitmovementsrouter.utils.StreamWithFile
 
 import java.util.UUID
 import javax.inject.Inject
 import scala.annotation.unused
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.ExecutionContext
+import scala.concurrent.Future
 
 object MessagesController extends ConvertError {
 
@@ -141,9 +156,7 @@ class MessagesController @Inject() (
                   None,
                   Some(messageType)
                 )
-
               (err, Option(messageType))
-
           }
           _ = auditingService.auditStatusEvent(
             NCTSToTraderSubmissionSuccessful,
