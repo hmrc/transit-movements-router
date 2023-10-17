@@ -54,7 +54,7 @@ sealed abstract class DepartureRequestMessageType(
 sealed abstract class DepartureResponseMessageType(
   val code: String,
   val rootNode: String,
-  override val auditType: Option[AuditType] = None
+  override val auditType: Option[AuditType]
 ) extends ResponseMessageType
     with DepartureMessageType
 
