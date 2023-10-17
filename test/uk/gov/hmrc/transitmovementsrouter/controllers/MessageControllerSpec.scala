@@ -73,6 +73,7 @@ import uk.gov.hmrc.transitmovementsrouter.controllers.actions.InternalAuthAction
 import uk.gov.hmrc.transitmovementsrouter.controllers.errors.PresentationError
 import uk.gov.hmrc.transitmovementsrouter.fakes.actions.FakeXmlTransformer
 import uk.gov.hmrc.transitmovementsrouter.generators.TestModelGenerators
+import uk.gov.hmrc.transitmovementsrouter.models.MessageType.MrnAllocated
 import uk.gov.hmrc.transitmovementsrouter.models.MessageType.RequestOfRelease
 import uk.gov.hmrc.transitmovementsrouter.models._
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.MovementNotFound
@@ -129,6 +130,7 @@ class MessageControllerSpec
   val mockSDESService: SDESService                                   = mock[SDESService]
   val mockSdesResponseParser: SdesResponseParser                     = mock[SdesResponseParser]
   val mockUpscanConnector: UpscanConnector                           = mock[UpscanConnector]
+  val mockAuditingService: AuditingService                           = mock[AuditingService]
 
   implicit val temporaryFileCreator: Files.SingletonTemporaryFileCreator.type = SingletonTemporaryFileCreator
 
@@ -165,6 +167,7 @@ class MessageControllerSpec
       mockSDESService,
       mockInternalAuthActionProvider,
       mockStatusMonitoringService,
+      mockAuditingService,
       config
     ) {
       // suppress logging
@@ -523,7 +526,7 @@ class MessageControllerSpec
   }
 
   "POST incoming from EIS" - {
-    "must return CREATED when message is successfully forwarded" in forAll(arbitrary[MovementId], arbitrary[MessageId], arbitrary[MessageType]) {
+    "must return CREATED when message is successfully forwarded" in forAll(arbitrary[MovementId], arbitrary[MessageId], arbitrary[ResponseMessageType]) {
       (movementId, messageId, messageType) =>
         when(mockMessageTypeExtractor.extract(any(), any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](messageType))
 
@@ -577,11 +580,26 @@ class MessageControllerSpec
       verifyNoInteractions(mockStatusMonitoringService)
     }
 
+    "must return BAD_REQUEST when message type is not a response message" in { //TODO: or should this be INTERNAL_SERVER_ERROR ?
+
+      val request = fakeRequest(incomingXml, incoming)
+        .withHeaders(FakeHeaders().add("X-Message-Type" -> "IE015"))
+
+      when(mockMessageTypeExtractor.extract(any(), any()))
+        .thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](MessageType.DeclarationData))
+
+      val result = controller().incomingViaEIS(ConversationId(movementId, messageId))(request)
+
+      status(result) mustBe BAD_REQUEST
+      verifyNoInteractions(mockInternalAuthActionProvider)
+      verifyNoInteractions(mockStatusMonitoringService)
+    }
+
     "must return NOT_FOUND when target movement is invalid or archived" in {
 
       when(mockPersistenceConnector.postBody(any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId], any(), any())(any(), any()))
         .thenReturn(EitherT.fromEither(Left(MovementNotFound(MovementId("ABC")))))
-      when(mockMessageTypeExtractor.extract(any(), any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](MessageType.RequestOfRelease))
+      when(mockMessageTypeExtractor.extract(any(), any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](MessageType.MrnAllocated))
 
       val request = fakeRequest(incomingXml, incoming)
         .withHeaders(FakeHeaders().add("X-Message-Type" -> RequestOfRelease.code))
@@ -596,10 +614,10 @@ class MessageControllerSpec
 
       when(mockPersistenceConnector.postBody(any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId], any(), any())(any(), any()))
         .thenReturn(EitherT.fromEither(Left(Unexpected(None))))
-      when(mockMessageTypeExtractor.extract(any(), any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](MessageType.RequestOfRelease))
+      when(mockMessageTypeExtractor.extract(any(), any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](MessageType.MrnAllocated))
 
       val request = fakeRequest(incomingXml, incoming)
-        .withHeaders(FakeHeaders().add("X-Message-Type" -> RequestOfRelease.code))
+        .withHeaders(FakeHeaders().add("X-Message-Type" -> MrnAllocated.code))
 
       val result = controller().incomingViaEIS(ConversationId(movementId, messageId))(request)
 
@@ -608,7 +626,7 @@ class MessageControllerSpec
       verify(mockStatusMonitoringService, times(1)).incoming(
         MovementId(eqTo(movementId.value)),
         MessageId(eqTo(messageId.value)),
-        eqTo(RequestOfRelease)
+        eqTo(MrnAllocated)
       )(any(), any())
     }
 
