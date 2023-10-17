@@ -141,7 +141,6 @@ class MessagesController @Inject() (
   private def extractAuditMessage(messageType: MessageType): EitherT[Future, MessageTypeExtractionError, AuditType] = {
     val auditType: EitherT[Future, MessageTypeExtractionError, AuditType] =
       EitherT.fromOption[Future](messageType.auditType, MessageTypeExtractionError.InvalidMessageType(s"$messageType is not a ResponseMessageType"))
-    //TODO: or EitherT.fromOption[Future](messageType.auditType, MessageTypeExtractionError.Unexpected(None))
     auditType
   }
 
