@@ -138,7 +138,7 @@ class MessagesController @Inject() (
     }
   }
 
-  private def extractAuditMessage(messageType: MessageType): EitherT[Future, MessageTypeExtractionError, AuditType] = {
+  private def extractAuditMessageType(messageType: MessageType): EitherT[Future, MessageTypeExtractionError, AuditType] = {
     val auditType: EitherT[Future, MessageTypeExtractionError, AuditType] =
       EitherT.fromOption[Future](messageType.auditType, MessageTypeExtractionError.InvalidMessageType(s"$messageType is not a ResponseMessageType"))
     auditType
@@ -152,7 +152,7 @@ class MessagesController @Inject() (
         val (movementId, triggerId) = ids.toMovementAndMessageId
         (for {
           messageType <- messageTypeExtractor.extract(request.headers, request.body).asPresentationWithMessageType(None)
-          auditMsg    <- extractAuditMessage(messageType).asPresentationWithMessageType(None)
+          auditMsg    <- extractAuditMessageType(messageType).asPresentationWithMessageType(None)
           _ = statusMonitoringService.incoming(movementId, triggerId, messageType)
           persistenceResponse <- persistStream(movementId, triggerId, messageType, request.body).leftMap(
             err => (err, Option(messageType))
