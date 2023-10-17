@@ -73,6 +73,7 @@ import uk.gov.hmrc.transitmovementsrouter.controllers.actions.InternalAuthAction
 import uk.gov.hmrc.transitmovementsrouter.controllers.errors.PresentationError
 import uk.gov.hmrc.transitmovementsrouter.fakes.actions.FakeXmlTransformer
 import uk.gov.hmrc.transitmovementsrouter.generators.TestModelGenerators
+import uk.gov.hmrc.transitmovementsrouter.models.AuditType.NCTSRequestedMissingMovement
 import uk.gov.hmrc.transitmovementsrouter.models.AuditType.NCTSToTraderSubmissionSuccessful
 import uk.gov.hmrc.transitmovementsrouter.models.MessageType.RequestOfRelease
 import uk.gov.hmrc.transitmovementsrouter.models._
@@ -535,6 +536,18 @@ class MessageControllerSpec
 
         when(
           mockAuditingService.auditStatusEvent(
+            eqTo(NCTSRequestedMissingMovement),
+            eqTo(Some(Json.toJson(PresentationError.notFoundError(s"Movement ${movementId.value} not found")))),
+            eqTo(Some(movementId)),
+            eqTo(None),
+            eqTo(None),
+            eqTo(None),
+            eqTo(Some(messageType))
+          )(any[HeaderCarrier], any[ExecutionContext])
+        ).thenReturn(Future.successful(()))
+
+        when(
+          mockAuditingService.auditStatusEvent(
             eqTo(NCTSToTraderSubmissionSuccessful),
             eqTo(None),
             eqTo(Some(movementId)),
@@ -577,6 +590,16 @@ class MessageControllerSpec
           eqTo(Some(messageType))
         )(any[HeaderCarrier], any[ExecutionContext])
 
+        verify(mockAuditingService, times(0)).auditStatusEvent(
+          eqTo(NCTSRequestedMissingMovement),
+          eqTo(Some(Json.toJson(PresentationError.notFoundError(s"Movement ${movementId.value} not found")))),
+          eqTo(Some(movementId)),
+          eqTo(None),
+          eqTo(None),
+          eqTo(None),
+          eqTo(Some(messageType))
+        )(any[HeaderCarrier], any[ExecutionContext])
+
     }
 
     "must return BAD_REQUEST when the X-Message-Type header is missing or body seems to not contain an appropriate root tag" in {
@@ -606,7 +629,20 @@ class MessageControllerSpec
     "must return NOT_FOUND when target movement is invalid or archived" in {
 
       when(mockPersistenceConnector.postBody(any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId], any(), any())(any(), any()))
-        .thenReturn(EitherT.fromEither(Left(MovementNotFound(MovementId("ABC")))))
+        .thenReturn(EitherT.fromEither(Left(MovementNotFound(MovementId("abcdef1234567890")))))
+
+      when(
+        mockAuditingService.auditStatusEvent(
+          eqTo(NCTSRequestedMissingMovement),
+          eqTo(Some(Json.toJson(PresentationError.notFoundError(s"Movement ${movementId.value} not found")))),
+          eqTo(Some(movementId)),
+          eqTo(None),
+          eqTo(None),
+          eqTo(None),
+          eqTo(Some(MessageType.RequestOfRelease))
+        )(any[HeaderCarrier], any[ExecutionContext])
+      ).thenReturn(Future.successful(()))
+
       when(
         mockAuditingService.auditStatusEvent(
           eqTo(NCTSToTraderSubmissionSuccessful),
@@ -637,13 +673,34 @@ class MessageControllerSpec
         eqTo(None),
         eqTo(Some(MessageType.RequestOfRelease))
       )(any[HeaderCarrier], any[ExecutionContext])
-
+      verify(mockAuditingService, times(1)).auditStatusEvent(
+        eqTo(NCTSRequestedMissingMovement),
+        eqTo(Some(Json.toJson(PresentationError.notFoundError(s"Movement ${movementId.value} not found")))),
+        eqTo(Some(movementId)),
+        eqTo(None),
+        eqTo(None),
+        eqTo(None),
+        eqTo(Some(MessageType.RequestOfRelease))
+      )(any[HeaderCarrier], any[ExecutionContext])
     }
 
     "must return INTERNAL_SERVER_ERROR when persistence service fails unexpected" in {
 
       when(mockPersistenceConnector.postBody(any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId], any(), any())(any(), any()))
         .thenReturn(EitherT.fromEither(Left(Unexpected(None))))
+
+      when(
+        mockAuditingService.auditStatusEvent(
+          eqTo(NCTSRequestedMissingMovement),
+          eqTo(Some(Json.toJson(PresentationError.notFoundError(s"Movement ${movementId.value} not found")))),
+          eqTo(Some(movementId)),
+          eqTo(None),
+          eqTo(None),
+          eqTo(None),
+          eqTo(Some(MessageType.RequestOfRelease))
+        )(any[HeaderCarrier], any[ExecutionContext])
+      ).thenReturn(Future.successful(()))
+
       when(
         mockAuditingService.auditStatusEvent(
           eqTo(NCTSToTraderSubmissionSuccessful),
@@ -680,7 +737,15 @@ class MessageControllerSpec
       eqTo(None),
       eqTo(Some(MessageType.RequestOfRelease))
     )(any[HeaderCarrier], any[ExecutionContext])
-
+    verify(mockAuditingService, times(0)).auditStatusEvent(
+      eqTo(NCTSRequestedMissingMovement),
+      eqTo(Some(Json.toJson(PresentationError.notFoundError(s"Movement ${movementId.value} not found")))),
+      eqTo(Some(movementId)),
+      eqTo(None),
+      eqTo(None),
+      eqTo(None),
+      eqTo(Some(MessageType.RequestOfRelease))
+    )(any[HeaderCarrier], any[ExecutionContext])
   }
 
   "POST incoming from Upscan" - {
