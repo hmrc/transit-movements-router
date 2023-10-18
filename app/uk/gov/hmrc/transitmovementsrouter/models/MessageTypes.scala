@@ -22,7 +22,6 @@ import play.api.libs.json.JsSuccess
 import play.api.libs.json.Reads
 import play.api.libs.json.Writes
 
-//TODO: need to take a look at this with respect to whether auditType and movementType needed at this level.
 sealed trait MessageType extends Product with Serializable {
   def code: String
   def rootNode: String

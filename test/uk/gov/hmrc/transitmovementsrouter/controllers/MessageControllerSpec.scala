@@ -73,6 +73,7 @@ import uk.gov.hmrc.transitmovementsrouter.controllers.actions.InternalAuthAction
 import uk.gov.hmrc.transitmovementsrouter.controllers.errors.PresentationError
 import uk.gov.hmrc.transitmovementsrouter.fakes.actions.FakeXmlTransformer
 import uk.gov.hmrc.transitmovementsrouter.generators.TestModelGenerators
+import uk.gov.hmrc.transitmovementsrouter.models.MessageType.GoodsReleaseNotification
 import uk.gov.hmrc.transitmovementsrouter.models.MessageType.MrnAllocated
 import uk.gov.hmrc.transitmovementsrouter.models.MessageType.RequestOfRelease
 import uk.gov.hmrc.transitmovementsrouter.models._
@@ -103,7 +104,7 @@ class MessageControllerSpec
     with ScalaFutures {
 
   val eori: EoriNumber           = EoriNumber("eori")
-  val movementType: MovementType = MovementType("departures")
+  val movementType: MovementType = MovementType("departure")
   val movementId: MovementId     = MovementId("abcdef1234567890")
   val messageId: MessageId       = MessageId("0987654321fedcba")
 
@@ -224,6 +225,7 @@ class MessageControllerSpec
     reset(mockSDESService)
     reset(mockPushNotificationsConnector)
     reset(mockUpscanConnector)
+    reset(mockAuditingService)
     reset(config)
     when(config.logIncoming).thenReturn(true)
     when(config.eisSizeLimit).thenReturn(5000000) // TODO: vary per test
@@ -541,7 +543,7 @@ class MessageControllerSpec
             )
         ).thenReturn(EitherT.rightT(()))
         val request = fakeRequest(incomingXml, incoming)
-          .withHeaders(FakeHeaders().add("X-Message-Type" -> RequestOfRelease.code))
+          .withHeaders(FakeHeaders().add("X-Message-Type" -> GoodsReleaseNotification.code))
 
         val result = controller().incomingViaEIS(ConversationId(movementId, messageId))(request)
 
@@ -553,7 +555,19 @@ class MessageControllerSpec
           MovementId(eqTo(movementId.value)),
           MessageId(eqTo(messageId.value)),
           eqTo(messageType)
-        )(any(), any())
+        )(any[HeaderCarrier](), any[ExecutionContext]())
+
+        verify(mockAuditingService, times(1)).auditMessageEvent(
+          eqTo(messageType.auditType.get),
+          eqTo(MimeTypes.XML),
+          any(),
+          any(),
+          eqTo(Some(movementId)),
+          eqTo(Some(messageId)),
+          eqTo(None),
+          eqTo(Some(messageType.movementType)),
+          eqTo(Some(messageType))
+        )(any[HeaderCarrier](), any[ExecutionContext]())
     }
 
     "must return BAD_REQUEST when the X-Message-Type header is missing or body seems to not contain an appropriate root tag" in {
@@ -564,6 +578,7 @@ class MessageControllerSpec
       status(result) mustBe BAD_REQUEST
       verifyNoInteractions(mockInternalAuthActionProvider)
       verifyNoInteractions(mockStatusMonitoringService)
+      verifyNoInteractions(mockAuditingService)
     }
 
     "must return BAD_REQUEST when message type is invalid" in {
@@ -578,6 +593,7 @@ class MessageControllerSpec
       status(result) mustBe BAD_REQUEST
       verifyNoInteractions(mockInternalAuthActionProvider)
       verifyNoInteractions(mockStatusMonitoringService)
+      verifyNoInteractions(mockAuditingService)
     }
 
     "must return BAD_REQUEST when message type is not a response message" in { //TODO: or should this be INTERNAL_SERVER_ERROR ?
@@ -593,6 +609,7 @@ class MessageControllerSpec
       status(result) mustBe BAD_REQUEST
       verifyNoInteractions(mockInternalAuthActionProvider)
       verifyNoInteractions(mockStatusMonitoringService)
+      verifyNoInteractions(mockAuditingService)
     }
 
     "must return NOT_FOUND when target movement is invalid or archived" in {
@@ -608,6 +625,7 @@ class MessageControllerSpec
 
       status(result) mustBe NOT_FOUND
       verifyNoInteractions(mockInternalAuthActionProvider)
+      verifyNoInteractions(mockAuditingService)
     }
 
     "must return INTERNAL_SERVER_ERROR when persistence service fails unexpected" in {
@@ -628,6 +646,7 @@ class MessageControllerSpec
         MessageId(eqTo(messageId.value)),
         eqTo(MrnAllocated)
       )(any(), any())
+      verifyNoInteractions(mockAuditingService)
     }
 
   }

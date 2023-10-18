@@ -152,7 +152,7 @@ class MessagesController @Inject() (
         val (movementId, triggerId) = ids.toMovementAndMessageId
         (for {
           messageType <- messageTypeExtractor.extract(request.headers, request.body).asPresentationWithMessageType(None)
-          auditMsg    <- extractAuditMessageType(messageType).asPresentationWithMessageType(None)
+          auditMsg    <- extractAuditMessageType(messageType).asPresentationWithMessageType(Some(messageType))
           _ = statusMonitoringService.incoming(movementId, triggerId, messageType)
           persistenceResponse <- persistStream(movementId, triggerId, messageType, request.body).leftMap(
             err => (err, Option(messageType))
