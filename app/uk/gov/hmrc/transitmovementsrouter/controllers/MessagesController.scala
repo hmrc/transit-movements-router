@@ -21,6 +21,7 @@ import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import cats.data.EitherT
 import play.api.Logging
+import play.api.http.MimeTypes
 import play.api.libs.Files.TemporaryFileCreator
 import play.api.libs.json.JsValue
 import play.api.libs.json.Json
@@ -91,6 +92,7 @@ class MessagesController @Inject() (
   sdesService: SDESService,
   internalAuth: InternalAuthActionProvider,
   statusMonitoringService: ServiceMonitoringService,
+  auditService: AuditingService,
   val config: AppConfig
 )(implicit
   val materializer: Materializer,
@@ -135,18 +137,34 @@ class MessagesController @Inject() (
     }
   }
 
+  private def extractAuditMessageType(messageType: MessageType): EitherT[Future, PresentationError, AuditType] =
+    EitherT.fromOption[Future](messageType.auditType, PresentationError.badRequestError(s"$messageType is not a ResponseMessageType"))
+
   def incomingViaEIS(ids: ConversationId): Action[Source[ByteString, _]] =
     authenticateEISToken.stream(transformer = eisMessageTransformers.unwrap) {
-      implicit request => _ =>
+      implicit request => size =>
         import MessagesController.PresentationEitherTHelper
 
         val (movementId, triggerId) = ids.toMovementAndMessageId
-
         (for {
           messageType <- messageTypeExtractor.extract(request.headers, request.body).asPresentationWithMessageType(None)
+          auditMsg <- extractAuditMessageType(messageType).leftMap(
+            err => (err, Option(messageType))
+          )
           _ = statusMonitoringService.incoming(movementId, triggerId, messageType)
           persistenceResponse <- persistStream(movementId, triggerId, messageType, request.body).leftMap(
             err => (err, Option(messageType))
+          )
+          _ = auditService.auditMessageEvent(
+            auditType = auditMsg,
+            contentType = MimeTypes.XML,
+            contentLength = size,
+            payload = request.body,
+            movementId = Some(movementId),
+            messageId = Some(persistenceResponse.messageId),
+            enrolmentEori = None,
+            movementType = Some(messageType.movementType),
+            messageType = Some(messageType)
           )
           _ = logIncomingSuccess(movementId, triggerId, persistenceResponse.messageId, messageType)
         } yield persistenceResponse)

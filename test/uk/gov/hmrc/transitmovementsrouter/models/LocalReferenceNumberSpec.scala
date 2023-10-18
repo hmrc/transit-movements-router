@@ -17,14 +17,12 @@
 package uk.gov.hmrc.transitmovementsrouter.models
 
 import org.scalacheck.Gen
-import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers.convertToAnyMustWrapper
 import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks.forAll
 import play.api.libs.json.JsString
 import play.api.libs.json.JsSuccess
-import play.api.libs.json.Json
 
 class LocalReferenceNumberSpec extends AnyFreeSpec with Matchers {
 
