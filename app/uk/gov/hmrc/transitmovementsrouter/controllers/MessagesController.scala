@@ -48,7 +48,6 @@ import uk.gov.hmrc.transitmovementsrouter.controllers.errors.ConvertError
 import uk.gov.hmrc.transitmovementsrouter.controllers.errors.PresentationError
 import uk.gov.hmrc.transitmovementsrouter.controllers.stream.StreamingParsers
 import uk.gov.hmrc.transitmovementsrouter.models._
-import uk.gov.hmrc.transitmovementsrouter.models.errors.MessageTypeExtractionError
 import uk.gov.hmrc.transitmovementsrouter.models.requests.MessageUpdate
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanFailedResponse
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse
@@ -138,11 +137,8 @@ class MessagesController @Inject() (
     }
   }
 
-  private def extractAuditMessageType(messageType: MessageType): EitherT[Future, MessageTypeExtractionError, AuditType] = {
-    val auditType: EitherT[Future, MessageTypeExtractionError, AuditType] =
-      EitherT.fromOption[Future](messageType.auditType, MessageTypeExtractionError.InvalidMessageType(s"$messageType is not a ResponseMessageType"))
-    auditType
-  }
+  private def extractAuditMessageType(messageType: MessageType): EitherT[Future, PresentationError, AuditType] =
+    EitherT.fromOption[Future](messageType.auditType, PresentationError.badRequestError(s"$messageType is not a ResponseMessageType"))
 
   def incomingViaEIS(ids: ConversationId): Action[Source[ByteString, _]] =
     authenticateEISToken.stream(transformer = eisMessageTransformers.unwrap) {
@@ -152,7 +148,9 @@ class MessagesController @Inject() (
         val (movementId, triggerId) = ids.toMovementAndMessageId
         (for {
           messageType <- messageTypeExtractor.extract(request.headers, request.body).asPresentationWithMessageType(None)
-          auditMsg    <- extractAuditMessageType(messageType).asPresentationWithMessageType(Some(messageType))
+          auditMsg <- extractAuditMessageType(messageType).leftMap(
+            err => (err, Option(messageType))
+          )
           _ = statusMonitoringService.incoming(movementId, triggerId, messageType)
           persistenceResponse <- persistStream(movementId, triggerId, messageType, request.body).leftMap(
             err => (err, Option(messageType))
