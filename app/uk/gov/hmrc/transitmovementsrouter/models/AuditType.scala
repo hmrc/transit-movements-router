@@ -20,25 +20,26 @@ sealed abstract class AuditType(val name: String)
 
 object AuditType {
 
-  final case object AmendmentAcceptance              extends AuditType("AmendmentAcceptance")
-  final case object InvalidationDecision             extends AuditType("InvalidationDecision")
-  final case object Discrepancies                    extends AuditType("Discrepancies")
-  final case object NotificationToAmendDeclaration   extends AuditType("NotificationToAmendDeclaration")
-  final case object GoodsReleaseNotification         extends AuditType("GoodsReleaseNotification")
-  final case object MRNAllocated                     extends AuditType("MRNAllocated")
-  final case object ReleaseForTransit                extends AuditType("ReleaseForTransit")
-  final case object RecoveryNotification             extends AuditType("RecoveryNotification")
-  final case object UnloadingPermission              extends AuditType("UnloadingPermission")
-  final case object WriteOffNotification             extends AuditType("WriteOffNotification")
-  final case object NoReleaseForTransit              extends AuditType("NoReleaseForTransit")
-  final case object GuaranteeNotValid                extends AuditType("GuaranteeNotValid")
-  final case object RejectionFromOfficeOfDeparture   extends AuditType("RejectionFromOfficeOfDeparture")
-  final case object RejectionFromOfficeOfDestination extends AuditType("RejectionFromOfficeOfDestination")
-  final case object ControlDecisionNotification      extends AuditType("ControlDecisionNotification")
-  final case object RequestOnNonArrivedMovement      extends AuditType("RequestOnNonArrivedMovement")
-  final case object PositiveAcknowledge              extends AuditType("PositiveAcknowledge")
-  final case object NCTSRequestedMissingMovement     extends AuditType("NCTSRequestedMissingMovement")
-  final case object NCTSToTraderSubmissionSuccessful extends AuditType("NCTSToTraderSubmissionSuccessful")
+  final case object AmendmentAcceptance               extends AuditType("AmendmentAcceptance")
+  final case object InvalidationDecision              extends AuditType("InvalidationDecision")
+  final case object Discrepancies                     extends AuditType("Discrepancies")
+  final case object NotificationToAmendDeclaration    extends AuditType("NotificationToAmendDeclaration")
+  final case object GoodsReleaseNotification          extends AuditType("GoodsReleaseNotification")
+  final case object MRNAllocated                      extends AuditType("MRNAllocated")
+  final case object ReleaseForTransit                 extends AuditType("ReleaseForTransit")
+  final case object RecoveryNotification              extends AuditType("RecoveryNotification")
+  final case object UnloadingPermission               extends AuditType("UnloadingPermission")
+  final case object WriteOffNotification              extends AuditType("WriteOffNotification")
+  final case object NoReleaseForTransit               extends AuditType("NoReleaseForTransit")
+  final case object GuaranteeNotValid                 extends AuditType("GuaranteeNotValid")
+  final case object RejectionFromOfficeOfDeparture    extends AuditType("RejectionFromOfficeOfDeparture")
+  final case object RejectionFromOfficeOfDestination  extends AuditType("RejectionFromOfficeOfDestination")
+  final case object ControlDecisionNotification       extends AuditType("ControlDecisionNotification")
+  final case object RequestOnNonArrivedMovement       extends AuditType("RequestOnNonArrivedMovement")
+  final case object PositiveAcknowledge               extends AuditType("PositiveAcknowledge")
+  final case object NCTSRequestedMissingMovement      extends AuditType("NCTSRequestedMissingMovement")
+  final case object NCTSToTraderSubmissionSuccessful  extends AuditType("NCTSToTraderSubmissionSuccessful")
+  final case object ForwardedIncidentNotificationToED extends AuditType("ForwardedIncidentNotificationToED")
 
   val values: Seq[AuditType] = Seq(
     AmendmentAcceptance,
@@ -59,7 +60,8 @@ object AuditType {
     RequestOnNonArrivedMovement,
     PositiveAcknowledge,
     NCTSRequestedMissingMovement,
-    NCTSToTraderSubmissionSuccessful
+    NCTSToTraderSubmissionSuccessful,
+    ForwardedIncidentNotificationToED
   )
 
   def find(code: String): Option[AuditType] =

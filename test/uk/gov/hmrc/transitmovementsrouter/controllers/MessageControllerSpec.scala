@@ -75,6 +75,8 @@ import uk.gov.hmrc.transitmovementsrouter.fakes.actions.FakeXmlTransformer
 import uk.gov.hmrc.transitmovementsrouter.generators.TestModelGenerators
 import uk.gov.hmrc.transitmovementsrouter.models.AuditType.NCTSRequestedMissingMovement
 import uk.gov.hmrc.transitmovementsrouter.models.AuditType.NCTSToTraderSubmissionSuccessful
+import uk.gov.hmrc.transitmovementsrouter.models.MessageType.GoodsReleaseNotification
+import uk.gov.hmrc.transitmovementsrouter.models.MessageType.MrnAllocated
 import uk.gov.hmrc.transitmovementsrouter.models.MessageType.RequestOfRelease
 import uk.gov.hmrc.transitmovementsrouter.models._
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.MovementNotFound
@@ -104,7 +106,7 @@ class MessageControllerSpec
     with ScalaFutures {
 
   val eori: EoriNumber           = EoriNumber("eori")
-  val movementType: MovementType = MovementType("departures")
+  val movementType: MovementType = MovementType("departure")
   val movementId: MovementId     = MovementId("abcdef1234567890")
   val messageId: MessageId       = MessageId("0987654321fedcba")
 
@@ -225,6 +227,7 @@ class MessageControllerSpec
     reset(mockSDESService)
     reset(mockPushNotificationsConnector)
     reset(mockUpscanConnector)
+    reset(mockAuditingService)
     reset(config)
     when(config.logIncoming).thenReturn(true)
     when(config.eisSizeLimit).thenReturn(5000000) // TODO: vary per test
@@ -527,12 +530,20 @@ class MessageControllerSpec
   }
 
   "POST incoming from EIS" - {
-    "must return CREATED when message is successfully forwarded" in forAll(arbitrary[MovementId], arbitrary[MessageId], arbitrary[MessageType]) {
+    "must return CREATED when message is successfully forwarded" in forAll(arbitrary[MovementId], arbitrary[MessageId], arbitrary[ResponseMessageType]) {
       (movementId, messageId, messageType) =>
         when(mockMessageTypeExtractor.extract(any(), any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](messageType))
 
         when(mockPersistenceConnector.postBody(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(messageType), any())(any(), any()))
           .thenReturn(EitherT.fromEither(Right(PersistenceResponse(messageId))))
+
+        when(
+          mockPushNotificationsConnector
+            .postMessageReceived(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(messageType), any[Source[ByteString, _]])(
+              any[HeaderCarrier],
+              any[ExecutionContext]
+            )
+        ).thenReturn(EitherT.rightT(()))
 
         when(
           mockAuditingService.auditStatusEvent(
@@ -541,7 +552,7 @@ class MessageControllerSpec
             eqTo(Some(movementId)),
             eqTo(None),
             eqTo(None),
-            eqTo(None),
+            eqTo(Some(messageType.movementType)),
             eqTo(Some(messageType))
           )(any[HeaderCarrier], any[ExecutionContext])
         ).thenReturn(Future.successful(()))
@@ -553,20 +564,13 @@ class MessageControllerSpec
             eqTo(Some(movementId)),
             eqTo(Some(messageId)),
             eqTo(None),
-            eqTo(None),
+            eqTo(Some(messageType.movementType)),
             eqTo(Some(messageType))
           )(any[HeaderCarrier], any[ExecutionContext])
         ).thenReturn(Future.successful(()))
 
-        when(
-          mockPushNotificationsConnector
-            .postMessageReceived(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(messageType), any[Source[ByteString, _]])(
-              any[HeaderCarrier],
-              any[ExecutionContext]
-            )
-        ).thenReturn(EitherT.rightT(()))
         val request = fakeRequest(incomingXml, incoming)
-          .withHeaders(FakeHeaders().add("X-Message-Type" -> RequestOfRelease.code))
+          .withHeaders(FakeHeaders().add("X-Message-Type" -> GoodsReleaseNotification.code))
 
         val result = controller().incomingViaEIS(ConversationId(movementId, messageId))(request)
 
@@ -578,15 +582,26 @@ class MessageControllerSpec
           MovementId(eqTo(movementId.value)),
           MessageId(eqTo(messageId.value)),
           eqTo(messageType)
-        )(any(), any())
+        )(any[HeaderCarrier](), any[ExecutionContext]())
 
+        verify(mockAuditingService, times(1)).auditMessageEvent(
+          eqTo(messageType.auditType.get),
+          eqTo(MimeTypes.XML),
+          any(),
+          any(),
+          eqTo(Some(movementId)),
+          eqTo(Some(messageId)),
+          eqTo(None),
+          eqTo(Some(messageType.movementType)),
+          eqTo(Some(messageType))
+        )(any[HeaderCarrier](), any[ExecutionContext]())
         verify(mockAuditingService, times(1)).auditStatusEvent(
           eqTo(NCTSToTraderSubmissionSuccessful),
           eqTo(None),
           eqTo(Some(movementId)),
           eqTo(Some(messageId)),
           eqTo(None),
-          eqTo(None),
+          eqTo(Some(messageType.movementType)),
           eqTo(Some(messageType))
         )(any[HeaderCarrier], any[ExecutionContext])
 
@@ -596,12 +611,10 @@ class MessageControllerSpec
           eqTo(Some(movementId)),
           eqTo(None),
           eqTo(None),
-          eqTo(None),
+          eqTo(Some(messageType.movementType)),
           eqTo(Some(messageType))
         )(any[HeaderCarrier], any[ExecutionContext])
-
     }
-
     "must return BAD_REQUEST when the X-Message-Type header is missing or body seems to not contain an appropriate root tag" in {
 
       when(mockMessageTypeExtractor.extract(any(), any())).thenReturn(EitherT.leftT[Future, MessageType](MessageTypeExtractionError.UnableToExtractFromBody))
@@ -610,6 +623,7 @@ class MessageControllerSpec
       status(result) mustBe BAD_REQUEST
       verifyNoInteractions(mockInternalAuthActionProvider)
       verifyNoInteractions(mockStatusMonitoringService)
+      verifyNoInteractions(mockAuditingService)
     }
 
     "must return BAD_REQUEST when message type is invalid" in {
@@ -624,6 +638,23 @@ class MessageControllerSpec
       status(result) mustBe BAD_REQUEST
       verifyNoInteractions(mockInternalAuthActionProvider)
       verifyNoInteractions(mockStatusMonitoringService)
+      verifyNoInteractions(mockAuditingService)
+    }
+
+    "must return BAD_REQUEST when message type is not a response message" in { //TODO: or should this be INTERNAL_SERVER_ERROR ?
+
+      val request = fakeRequest(incomingXml, incoming)
+        .withHeaders(FakeHeaders().add("X-Message-Type" -> "IE015"))
+
+      when(mockMessageTypeExtractor.extract(any(), any()))
+        .thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](MessageType.DeclarationData))
+
+      val result = controller().incomingViaEIS(ConversationId(movementId, messageId))(request)
+
+      status(result) mustBe BAD_REQUEST
+      verifyNoInteractions(mockInternalAuthActionProvider)
+      verifyNoInteractions(mockStatusMonitoringService)
+      verifyNoInteractions(mockAuditingService)
     }
 
     "must return NOT_FOUND when target movement is invalid or archived" in {
@@ -638,8 +669,8 @@ class MessageControllerSpec
           eqTo(Some(movementId)),
           eqTo(None),
           eqTo(None),
-          eqTo(None),
-          eqTo(Some(MessageType.RequestOfRelease))
+          eqTo(Some(MessageType.MrnAllocated.movementType)),
+          eqTo(Some(MessageType.MrnAllocated))
         )(any[HeaderCarrier], any[ExecutionContext])
       ).thenReturn(Future.successful(()))
 
@@ -650,12 +681,12 @@ class MessageControllerSpec
           eqTo(Some(movementId)),
           eqTo(Some(messageId)),
           eqTo(None),
-          eqTo(None),
-          eqTo(Some(MessageType.RequestOfRelease))
+          eqTo(Some(MessageType.MrnAllocated.movementType)),
+          eqTo(Some(MessageType.MrnAllocated))
         )(any[HeaderCarrier], any[ExecutionContext])
       ).thenReturn(Future.successful(()))
 
-      when(mockMessageTypeExtractor.extract(any(), any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](MessageType.RequestOfRelease))
+      when(mockMessageTypeExtractor.extract(any(), any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](MessageType.MrnAllocated))
 
       val request = fakeRequest(incomingXml, incoming)
         .withHeaders(FakeHeaders().add("X-Message-Type" -> RequestOfRelease.code))
@@ -670,8 +701,8 @@ class MessageControllerSpec
         eqTo(Some(movementId)),
         eqTo(Some(messageId)),
         eqTo(None),
-        eqTo(None),
-        eqTo(Some(MessageType.RequestOfRelease))
+        eqTo(Some(MessageType.MrnAllocated.movementType)),
+        eqTo(Some(MessageType.MrnAllocated))
       )(any[HeaderCarrier], any[ExecutionContext])
       verify(mockAuditingService, times(1)).auditStatusEvent(
         eqTo(NCTSRequestedMissingMovement),
@@ -679,9 +710,21 @@ class MessageControllerSpec
         eqTo(Some(movementId)),
         eqTo(None),
         eqTo(None),
-        eqTo(None),
-        eqTo(Some(MessageType.RequestOfRelease))
+        eqTo(Some(MessageType.MrnAllocated.movementType)),
+        eqTo(Some(MessageType.MrnAllocated))
       )(any[HeaderCarrier], any[ExecutionContext])
+
+      verify(mockAuditingService, times(0)).auditMessageEvent(
+        eqTo(MessageType.MrnAllocated.auditType.get),
+        eqTo(MimeTypes.XML),
+        any(),
+        any(),
+        eqTo(Some(movementId)),
+        eqTo(Some(messageId)),
+        eqTo(None),
+        eqTo(Some(MessageType.MrnAllocated.movementType)),
+        eqTo(Some(MessageType.MrnAllocated))
+      )(any[HeaderCarrier](), any[ExecutionContext]())
     }
 
     "must return INTERNAL_SERVER_ERROR when persistence service fails unexpected" in {
@@ -696,7 +739,7 @@ class MessageControllerSpec
           eqTo(Some(movementId)),
           eqTo(None),
           eqTo(None),
-          eqTo(None),
+          eqTo(Some(MessageType.MrnAllocated.movementType)),
           eqTo(Some(MessageType.RequestOfRelease))
         )(any[HeaderCarrier], any[ExecutionContext])
       ).thenReturn(Future.successful(()))
@@ -708,15 +751,15 @@ class MessageControllerSpec
           eqTo(Some(movementId)),
           eqTo(Some(messageId)),
           eqTo(None),
-          eqTo(None),
+          eqTo(Some(MessageType.MrnAllocated.movementType)),
           eqTo(Some(MessageType.RequestOfRelease))
         )(any[HeaderCarrier], any[ExecutionContext])
       ).thenReturn(Future.successful(()))
 
-      when(mockMessageTypeExtractor.extract(any(), any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](MessageType.RequestOfRelease))
+      when(mockMessageTypeExtractor.extract(any(), any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](MessageType.MrnAllocated))
 
       val request = fakeRequest(incomingXml, incoming)
-        .withHeaders(FakeHeaders().add("X-Message-Type" -> RequestOfRelease.code))
+        .withHeaders(FakeHeaders().add("X-Message-Type" -> MrnAllocated.code))
 
       val result = controller().incomingViaEIS(ConversationId(movementId, messageId))(request)
 
@@ -725,8 +768,9 @@ class MessageControllerSpec
       verify(mockStatusMonitoringService, times(1)).incoming(
         MovementId(eqTo(movementId.value)),
         MessageId(eqTo(messageId.value)),
-        eqTo(RequestOfRelease)
+        eqTo(MrnAllocated)
       )(any(), any())
+      verifyNoInteractions(mockAuditingService)
     }
     verify(mockAuditingService, times(0)).auditStatusEvent(
       eqTo(NCTSToTraderSubmissionSuccessful),
@@ -734,8 +778,8 @@ class MessageControllerSpec
       eqTo(Some(movementId)),
       eqTo(Some(messageId)),
       eqTo(None),
-      eqTo(None),
-      eqTo(Some(MessageType.RequestOfRelease))
+      eqTo(Some(MessageType.MrnAllocated.movementType)),
+      eqTo(Some(MessageType.MrnAllocated))
     )(any[HeaderCarrier], any[ExecutionContext])
     verify(mockAuditingService, times(0)).auditStatusEvent(
       eqTo(NCTSRequestedMissingMovement),
@@ -743,8 +787,8 @@ class MessageControllerSpec
       eqTo(Some(movementId)),
       eqTo(None),
       eqTo(None),
-      eqTo(None),
-      eqTo(Some(MessageType.RequestOfRelease))
+      eqTo(Some(MessageType.MrnAllocated.movementType)),
+      eqTo(Some(MessageType.MrnAllocated))
     )(any[HeaderCarrier], any[ExecutionContext])
   }
 

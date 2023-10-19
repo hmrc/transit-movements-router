@@ -42,7 +42,6 @@ import java.net.URL
 import java.time.Clock
 import java.time.LocalDateTime
 import java.time.ZoneOffset
-import javax.activation.MimeType
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 

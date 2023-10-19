@@ -60,7 +60,6 @@ import uk.gov.hmrc.transitmovementsrouter.it.base.TestMetrics
 import uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuiteWithGuice
 import uk.gov.hmrc.transitmovementsrouter.models.ConversationId
 import uk.gov.hmrc.transitmovementsrouter.models.EoriNumber
-import uk.gov.hmrc.transitmovementsrouter.models.MessageId
 import uk.gov.hmrc.transitmovementsrouter.models.MovementType
 import uk.gov.hmrc.transitmovementsrouter.utils.UUIDGenerator
 
@@ -561,6 +560,49 @@ class MessagesControllerIntegrationSpec
             Helpers.status(result) mustBe CREATED
           }
         }
+    }
+
+    "when EIS makes a call with a non response message, return 400" in {
+      val newApp                  = appBuilder.build()
+      val conversationId          = ConversationId(UUID.randomUUID())
+      val (movementId, messageId) = conversationId.toMovementAndMessageId
+      val outputMessageId         = Gen.stringOfN(16, Gen.hexChar.map(_.toLower)).sample.get
+
+      // We should hit the persistence layer on /transit-movements/traders/movements/${movementId.value}/messages?triggerId=messageId
+      server.stubFor(
+        post(new UrlPathPattern(new EqualToPattern(s"/transit-movements/traders/movements/${movementId.value}/messages"), false))
+          .withQueryParam("triggerId", new EqualToPattern(messageId.value))
+          .withHeader("x-message-type", new EqualToPattern("IE015"))
+          .willReturn(
+            aResponse().withStatus(OK).withBody(Json.stringify(Json.obj("messageId" -> outputMessageId)))
+          )
+      )
+
+      server.stubFor(
+        post(s"/transit-movements-push-notifications/traders/movements/${movementId.value}/messages/$outputMessageId/messageReceived")
+          .willReturn(
+            aResponse().withStatus(OK)
+          )
+      )
+
+      val eisRequest = FakeRequest(
+        "POST",
+        s"/transit-movements-router/movement/${conversationId.value.toString}/messages",
+        FakeHeaders(
+          Seq(
+            "Authorization"    -> s"Bearer ABC",
+            "x-correlation-id" -> UUID.randomUUID().toString
+          )
+        ),
+        Source.single(ByteString(sampleOutgoingLargeXml))
+      )
+
+      running(newApp) {
+        val sut    = newApp.injector.instanceOf[MessagesController]
+        val result = sut.incomingViaEIS(conversationId)(eisRequest)
+
+        Helpers.status(result) mustBe BAD_REQUEST
+      }
     }
 
     "when EIS makes a call with an invalid authorization header with an invalid body, return 400" in {

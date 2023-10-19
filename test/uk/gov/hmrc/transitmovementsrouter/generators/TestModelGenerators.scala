@@ -21,6 +21,7 @@ import org.scalacheck.Gen
 import uk.gov.hmrc.objectstore.client.Md5Hash
 import uk.gov.hmrc.objectstore.client.ObjectSummaryWithMd5
 import uk.gov.hmrc.objectstore.client.Path
+import uk.gov.hmrc.transitmovementsrouter.models.MessageType.responseValues
 import uk.gov.hmrc.transitmovementsrouter.models._
 import uk.gov.hmrc.transitmovementsrouter.models.responses.FailureDetails
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UploadDetails
@@ -84,6 +85,9 @@ trait TestModelGenerators extends BaseGenerators {
 
   implicit lazy val arbitraryMessageType: Arbitrary[MessageType] =
     Arbitrary(Gen.oneOf(MessageType.values))
+
+  implicit lazy val arbitraryResponseMessageType: Arbitrary[ResponseMessageType] =
+    Arbitrary(Gen.oneOf(responseValues))
 
   implicit lazy val arbitraryRequestMessageType: Arbitrary[RequestMessageType] =
     Arbitrary(Gen.oneOf(MessageType.requestValues))
