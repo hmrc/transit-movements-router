@@ -31,11 +31,7 @@ import play.api.mvc.Request
 import play.api.mvc.Result
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.HeaderNames
-import uk.gov.hmrc.internalauth.client.IAAction
-import uk.gov.hmrc.internalauth.client.Predicate
-import uk.gov.hmrc.internalauth.client.Resource
-import uk.gov.hmrc.internalauth.client.ResourceLocation
-import uk.gov.hmrc.internalauth.client.ResourceType
+import uk.gov.hmrc.internalauth.client._
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
 import uk.gov.hmrc.play.http.HeaderCarrierConverter
 import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
@@ -47,11 +43,13 @@ import uk.gov.hmrc.transitmovementsrouter.controllers.actions.InternalAuthAction
 import uk.gov.hmrc.transitmovementsrouter.controllers.errors.ConvertError
 import uk.gov.hmrc.transitmovementsrouter.controllers.errors.PresentationError
 import uk.gov.hmrc.transitmovementsrouter.controllers.stream.StreamingParsers
+import uk.gov.hmrc.transitmovementsrouter.models.AuditType.NCTSRequestedMissingMovement
+import uk.gov.hmrc.transitmovementsrouter.models.AuditType.NCTSToTraderSubmissionSuccessful
 import uk.gov.hmrc.transitmovementsrouter.models._
 import uk.gov.hmrc.transitmovementsrouter.models.requests.MessageUpdate
+import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.DownloadUrl
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanFailedResponse
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse
-import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.DownloadUrl
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanSuccessResponse
 import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesNotification
 import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesNotificationType
@@ -152,9 +150,20 @@ class MessagesController @Inject() (
             err => (err, Option(messageType))
           )
           _ = statusMonitoringService.incoming(movementId, triggerId, messageType)
-          persistenceResponse <- persistStream(movementId, triggerId, messageType, request.body).leftMap(
-            err => (err, Option(messageType))
-          )
+          persistenceResponse <- persistStream(movementId, triggerId, messageType, request.body).leftMap {
+            err =>
+              if (err.code.statusCode == NOT_FOUND)
+                auditService.auditStatusEvent(
+                  NCTSRequestedMissingMovement,
+                  Some(Json.toJson(err)),
+                  Some(movementId),
+                  None,
+                  None,
+                  Some(messageType.movementType),
+                  Some(messageType)
+                )
+              (err, Option(messageType))
+          }
           _ = auditService.auditMessageEvent(
             auditType = auditMsg,
             contentType = MimeTypes.XML,
@@ -165,6 +174,15 @@ class MessagesController @Inject() (
             enrolmentEori = None,
             movementType = Some(messageType.movementType),
             messageType = Some(messageType)
+          )
+          _ = auditService.auditStatusEvent(
+            NCTSToTraderSubmissionSuccessful,
+            None,
+            Some(movementId),
+            Some(persistenceResponse.messageId),
+            None,
+            Some(messageType.movementType),
+            Some(messageType)
           )
           _ = logIncomingSuccess(movementId, triggerId, persistenceResponse.messageId, messageType)
         } yield persistenceResponse)
