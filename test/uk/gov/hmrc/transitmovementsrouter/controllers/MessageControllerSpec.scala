@@ -75,9 +75,7 @@ import uk.gov.hmrc.transitmovementsrouter.fakes.actions.FakeXmlTransformer
 import uk.gov.hmrc.transitmovementsrouter.generators.TestModelGenerators
 import uk.gov.hmrc.transitmovementsrouter.models.AuditType.NCTSRequestedMissingMovement
 import uk.gov.hmrc.transitmovementsrouter.models.AuditType.NCTSToTraderSubmissionSuccessful
-import uk.gov.hmrc.transitmovementsrouter.models.MessageType.GoodsReleaseNotification
-import uk.gov.hmrc.transitmovementsrouter.models.MessageType.MrnAllocated
-import uk.gov.hmrc.transitmovementsrouter.models.MessageType.RequestOfRelease
+import uk.gov.hmrc.transitmovementsrouter.models.MessageType.{DeclarationAmendment, GoodsReleaseNotification, MrnAllocated}
 import uk.gov.hmrc.transitmovementsrouter.models._
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.MovementNotFound
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.Unexpected
@@ -689,7 +687,7 @@ class MessageControllerSpec
       when(mockMessageTypeExtractor.extract(any(), any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](MessageType.MrnAllocated))
 
       val request = fakeRequest(incomingXml, incoming)
-        .withHeaders(FakeHeaders().add("X-Message-Type" -> RequestOfRelease.code))
+        .withHeaders(FakeHeaders().add("X-Message-Type" -> DeclarationAmendment.code))
 
       val result = controller().incomingViaEIS(ConversationId(movementId, messageId))(request)
 
@@ -740,7 +738,7 @@ class MessageControllerSpec
           eqTo(None),
           eqTo(None),
           eqTo(Some(MessageType.MrnAllocated.movementType)),
-          eqTo(Some(MessageType.RequestOfRelease))
+          eqTo(Some(MessageType.DeclarationAmendment))
         )(any[HeaderCarrier], any[ExecutionContext])
       ).thenReturn(Future.successful(()))
 
@@ -752,7 +750,7 @@ class MessageControllerSpec
           eqTo(Some(messageId)),
           eqTo(None),
           eqTo(Some(MessageType.MrnAllocated.movementType)),
-          eqTo(Some(MessageType.RequestOfRelease))
+          eqTo(Some(MessageType.DeclarationAmendment))
         )(any[HeaderCarrier], any[ExecutionContext])
       ).thenReturn(Future.successful(()))
 

@@ -85,9 +85,6 @@ object MessageType {
   /** E_DEC_DAT (IE015) */
   final case object DeclarationData extends DepartureRequestMessageType("IE015", "CC015C")
 
-  /** E_REQ_REL (IE054) */
-  final case object RequestOfRelease extends DepartureRequestMessageType("IE054", "CC054C")
-
   /** E_PRE_NOT (IE170) */
   final case object PresentationNotification extends DepartureRequestMessageType("IE170", "CC170C")
 
@@ -95,7 +92,6 @@ object MessageType {
     DeclarationAmendment,
     DeclarationInvalidation,
     DeclarationData,
-    RequestOfRelease,
     PresentationNotification
   )
 
