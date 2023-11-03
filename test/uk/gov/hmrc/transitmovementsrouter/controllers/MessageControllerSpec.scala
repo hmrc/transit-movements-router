@@ -75,7 +75,9 @@ import uk.gov.hmrc.transitmovementsrouter.fakes.actions.FakeXmlTransformer
 import uk.gov.hmrc.transitmovementsrouter.generators.TestModelGenerators
 import uk.gov.hmrc.transitmovementsrouter.models.AuditType.NCTSRequestedMissingMovement
 import uk.gov.hmrc.transitmovementsrouter.models.AuditType.NCTSToTraderSubmissionSuccessful
-import uk.gov.hmrc.transitmovementsrouter.models.MessageType.{DeclarationAmendment, GoodsReleaseNotification, MrnAllocated}
+import uk.gov.hmrc.transitmovementsrouter.models.MessageType.DeclarationAmendment
+import uk.gov.hmrc.transitmovementsrouter.models.MessageType.GoodsReleaseNotification
+import uk.gov.hmrc.transitmovementsrouter.models.MessageType.MrnAllocated
 import uk.gov.hmrc.transitmovementsrouter.models._
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.MovementNotFound
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.Unexpected
