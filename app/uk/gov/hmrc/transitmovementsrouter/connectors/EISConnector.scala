@@ -148,14 +148,24 @@ class EISConnectorImpl(
       // "explicitHeaders", so we need to use "headers" here and filter on what's returned.
       val messageType = hc.headers(Seq(RouterHeaderNames.MESSAGE_TYPE)).headOption.map(_._2).getOrElse("undefined")
       lazy val logMessage =
-        s"""|Posting NCTS message, routing to $code
+        s"""|transit-movements-router-eis
+            |
+            |Posting NCTS message, routing to $code
+            |
+            |Message Metadata (not submitted to EIS):
+            |
+            |Movement ID: ${movementId.value}
+            |Message ID: ${messageId.value}
+            |Message Type: $messageType
+            |
+            |Submission Information:
+            |
             |${HMRCHeaderNames.xRequestId}: ${requestId.getOrElse("undefined")}
             |${RouterHeaderNames.CORRELATION_ID}: $correlationId
             |${RouterHeaderNames.CONVERSATION_ID}: ${conversationId.value.toString}
             |${HeaderNames.ACCEPT}: $accept
             |${HeaderNames.CONTENT_TYPE}: ${xmlSourceWriter.contentType}
             |${HeaderNames.DATE}: $date
-            |${RouterHeaderNames.MESSAGE_TYPE} (not submitted to EIS): $messageType
             |""".stripMargin
 
       withCircuitBreaker[Either[RoutingError, Unit]](shouldCauseCircuitBreakerStrike) {
