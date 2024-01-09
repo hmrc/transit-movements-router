@@ -16,16 +16,16 @@
 
 package uk.gov.hmrc.transitmovementsrouter.connectors
 
-import akka.NotUsed
-import akka.stream.Attributes
-import akka.stream.Attributes.LogLevels
-import akka.stream.Materializer
-import akka.stream.alpakka.xml.ParseEvent
-import akka.stream.alpakka.xml.scaladsl.XmlParsing
-import akka.stream.scaladsl.Flow
-import akka.stream.scaladsl.Sink
-import akka.stream.scaladsl.Source
-import akka.util.ByteString
+import org.apache.pekko.NotUsed
+import org.apache.pekko.stream.Attributes
+import org.apache.pekko.stream.Attributes.LogLevels
+import org.apache.pekko.stream.Materializer
+import org.apache.pekko.stream.connectors.xml.ParseEvent
+import org.apache.pekko.stream.connectors.xml.scaladsl.XmlParsing
+import org.apache.pekko.stream.scaladsl.Flow
+import org.apache.pekko.stream.scaladsl.Sink
+import org.apache.pekko.stream.scaladsl.Source
+import org.apache.pekko.util.ByteString
 import play.api.Logging
 import play.api.http.HeaderNames
 import play.api.http.MimeTypes

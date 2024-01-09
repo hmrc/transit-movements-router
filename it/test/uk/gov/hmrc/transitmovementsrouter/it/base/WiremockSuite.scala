@@ -19,7 +19,6 @@ package uk.gov.hmrc.transitmovementsrouter.it.base
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.common.ConsoleNotifier
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig
-import com.kenshoo.play.metrics.Metrics
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.Suite
@@ -29,6 +28,7 @@ import play.api.inject.Injector
 import play.api.inject.bind
 import play.api.inject.guice.GuiceApplicationBuilder
 import play.api.inject.guice.GuiceableModule
+
 import java.time.Clock
 
 trait WiremockSuite extends BeforeAndAfterAll with BeforeAndAfterEach {
@@ -74,7 +74,6 @@ trait WiremockSuiteWithGuice extends WiremockSuite {
   protected lazy val injector: Injector = fakeApplication().injector
 
   protected def bindings: Seq[GuiceableModule] = Seq(
-    bind[Metrics].toInstance(new TestMetrics),
     bind[Clock].toInstance(Clock.systemUTC())
   )
 

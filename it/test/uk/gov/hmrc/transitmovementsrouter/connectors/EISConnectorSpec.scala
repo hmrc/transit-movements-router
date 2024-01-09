@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovementsrouter.connectors
+package test.uk.gov.hmrc.transitmovementsrouter.connectors
 
-import akka.stream.scaladsl.Source
-import akka.util.ByteString
 import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.stubbing.Scenario
+import org.apache.pekko.stream.scaladsl.Source
+import org.apache.pekko.util.ByteString
 import org.mockito.ArgumentMatchers
 import org.mockito.Mockito.when
 import org.scalacheck.Arbitrary.arbitrary
@@ -46,6 +46,9 @@ import uk.gov.hmrc.transitmovementsrouter.config.CircuitBreakerConfig
 import uk.gov.hmrc.transitmovementsrouter.config.EISInstanceConfig
 import uk.gov.hmrc.transitmovementsrouter.config.Headers
 import uk.gov.hmrc.transitmovementsrouter.config.RetryConfig
+import uk.gov.hmrc.transitmovementsrouter.connectors.EISConnector
+import uk.gov.hmrc.transitmovementsrouter.connectors.EISConnectorImpl
+import uk.gov.hmrc.transitmovementsrouter.connectors.Retries
 import uk.gov.hmrc.transitmovementsrouter.it.base.RegexPatterns
 import uk.gov.hmrc.transitmovementsrouter.it.base.TestActorSystem
 import uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuite
@@ -62,8 +65,8 @@ import java.time.Clock
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.util.UUID
-import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 
 class EISConnectorSpec
@@ -366,7 +369,7 @@ class EISConnectorSpec
         val hc = HeaderCarrier()
 
         whenReady(connector().post(movementId, messageId, source, hc)) {
-          case Left(x) if x.isInstanceOf[RoutingError.Upstream] =>
+          case Left(x) if x.isInstanceOf[Upstream] =>
             x.asInstanceOf[RoutingError.Upstream].upstreamErrorResponse.statusCode mustBe statusCode
           case x =>
             fail("Left was not a RoutingError.Upstream: " + x)

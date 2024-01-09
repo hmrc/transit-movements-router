@@ -16,10 +16,10 @@
 
 package uk.gov.hmrc.transitmovementsrouter.base
 
-import akka.stream.alpakka.xml.ParseEvent
-import akka.stream.alpakka.xml.scaladsl.XmlParsing
-import akka.stream.scaladsl.Source
-import akka.util.ByteString
+import org.apache.pekko.stream.connectors.xml.ParseEvent
+import org.apache.pekko.stream.connectors.xml.scaladsl.XmlParsing
+import org.apache.pekko.stream.scaladsl.Source
+import org.apache.pekko.util.ByteString
 
 import java.nio.charset.StandardCharsets
 import scala.xml.NodeSeq

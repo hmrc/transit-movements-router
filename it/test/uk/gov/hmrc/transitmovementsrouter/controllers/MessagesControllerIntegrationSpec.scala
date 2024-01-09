@@ -16,8 +16,9 @@
 
 package uk.gov.hmrc.transitmovementsrouter.controllers
 
-import akka.stream.scaladsl.Source
-import akka.util.ByteString
+import com.codahale.metrics.MetricRegistry
+import org.apache.pekko.stream.scaladsl.Source
+import org.apache.pekko.util.ByteString
 import com.github.tomakehurst.wiremock.client.WireMock.aResponse
 import com.github.tomakehurst.wiremock.client.WireMock.equalTo
 import com.github.tomakehurst.wiremock.client.WireMock.equalToJson
@@ -27,7 +28,6 @@ import com.github.tomakehurst.wiremock.client.WireMock.post
 import com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo
 import com.github.tomakehurst.wiremock.matching.EqualToPattern
 import com.github.tomakehurst.wiremock.matching.UrlPathPattern
-import com.kenshoo.play.metrics.Metrics
 import org.mockito.ArgumentMatchers.any
 import org.mockito.ArgumentMatchersSugar.eqTo
 import org.mockito.Mockito.when
@@ -56,7 +56,6 @@ import uk.gov.hmrc.objectstore.client.Path
 import uk.gov.hmrc.objectstore.client.RetentionPeriod
 import uk.gov.hmrc.objectstore.client.play.PlayObjectStoreClientEither
 import uk.gov.hmrc.transitmovementsrouter.it.base.RegexPatterns
-import uk.gov.hmrc.transitmovementsrouter.it.base.TestMetrics
 import uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuiteWithGuice
 import uk.gov.hmrc.transitmovementsrouter.models.ConversationId
 import uk.gov.hmrc.transitmovementsrouter.models.EoriNumber
@@ -196,7 +195,8 @@ class MessagesControllerIntegrationSpec
       "microservice.services.eis.xi.uri"                                -> "/xi",
       "microservice.services.eis.gb.retry.max-retries"                  -> 0,
       "microservice.services.eis.message-size-limit"                    -> s"${sampleOutgoingLargeXmlSize}B",
-      "microservice.services.internal-auth.enabled"                     -> false
+      "microservice.services.internal-auth.enabled"                     -> false,
+      "metrics.jvm"                                                     -> false
     )
 
   private val clock   = Clock.fixed(OffsetDateTime.of(2023, 4, 13, 10, 34, 41, 500, ZoneOffset.UTC).toInstant, ZoneOffset.UTC)
@@ -233,7 +233,7 @@ class MessagesControllerIntegrationSpec
   }
 
   override protected lazy val bindings: Seq[GuiceableModule] = Seq(
-    bind[Metrics].to[TestMetrics],
+    bind[MetricRegistry].toInstance(new MetricRegistry),
     bind[Clock].toInstance(clock),
     bind[PlayObjectStoreClientEither].toInstance(objectStoreService),
     bind[UUIDGenerator].toInstance(SingleUUIDGenerator)

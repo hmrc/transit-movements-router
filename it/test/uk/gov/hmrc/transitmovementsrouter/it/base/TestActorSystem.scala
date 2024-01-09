@@ -16,11 +16,15 @@
 
 package uk.gov.hmrc.transitmovementsrouter.it.base
 
-import com.codahale.metrics.MetricRegistry
-import com.kenshoo.play.metrics.Metrics
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.Materializer
+import org.scalatest.Suite
 
-class TestMetrics extends Metrics {
-  override def defaultRegistry: MetricRegistry = new MetricRegistry
+object TestActorSystem {
+  val system: ActorSystem = ActorSystem("test")
+}
 
-  override def toJson: String = "{}"
+trait TestActorSystem { self: Suite =>
+  implicit val system: ActorSystem        = TestActorSystem.system
+  implicit val materializer: Materializer = Materializer(TestActorSystem.system)
 }

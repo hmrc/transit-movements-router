@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 HM Revenue & Customs
+ * Copyright 2024 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,17 +14,11 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovementsrouter.it.base
+package test.uk.gov.hmrc.transitmovementsrouter.it.base
 
-import akka.actor.ActorSystem
-import akka.stream.Materializer
-import org.scalatest.Suite
+import com.codahale.metrics.MetricRegistry
+import uk.gov.hmrc.play.bootstrap.metrics.Metrics
 
-object TestActorSystem {
-  val system: ActorSystem = ActorSystem("test")
-}
-
-trait TestActorSystem { self: Suite =>
-  implicit val system: ActorSystem        = TestActorSystem.system
-  implicit val materializer: Materializer = Materializer(TestActorSystem.system)
+class TestMetrics extends Metrics {
+  override def defaultRegistry: MetricRegistry = new MetricRegistry
 }

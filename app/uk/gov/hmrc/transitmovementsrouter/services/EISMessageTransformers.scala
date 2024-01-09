@@ -16,15 +16,15 @@
 
 package uk.gov.hmrc.transitmovementsrouter.services
 
-import akka.stream.alpakka.xml.Attribute
-import akka.stream.alpakka.xml.EndElement
-import akka.stream.alpakka.xml.Namespace
-import akka.stream.alpakka.xml.ParseEvent
-import akka.stream.alpakka.xml.StartElement
-import akka.stream.alpakka.xml.scaladsl.XmlParsing
-import akka.stream.alpakka.xml.scaladsl.XmlWriting
-import akka.stream.scaladsl.Flow
-import akka.util.ByteString
+import org.apache.pekko.stream.connectors.xml.Attribute
+import org.apache.pekko.stream.connectors.xml.EndElement
+import org.apache.pekko.stream.connectors.xml.Namespace
+import org.apache.pekko.stream.connectors.xml.ParseEvent
+import org.apache.pekko.stream.connectors.xml.StartElement
+import org.apache.pekko.stream.connectors.xml.scaladsl.XmlParsing
+import org.apache.pekko.stream.connectors.xml.scaladsl.XmlWriting
+import org.apache.pekko.stream.scaladsl.Flow
+import org.apache.pekko.util.ByteString
 import com.google.inject.ImplementedBy
 import com.google.inject.Singleton
 import uk.gov.hmrc.transitmovementsrouter.services.state.UnwrappingState

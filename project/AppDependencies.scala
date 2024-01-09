@@ -1,40 +1,32 @@
-import play.core.PlayVersion
-import play.core.PlayVersion.current
 import sbt._
 
 object AppDependencies {
 
   private val catsVersion         = "2.7.0"
   private val catsRetryVersion    = "3.1.0"
-  private val boostrapPlayVersion = "7.12.0"
+  private val boostrapPlayVersion = "8.4.0"
 
   val compile = Seq(
-    "uk.gov.hmrc"             %% "bootstrap-backend-play-28"    % boostrapPlayVersion,
+    "uk.gov.hmrc"             %% "bootstrap-backend-play-30"    % boostrapPlayVersion,
     "org.typelevel"           %% "cats-core"                    % catsVersion,
     "com.github.cb372"        %% "cats-retry"                   % catsRetryVersion,
-    "uk.gov.hmrc.objectstore" %% "object-store-client-play-28"  % "1.0.0",
+    "uk.gov.hmrc.objectstore" %% "object-store-client-play-30"  % "1.3.0",
     "com.github.cb372"        %% "alleycats-retry"              % catsRetryVersion,
-    "com.typesafe.akka"       %% "akka-slf4j"                   % PlayVersion.akkaVersion,
-    "com.lightbend.akka"      %% "akka-stream-alpakka-xml"      % "3.0.4",
+    "org.apache.pekko"        %% "pekko-slf4j"                  % "1.0.1",
+    "org.apache.pekko"        %% "pekko-connectors-xml"         % "1.0.1",
     "io.lemonlabs"            %% "scala-uri"                    % "3.6.0",
     "org.typelevel"           %% "alleycats-core"               % catsVersion,
-    "uk.gov.hmrc"             %% "internal-auth-client-play-28" % "1.4.0"
+    "uk.gov.hmrc"             %% "internal-auth-client-play-30" % "1.8.0"
   )
 
   val test = Seq(
-    "org.scalatest"          %% "scalatest"               % "3.2.10",
-    "com.typesafe.play"      %% "play-test"               % current,
-    "com.vladsch.flexmark"    % "flexmark-all"            % "0.62.2",
-    "org.scalatestplus.play" %% "scalatestplus-play"      % "4.0.3",
-    "com.github.tomakehurst"  % "wiremock-standalone"     % "2.27.2",
-    "org.scalacheck"         %% "scalacheck"              % "1.15.4",
-    "org.mockito"            %% "mockito-scala-scalatest" % "1.17.5",
-    "org.mockito"             % "mockito-core"            % "3.3.3",
-    "org.scalatestplus"      %% "mockito-3-2"             % "3.1.2.0",
-    "org.scalatestplus"      %% "scalacheck-1-14"         % "3.2.2.0",
-    "org.typelevel"          %% "cats-core"               % catsVersion,
-    "com.github.cb372"       %% "cats-retry"              % catsRetryVersion,
-    "com.github.cb372"       %% "alleycats-retry"         % catsRetryVersion,
-    "uk.gov.hmrc"            %% "bootstrap-test-play-28"  % boostrapPlayVersion
-  ).map(_ % s"$Test, $IntegrationTest")
+    "org.scalacheck"    %% "scalacheck"              % "1.16.0",
+    "org.mockito"       %% "mockito-scala-scalatest" % "1.17.14",
+    "org.scalatestplus" %% "mockito-3-2"             % "3.1.2.0",
+    "org.scalatestplus" %% "scalacheck-1-14"         % "3.2.2.0",
+    "org.typelevel"     %% "cats-core"               % catsVersion,
+    "com.github.cb372"  %% "cats-retry"              % catsRetryVersion,
+    "com.github.cb372"  %% "alleycats-retry"         % catsRetryVersion,
+    "uk.gov.hmrc"       %% "bootstrap-test-play-30"  % boostrapPlayVersion
+  ).map(_ % Test)
 }

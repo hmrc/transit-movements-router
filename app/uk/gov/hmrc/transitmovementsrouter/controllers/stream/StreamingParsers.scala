@@ -16,12 +16,12 @@
 
 package uk.gov.hmrc.transitmovementsrouter.controllers.stream
 
-import akka.stream.IOOperationIncompleteException
-import akka.stream.Materializer
-import akka.stream.scaladsl.FileIO
-import akka.stream.scaladsl.Flow
-import akka.stream.scaladsl.Source
-import akka.util.ByteString
+import org.apache.pekko.stream.IOOperationIncompleteException
+import org.apache.pekko.stream.Materializer
+import org.apache.pekko.stream.scaladsl.FileIO
+import org.apache.pekko.stream.scaladsl.Flow
+import org.apache.pekko.stream.scaladsl.Source
+import org.apache.pekko.util.ByteString
 import cats.syntax.all._
 import com.fasterxml.aalto.WFCException
 import play.api.Logging

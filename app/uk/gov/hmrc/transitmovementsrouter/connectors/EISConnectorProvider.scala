@@ -16,7 +16,7 @@
 
 package uk.gov.hmrc.transitmovementsrouter.connectors
 
-import akka.stream.Materializer
+import org.apache.pekko.stream.Materializer
 import com.google.inject.ImplementedBy
 import com.google.inject.Inject
 import com.google.inject.Singleton

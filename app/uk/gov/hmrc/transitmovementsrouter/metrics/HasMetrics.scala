@@ -16,10 +16,10 @@
 
 package uk.gov.hmrc.transitmovementsrouter.metrics
 
-import java.util.concurrent.atomic.AtomicBoolean
-
 import com.codahale.metrics.MetricRegistry
-import com.kenshoo.play.metrics.Metrics
+
+import java.util.concurrent.atomic.AtomicBoolean
+import uk.gov.hmrc.play.bootstrap.metrics.Metrics
 import play.api.mvc.Action
 import play.api.mvc.BaseController
 import play.api.mvc.Result
