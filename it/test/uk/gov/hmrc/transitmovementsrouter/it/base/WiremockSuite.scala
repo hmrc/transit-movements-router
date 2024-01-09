@@ -28,6 +28,8 @@ import play.api.inject.Injector
 import play.api.inject.bind
 import play.api.inject.guice.GuiceApplicationBuilder
 import play.api.inject.guice.GuiceableModule
+import test.uk.gov.hmrc.transitmovementsrouter.it.base.TestMetrics
+import uk.gov.hmrc.play.bootstrap.metrics.Metrics
 
 import java.time.Clock
 
@@ -74,6 +76,7 @@ trait WiremockSuiteWithGuice extends WiremockSuite {
   protected lazy val injector: Injector = fakeApplication().injector
 
   protected def bindings: Seq[GuiceableModule] = Seq(
+    bind[Metrics].toInstance(new TestMetrics),
     bind[Clock].toInstance(Clock.systemUTC())
   )
 

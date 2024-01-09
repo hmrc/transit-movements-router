@@ -16,18 +16,11 @@
 
 package uk.gov.hmrc.transitmovementsrouter.controllers
 
-import com.codahale.metrics.MetricRegistry
-import org.apache.pekko.stream.scaladsl.Source
-import org.apache.pekko.util.ByteString
-import com.github.tomakehurst.wiremock.client.WireMock.aResponse
-import com.github.tomakehurst.wiremock.client.WireMock.equalTo
-import com.github.tomakehurst.wiremock.client.WireMock.equalToJson
-import com.github.tomakehurst.wiremock.client.WireMock.equalToXml
-import com.github.tomakehurst.wiremock.client.WireMock.matching
-import com.github.tomakehurst.wiremock.client.WireMock.post
-import com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo
+import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.matching.EqualToPattern
 import com.github.tomakehurst.wiremock.matching.UrlPathPattern
+import org.apache.pekko.stream.scaladsl.Source
+import org.apache.pekko.util.ByteString
 import org.mockito.ArgumentMatchers.any
 import org.mockito.ArgumentMatchersSugar.eqTo
 import org.mockito.Mockito.when
@@ -49,12 +42,14 @@ import play.api.test.FakeRequest
 import play.api.test.Helpers
 import play.api.test.Helpers.defaultAwaitTimeout
 import play.api.test.Helpers.running
+import test.uk.gov.hmrc.transitmovementsrouter.it.base.TestMetrics
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.objectstore.client.Md5Hash
 import uk.gov.hmrc.objectstore.client.ObjectSummaryWithMd5
 import uk.gov.hmrc.objectstore.client.Path
 import uk.gov.hmrc.objectstore.client.RetentionPeriod
 import uk.gov.hmrc.objectstore.client.play.PlayObjectStoreClientEither
+import uk.gov.hmrc.play.bootstrap.metrics.Metrics
 import uk.gov.hmrc.transitmovementsrouter.it.base.RegexPatterns
 import uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuiteWithGuice
 import uk.gov.hmrc.transitmovementsrouter.models.ConversationId
@@ -233,7 +228,7 @@ class MessagesControllerIntegrationSpec
   }
 
   override protected lazy val bindings: Seq[GuiceableModule] = Seq(
-    bind[MetricRegistry].toInstance(new MetricRegistry),
+    bind[Metrics].to[TestMetrics],
     bind[Clock].toInstance(clock),
     bind[PlayObjectStoreClientEither].toInstance(objectStoreService),
     bind[UUIDGenerator].toInstance(SingleUUIDGenerator)
