@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovementsrouter.it.base
+package test.uk.gov.hmrc.transitmovementsrouter.it.base
 
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.common.ConsoleNotifier
@@ -28,7 +28,6 @@ import play.api.inject.Injector
 import play.api.inject.bind
 import play.api.inject.guice.GuiceApplicationBuilder
 import play.api.inject.guice.GuiceableModule
-import test.uk.gov.hmrc.transitmovementsrouter.it.base.TestMetrics
 import uk.gov.hmrc.play.bootstrap.metrics.Metrics
 
 import java.time.Clock

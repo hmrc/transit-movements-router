@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovementsrouter.connectors
+package test.uk.gov.hmrc.transitmovementsrouter.connectors
 
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.lemonlabs.uri.Url
@@ -43,8 +43,9 @@ import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.UpstreamErrorResponse
 import uk.gov.hmrc.http.test.HttpClientV2Support
 import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
-import uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuite
-import uk.gov.hmrc.transitmovementsrouter.it.generators.ModelGenerators
+import uk.gov.hmrc.transitmovementsrouter.connectors.AuditingConnectorImpl
+import test.uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuite
+import test.uk.gov.hmrc.transitmovementsrouter.it.generators.ModelGenerators
 import uk.gov.hmrc.transitmovementsrouter.models._
 import uk.gov.hmrc.transitmovementsrouter.models.requests.Details
 import uk.gov.hmrc.transitmovementsrouter.models.requests.Metadata

@@ -49,10 +49,10 @@ import uk.gov.hmrc.transitmovementsrouter.config.RetryConfig
 import uk.gov.hmrc.transitmovementsrouter.connectors.EISConnector
 import uk.gov.hmrc.transitmovementsrouter.connectors.EISConnectorImpl
 import uk.gov.hmrc.transitmovementsrouter.connectors.Retries
-import uk.gov.hmrc.transitmovementsrouter.it.base.RegexPatterns
-import uk.gov.hmrc.transitmovementsrouter.it.base.TestActorSystem
-import uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuite
-import uk.gov.hmrc.transitmovementsrouter.it.generators.ModelGenerators
+import test.uk.gov.hmrc.transitmovementsrouter.it.base.RegexPatterns
+import test.uk.gov.hmrc.transitmovementsrouter.it.base.TestActorSystem
+import test.uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuite
+import test.uk.gov.hmrc.transitmovementsrouter.it.generators.ModelGenerators
 import uk.gov.hmrc.transitmovementsrouter.models.ConversationId
 import uk.gov.hmrc.transitmovementsrouter.models.LocalReferenceNumber
 import uk.gov.hmrc.transitmovementsrouter.models.MessageId

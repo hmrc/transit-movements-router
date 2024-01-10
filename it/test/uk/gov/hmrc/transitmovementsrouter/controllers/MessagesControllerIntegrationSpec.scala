@@ -51,8 +51,8 @@ import uk.gov.hmrc.objectstore.client.RetentionPeriod
 import uk.gov.hmrc.objectstore.client.play.PlayObjectStoreClientEither
 import uk.gov.hmrc.play.bootstrap.metrics.Metrics
 import uk.gov.hmrc.transitmovementsrouter.controllers.MessagesController
-import uk.gov.hmrc.transitmovementsrouter.it.base.RegexPatterns
-import uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuiteWithGuice
+import test.uk.gov.hmrc.transitmovementsrouter.it.base.RegexPatterns
+import test.uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuiteWithGuice
 import uk.gov.hmrc.transitmovementsrouter.models.ConversationId
 import uk.gov.hmrc.transitmovementsrouter.models.EoriNumber
 import uk.gov.hmrc.transitmovementsrouter.models.MovementType

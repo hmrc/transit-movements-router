@@ -34,8 +34,8 @@ import uk.gov.hmrc.transitmovementsrouter.models.errors.UpscanError.NotFound
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.test.HttpClientV2Support
 import uk.gov.hmrc.transitmovementsrouter.connectors.UpscanConnectorImpl
-import uk.gov.hmrc.transitmovementsrouter.it.base.TestActorSystem
-import uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuite
+import test.uk.gov.hmrc.transitmovementsrouter.it.base.TestActorSystem
+import test.uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuite
 import uk.gov.hmrc.transitmovementsrouter.models.errors.UpscanError
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.DownloadUrl
 
