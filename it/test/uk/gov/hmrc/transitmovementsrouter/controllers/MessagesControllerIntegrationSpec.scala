@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovementsrouter.controllers
+package test.uk.gov.hmrc.transitmovementsrouter.controllers
 
 import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.matching.EqualToPattern
@@ -50,6 +50,7 @@ import uk.gov.hmrc.objectstore.client.Path
 import uk.gov.hmrc.objectstore.client.RetentionPeriod
 import uk.gov.hmrc.objectstore.client.play.PlayObjectStoreClientEither
 import uk.gov.hmrc.play.bootstrap.metrics.Metrics
+import uk.gov.hmrc.transitmovementsrouter.controllers.MessagesController
 import uk.gov.hmrc.transitmovementsrouter.it.base.RegexPatterns
 import uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuiteWithGuice
 import uk.gov.hmrc.transitmovementsrouter.models.ConversationId
@@ -116,14 +117,14 @@ class MessagesControllerIntegrationSpec
     </ncts:CC015C>.mkString
 
   val sampleOutgoingXmlWrapped: String =
-    <n1:TraderChannelRequest xmlns:txd="http://ncts.dgtaxud.ec" xmlns:n1="http://www.hmrc.gov.uk/eis/ncts5/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.hmrc.gov.uk/eis/ncts5/v1 EIS_WrapperV11_TraderChannelRequest-51.8.xsd">
+    <n1:TraderChannelSubmission xmlns:txd="http://ncts.dgtaxud.ec" xmlns:n1="http://www.hmrc.gov.uk/eis/ncts5/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.hmrc.gov.uk/eis/ncts5/v1 EIS_WrapperV10_TraderChannelSubmission-51.8.xsd">
       <txd:CC015C PhaseID="NCTS5.0">
         <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
         <CustomsOfficeOfDeparture>
           <referenceNumber>GB1234567</referenceNumber>
         </CustomsOfficeOfDeparture>
       </txd:CC015C>
-    </n1:TraderChannelRequest>.mkString
+    </n1:TraderChannelSubmission>.mkString
 
   val sampleOutgoingLargeXml: String =
     <ncts:CC015C PhaseID="NCTS5.0" xmlns:ncts="http://ncts.dgtaxud.ec">
@@ -160,14 +161,14 @@ class MessagesControllerIntegrationSpec
     </ncts:CC015C>.mkString
 
   val sampleOutgoingXIXmlWrapped: String =
-    <n1:TraderChannelRequest xmlns:txd="http://ncts.dgtaxud.ec" xmlns:n1="http://www.hmrc.gov.uk/eis/ncts5/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.hmrc.gov.uk/eis/ncts5/v1 EIS_WrapperV11_TraderChannelRequest-51.8.xsd">
+    <n1:TraderChannelSubmission xmlns:txd="http://ncts.dgtaxud.ec" xmlns:n1="http://www.hmrc.gov.uk/eis/ncts5/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.hmrc.gov.uk/eis/ncts5/v1 EIS_WrapperV10_TraderChannelSubmission-51.8.xsd">
       <txd:CC015C PhaseID="NCTS5.0">
         <preparationDateAndTime>2022-05-25T09:37:04</preparationDateAndTime>
         <CustomsOfficeOfDeparture>
           <referenceNumber>XI1234567</referenceNumber>
         </CustomsOfficeOfDeparture>
       </txd:CC015C>
-    </n1:TraderChannelRequest>.mkString
+    </n1:TraderChannelSubmission>.mkString
 
   val brokenXml: String =
     """<nope>
