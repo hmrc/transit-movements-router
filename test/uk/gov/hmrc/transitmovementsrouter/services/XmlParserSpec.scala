@@ -16,7 +16,7 @@
 
 package uk.gov.hmrc.transitmovementsrouter.services
 
-import akka.stream.scaladsl.Sink
+import org.apache.pekko.stream.scaladsl.Sink
 import org.scalatest.concurrent.ScalaFutures.whenReady
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers

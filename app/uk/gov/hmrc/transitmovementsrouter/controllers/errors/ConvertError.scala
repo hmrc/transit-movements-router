@@ -17,18 +17,11 @@
 package uk.gov.hmrc.transitmovementsrouter.controllers.errors
 
 import cats.data.EitherT
-import uk.gov.hmrc.transitmovementsrouter.models.errors.CustomOfficeExtractorError
-import uk.gov.hmrc.transitmovementsrouter.models.errors.MessageTypeExtractionError
-import uk.gov.hmrc.transitmovementsrouter.models.errors.ObjectStoreError
-import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError
-import uk.gov.hmrc.transitmovementsrouter.models.errors.PushNotificationError
-import uk.gov.hmrc.transitmovementsrouter.models.errors.SDESError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.CustomOfficeExtractorError.NoElementFound
 import uk.gov.hmrc.transitmovementsrouter.models.errors.CustomOfficeExtractorError.TooManyElementsFound
 import uk.gov.hmrc.transitmovementsrouter.models.errors.CustomOfficeExtractorError.UnrecognisedOffice
-import uk.gov.hmrc.transitmovementsrouter.models.errors.RoutingError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.RoutingError._
-import uk.gov.hmrc.transitmovementsrouter.models.errors.UpscanError
+import uk.gov.hmrc.transitmovementsrouter.models.errors._
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future

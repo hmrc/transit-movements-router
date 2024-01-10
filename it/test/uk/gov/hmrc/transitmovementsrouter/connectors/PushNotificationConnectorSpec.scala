@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovementsrouter.connectors
+package test.uk.gov.hmrc.transitmovementsrouter.connectors
 
-import akka.stream.scaladsl.Source
-import akka.util.ByteString
+import org.apache.pekko.stream.scaladsl.Source
+import org.apache.pekko.util.ByteString
 import com.github.tomakehurst.wiremock.client.WireMock.aResponse
 import com.github.tomakehurst.wiremock.client.WireMock.equalTo
 import com.github.tomakehurst.wiremock.client.WireMock.equalToJson
@@ -45,9 +45,10 @@ import play.mvc.Http.MimeTypes
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.test.HttpClientV2Support
 import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
-import uk.gov.hmrc.transitmovementsrouter.it.base.TestActorSystem
-import uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuite
-import uk.gov.hmrc.transitmovementsrouter.it.generators.ModelGenerators
+import uk.gov.hmrc.transitmovementsrouter.connectors.PushNotificationsConnectorImpl
+import test.uk.gov.hmrc.transitmovementsrouter.it.base.TestActorSystem
+import test.uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuite
+import test.uk.gov.hmrc.transitmovementsrouter.it.generators.ModelGenerators
 import uk.gov.hmrc.transitmovementsrouter.models.MessageId
 import uk.gov.hmrc.transitmovementsrouter.models.MessageType
 import uk.gov.hmrc.transitmovementsrouter.models.MovementId

@@ -16,10 +16,11 @@
 
 package uk.gov.hmrc.transitmovementsrouter.services
 
-import akka.NotUsed
-import akka.stream.alpakka.xml._
-import akka.stream.alpakka.xml.scaladsl.XmlParsing
-import akka.stream.scaladsl.Flow
+import org.apache.pekko.NotUsed
+import org.apache.pekko.stream.connectors.xml._
+import org.apache.pekko.stream.connectors.xml.scaladsl.XmlParsing
+import org.apache.pekko.stream.scaladsl.Flow
+import uk.gov.hmrc.transitmovementsrouter.models.CustomsOffice
 import uk.gov.hmrc.transitmovementsrouter.models._
 
 object XmlParser extends XmlParsingServiceHelpers {
@@ -32,5 +33,4 @@ object XmlParser extends XmlParsingServiceHelpers {
       case element if element.getTextContent.nonEmpty => CustomsOffice(element.getTextContent)
     }
     .single("referenceNumber")
-
 }

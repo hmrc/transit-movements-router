@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovementsrouter.connectors
+package test.uk.gov.hmrc.transitmovementsrouter.connectors
 
-import akka.stream.scaladsl.Sink
+import org.apache.pekko.stream.scaladsl.Sink
 import com.github.tomakehurst.wiremock.client.WireMock.aResponse
 import com.github.tomakehurst.wiremock.client.WireMock.get
 import org.scalacheck.Gen
@@ -30,10 +30,12 @@ import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 import play.api.http.Status.INTERNAL_SERVER_ERROR
 import play.api.http.Status.NOT_FOUND
 import play.api.http.Status.OK
+import uk.gov.hmrc.transitmovementsrouter.models.errors.UpscanError.NotFound
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.test.HttpClientV2Support
-import uk.gov.hmrc.transitmovementsrouter.it.base.TestActorSystem
-import uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuite
+import uk.gov.hmrc.transitmovementsrouter.connectors.UpscanConnectorImpl
+import test.uk.gov.hmrc.transitmovementsrouter.it.base.TestActorSystem
+import test.uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuite
 import uk.gov.hmrc.transitmovementsrouter.models.errors.UpscanError
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.DownloadUrl
 
@@ -85,8 +87,8 @@ class UpscanConnectorSpec
         .streamFile(DownloadUrl(s"http://localhost:${server.port()}/test.xml"))
 
       whenReady(result.value, timeout) {
-        case Left(UpscanError.NotFound) => succeed
-        case a                          => fail(s"Expected Left(NotFound), got $a")
+        case Left(NotFound) => succeed
+        case a              => fail(s"Expected Left(NotFound), got $a")
       }
     }
 

@@ -16,9 +16,9 @@
 
 package uk.gov.hmrc.transitmovementsrouter.fakes.actions
 
-import akka.stream.scaladsl.Flow
-import akka.stream.scaladsl.Sink
-import akka.util.ByteString
+import org.apache.pekko.stream.scaladsl.Flow
+import org.apache.pekko.stream.scaladsl.Sink
+import org.apache.pekko.util.ByteString
 import uk.gov.hmrc.transitmovementsrouter.base.StreamTestHelpers
 import uk.gov.hmrc.transitmovementsrouter.services.EISMessageTransformers
 

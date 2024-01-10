@@ -20,7 +20,7 @@ import com.codahale.metrics.Counter
 import com.codahale.metrics.Histogram
 import com.codahale.metrics.MetricRegistry
 import com.codahale.metrics.Timer
-import com.kenshoo.play.metrics.Metrics
+import uk.gov.hmrc.play.bootstrap.metrics.Metrics
 import org.mockito.ArgumentMatchers._
 import org.mockito.Mockito
 import org.mockito.Mockito._

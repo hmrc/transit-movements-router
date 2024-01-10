@@ -16,11 +16,11 @@
 
 package uk.gov.hmrc.transitmovementsrouter.connectors
 
-import akka.stream.scaladsl.Source
-import akka.util.ByteString
+import org.apache.pekko.stream.scaladsl.Source
+import org.apache.pekko.util.ByteString
 import com.google.inject.ImplementedBy
 import com.google.inject.Inject
-import com.kenshoo.play.metrics.Metrics
+import uk.gov.hmrc.play.bootstrap.metrics.Metrics
 import io.lemonlabs.uri.UrlPath
 import play.api.Logging
 import play.api.http.HeaderNames

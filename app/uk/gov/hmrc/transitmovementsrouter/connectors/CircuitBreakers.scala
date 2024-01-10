@@ -16,8 +16,8 @@
 
 package uk.gov.hmrc.transitmovementsrouter.connectors
 
-import akka.pattern.CircuitBreaker
-import akka.stream.Materializer
+import org.apache.pekko.pattern.CircuitBreaker
+import org.apache.pekko.stream.Materializer
 import play.api.Logging
 import uk.gov.hmrc.transitmovementsrouter.config.EISInstanceConfig
 

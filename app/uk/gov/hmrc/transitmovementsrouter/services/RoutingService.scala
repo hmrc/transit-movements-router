@@ -16,8 +16,8 @@
 
 package uk.gov.hmrc.transitmovementsrouter.services
 
-import akka.stream.scaladsl.Source
-import akka.util.ByteString
+import org.apache.pekko.stream.scaladsl.Source
+import org.apache.pekko.util.ByteString
 import cats.data.EitherT
 import com.google.inject._
 import play.api.Logging
