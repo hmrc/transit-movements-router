@@ -88,7 +88,7 @@ class StreamingParsersSpec extends AnyFreeSpec with Matchers with TestActorSyste
         Future.successful(Ok(request.body))
     }
 
-    def resultStream: Action[Source[ByteString, _]] = Action.andThen(TestActionBuilder).stream {
+    def resultStream: Action[Source[ByteString, _]] = Action.andThen(TestActionBuilder).streamWithSize {
       request => _ =>
         (for {
           a <- request.body.runWith(Sink.last)
@@ -101,7 +101,7 @@ class StreamingParsersSpec extends AnyFreeSpec with Matchers with TestActorSyste
 
     def transformStream: Action[Source[ByteString, _]] = Action
       .andThen(TestActionBuilder)
-      .stream(
+      .streamWithSize(
         Flow.fromFunction[ByteString, ByteString](
           a => a ++ a
         )
@@ -118,7 +118,7 @@ class StreamingParsersSpec extends AnyFreeSpec with Matchers with TestActorSyste
 
     def errorStream: Action[Source[ByteString, _]] = Action
       .andThen(TestActionBuilder)
-      .stream(
+      .streamWithSize(
         Flow.fromFunction[ByteString, ByteString](
           _ => throw new IllegalStateException("this happened")
         )
@@ -129,7 +129,7 @@ class StreamingParsersSpec extends AnyFreeSpec with Matchers with TestActorSyste
 
     def internalErrorStream: Action[Source[ByteString, _]] = Action
       .andThen(TestActionBuilder)
-      .stream(
+      .streamWithSize(
         Flow.fromFunction[ByteString, ByteString](
           _ => throw new NumberFormatException() // doesn't matter - we're just not expecting it
         )
