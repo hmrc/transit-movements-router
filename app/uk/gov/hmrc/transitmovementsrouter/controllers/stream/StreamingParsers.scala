@@ -16,24 +16,19 @@
 
 package uk.gov.hmrc.transitmovementsrouter.controllers.stream
 
+import cats.implicits.catsSyntaxMonadError
+import com.fasterxml.aalto.WFCException
 import org.apache.pekko.stream.IOOperationIncompleteException
 import org.apache.pekko.stream.Materializer
 import org.apache.pekko.stream.scaladsl.FileIO
 import org.apache.pekko.stream.scaladsl.Flow
 import org.apache.pekko.stream.scaladsl.Source
 import org.apache.pekko.util.ByteString
-import cats.syntax.all._
-import com.fasterxml.aalto.WFCException
 import play.api.Logging
 import play.api.libs.Files.TemporaryFileCreator
 import play.api.libs.json.Json
 import play.api.libs.streams.Accumulator
-import play.api.mvc.Action
-import play.api.mvc.ActionBuilder
-import play.api.mvc.BaseControllerHelpers
-import play.api.mvc.BodyParser
-import play.api.mvc.Request
-import play.api.mvc.Result
+import play.api.mvc._
 import uk.gov.hmrc.http.HeaderNames
 import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
 import uk.gov.hmrc.transitmovementsrouter.controllers.errors.PresentationError
@@ -43,16 +38,17 @@ import java.nio.file.Files
 import java.util.concurrent.Executors
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
-import scala.util.Failure
-import scala.util.Success
+import scala.util.Try
 
 trait StreamingParsers {
   self: BaseControllerHelpers with Logging =>
 
-  val config: AppConfig
-
   implicit val materializer: Materializer
 
+  /*
+    This keeps Play's connection thread pool outside of our streaming, and uses a cached thread pool
+    to spin things up as needed.
+   */
   implicit val materializerExecutionContext: ExecutionContext =
     ExecutionContext.fromExecutorService(Executors.newCachedThreadPool())
 
@@ -61,40 +57,56 @@ trait StreamingParsers {
       Accumulator.source[ByteString].map(Right.apply)
   }
 
+  val config: AppConfig
+
   implicit class ActionBuilderStreamHelpers(actionBuilder: ActionBuilder[Request, _]) {
 
-    // This method allows for the transformation of a stream before it goes into a file,
-    // such that we only transform it once.
-    def stream(transformer: Flow[ByteString, ByteString, _])(
+    /** Updates the [[Source]] in the [[Request]] with a version that can be used
+      * multiple times via the use of a temporary file.
+      *
+      * @param block The code to use the with the reusable source
+      * @return An [[Action]]
+      */
+
+    def streamWithSize(transformer: Flow[ByteString, ByteString, _])(
       block: Request[Source[ByteString, _]] => Long => Future[Result]
     )(implicit temporaryFileCreator: TemporaryFileCreator): Action[Source[ByteString, _]] =
       actionBuilder.async(streamFromMemory) {
         request =>
-          val tempFile = temporaryFileCreator.create()
-          request.body
-            .via(transformer)
-            .runWith(FileIO.toPath(tempFile))
-            .transformWith {
-              case Success(_) =>
-                val size = Files.size(tempFile.path)
-                block(request.withBody(FileIO.fromPath(tempFile)))(size)
-              case Failure(error: IOOperationIncompleteException)
-                  if error.getCause.isInstanceOf[IllegalStateException] || error.getCause.isInstanceOf[WFCException] =>
+          // This is outside the for comprehension because we need access to the file
+          // if the rest of the futures fail, which we wouldn't get if it was in there.
+          Future
+            .fromTry(Try(temporaryFileCreator.create()))
+            .flatMap {
+              file =>
+                (for {
+                  _      <- request.body.via(transformer).runWith(FileIO.toPath(file))
+                  size   <- Future.fromTry(Try(Files.size(file)))
+                  result <- block(request.withBody(FileIO.fromPath(file)))(size)
+                } yield result)
+                  .attemptTap {
+                    _ =>
+                      file.delete()
+                      Future.successful(())
+                  }
+            }
+            .recover {
+              case error: IOOperationIncompleteException if error.getCause.isInstanceOf[IllegalStateException] || error.getCause.isInstanceOf[WFCException] =>
                 if (config.logIncoming) {
                   logger.error(
                     s"""Unable to process message from EIS -- bad request:
-                                  |
-                                  |Request ID: ${request.headers.get(HeaderNames.xRequestId).getOrElse("unavailable")}
-                                  |Correlation ID: ${request.headers.get(RouterHeaderNames.CORRELATION_ID).getOrElse("unavailable")}
-                                  |Conversation ID: ${request.headers.get(RouterHeaderNames.CONVERSATION_ID).getOrElse("unavailable")}
-                                  |Message: ${error.getMessage}
-                                  |
-                                  |Failed to transform XML""".stripMargin,
+                       |
+                       |Request ID: ${request.headers.get(HeaderNames.xRequestId).getOrElse("unavailable")}
+                       |Correlation ID: ${request.headers.get(RouterHeaderNames.CORRELATION_ID).getOrElse("unavailable")}
+                       |Conversation ID: ${request.headers.get(RouterHeaderNames.CONVERSATION_ID).getOrElse("unavailable")}
+                       |Message: ${error.getMessage}
+                       |
+                       |Failed to transform XML""".stripMargin,
                     error
                   )
                 }
-                Future.successful(Status(BAD_REQUEST)(Json.toJson(PresentationError.badRequestError(error.getCause.getMessage))))
-              case Failure(thr) =>
+                Status(BAD_REQUEST)(Json.toJson(PresentationError.badRequestError(error.getCause.getMessage)))
+              case error: Throwable =>
                 if (config.logIncoming) {
                   logger.error(
                     s"""Unable to process message from EIS -- internal server error:
@@ -102,25 +114,19 @@ trait StreamingParsers {
                        |Request ID: ${request.headers.get(HeaderNames.xRequestId).getOrElse("unavailable")}
                        |Correlation ID: ${request.headers.get(RouterHeaderNames.CORRELATION_ID).getOrElse("unavailable")}
                        |Conversation ID: ${request.headers.get(RouterHeaderNames.CONVERSATION_ID).getOrElse("unavailable")}
-                       |Message: ${thr.getMessage}
+                       |Message: ${error.getMessage}
                        |
                        |Failed to transform XML""".stripMargin,
-                    thr
+                    error
                   )
                 }
-                Future.successful(Status(INTERNAL_SERVER_ERROR)(Json.toJson(PresentationError.internalServiceError(cause = Some(thr)))))
-            }
-            .attemptTap {
-              _ =>
-                temporaryFileCreator.delete(tempFile)
-                Future.unit
+                Status(INTERNAL_SERVER_ERROR)(Json.toJson(PresentationError.internalServiceError(cause = Some(error))))
             }
       }
 
-    def stream(
+    def streamWithSize(
       block: Request[Source[ByteString, _]] => Long => Future[Result]
     )(implicit temporaryFileCreator: TemporaryFileCreator): Action[Source[ByteString, _]] =
-      stream(Flow.apply[ByteString])(block)(temporaryFileCreator)
+      streamWithSize(Flow.apply[ByteString])(block)(temporaryFileCreator)
   }
-
 }

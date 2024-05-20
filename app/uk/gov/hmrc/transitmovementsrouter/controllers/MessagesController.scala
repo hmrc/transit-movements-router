@@ -122,7 +122,7 @@ class MessagesController @Inject() (
         _               <- sdesService.send(movementId, messageId, objectStoreFile).asPresentation
       } yield Accepted
 
-    internalAuth(predicate).stream {
+    internalAuth(predicate).streamWithSize {
       implicit request => size =>
         (for {
           messageType        <- messageTypeExtractor.extractFromHeaders(request.headers).asPresentation
@@ -139,7 +139,7 @@ class MessagesController @Inject() (
     EitherT.fromOption[Future](messageType.auditType, PresentationError.badRequestError(s"$messageType is not a ResponseMessageType"))
 
   def incomingViaEIS(ids: ConversationId): Action[Source[ByteString, _]] =
-    authenticateEISToken.stream(transformer = eisMessageTransformers.unwrap) {
+    authenticateEISToken.streamWithSize(transformer = eisMessageTransformers.unwrap) {
       implicit request => size =>
         import MessagesController.PresentationEitherTHelper
 
