@@ -4,7 +4,7 @@ object AppDependencies {
 
   private val catsVersion         = "2.7.0"
   private val catsRetryVersion    = "3.1.0"
-  private val boostrapPlayVersion = "8.4.0"
+  private val boostrapPlayVersion = "8.6.0"
 
   val compile = Seq(
     "uk.gov.hmrc"             %% "bootstrap-backend-play-30"    % boostrapPlayVersion,
@@ -16,7 +16,7 @@ object AppDependencies {
     "org.apache.pekko"        %% "pekko-connectors-xml"         % "1.0.1",
     "io.lemonlabs"            %% "scala-uri"                    % "3.6.0",
     "org.typelevel"           %% "alleycats-core"               % catsVersion,
-    "uk.gov.hmrc"             %% "internal-auth-client-play-30" % "1.8.0"
+    "uk.gov.hmrc"             %% "internal-auth-client-play-30" % "2.0.0"
   )
 
   val test = Seq(
