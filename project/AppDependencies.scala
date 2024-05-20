@@ -10,7 +10,7 @@ object AppDependencies {
     "uk.gov.hmrc"             %% "bootstrap-backend-play-30"    % boostrapPlayVersion,
     "org.typelevel"           %% "cats-core"                    % catsVersion,
     "com.github.cb372"        %% "cats-retry"                   % catsRetryVersion,
-    "uk.gov.hmrc.objectstore" %% "object-store-client-play-30"  % "1.3.0",
+    "uk.gov.hmrc.objectstore" %% "object-store-client-play-30"  % "1.4.0",
     "com.github.cb372"        %% "alleycats-retry"              % catsRetryVersion,
     "org.apache.pekko"        %% "pekko-slf4j"                  % "1.0.1",
     "org.apache.pekko"        %% "pekko-connectors-xml"         % "1.0.1",
