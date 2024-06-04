@@ -42,7 +42,9 @@ import play.api.test.FakeRequest
 import play.api.test.Helpers
 import play.api.test.Helpers.defaultAwaitTimeout
 import play.api.test.Helpers.running
+import test.uk.gov.hmrc.transitmovementsrouter.it.base.RegexPatterns
 import test.uk.gov.hmrc.transitmovementsrouter.it.base.TestMetrics
+import test.uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuiteWithGuice
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.objectstore.client.Md5Hash
 import uk.gov.hmrc.objectstore.client.ObjectSummaryWithMd5
@@ -51,8 +53,6 @@ import uk.gov.hmrc.objectstore.client.RetentionPeriod
 import uk.gov.hmrc.objectstore.client.play.PlayObjectStoreClientEither
 import uk.gov.hmrc.play.bootstrap.metrics.Metrics
 import uk.gov.hmrc.transitmovementsrouter.controllers.MessagesController
-import test.uk.gov.hmrc.transitmovementsrouter.it.base.RegexPatterns
-import test.uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuiteWithGuice
 import uk.gov.hmrc.transitmovementsrouter.models.ConversationId
 import uk.gov.hmrc.transitmovementsrouter.models.EoriNumber
 import uk.gov.hmrc.transitmovementsrouter.models.MovementType
@@ -598,6 +598,93 @@ class MessagesControllerIntegrationSpec
         val result = sut.incomingViaEIS(conversationId)(eisRequest)
 
         Helpers.status(result) mustBe BAD_REQUEST
+      }
+    }
+
+    "when EIS makes a call with a non xml message, return 400" in {
+      val newApp                  = appBuilder.build()
+      val conversationId          = ConversationId(UUID.randomUUID())
+      val (movementId, messageId) = conversationId.toMovementAndMessageId
+      val outputMessageId         = Gen.stringOfN(16, Gen.hexChar.map(_.toLower)).sample.get
+
+      // We should hit the persistence layer on /transit-movements/traders/movements/${movementId.value}/messages?triggerId=messageId
+      server.stubFor(
+        post(new UrlPathPattern(new EqualToPattern(s"/transit-movements/traders/movements/${movementId.value}/messages"), false))
+          .withQueryParam("triggerId", new EqualToPattern(messageId.value))
+          .withHeader("x-message-type", new EqualToPattern("IE015"))
+          .willReturn(
+            aResponse().withStatus(OK).withBody(Json.stringify(Json.obj("messageId" -> outputMessageId)))
+          )
+      )
+
+      server.stubFor(
+        post(s"/transit-movements-push-notifications/traders/movements/${movementId.value}/messages/$outputMessageId/messageReceived")
+          .willReturn(
+            aResponse().withStatus(OK)
+          )
+      )
+
+      val eisRequest = FakeRequest(
+        "POST",
+        s"/transit-movements-router/movement/${conversationId.value.toString}/messages",
+        FakeHeaders(
+          Seq(
+            "Authorization"    -> s"Bearer ABC",
+            "x-correlation-id" -> UUID.randomUUID().toString
+          )
+        ),
+        Source.single(ByteString("Text somethings"))
+      )
+
+      running(newApp) {
+        val sut    = newApp.injector.instanceOf[MessagesController]
+        val result = sut.incomingViaEIS(conversationId)(eisRequest)
+
+        Helpers.status(result) mustBe BAD_REQUEST
+      }
+    }
+
+    "when EIS makes a call and Internal server error occurred, return 500" in {
+      val newApp                  = appBuilder.build()
+      val conversationId          = ConversationId(UUID.randomUUID())
+      val (movementId, messageId) = conversationId.toMovementAndMessageId
+      val outputMessageId         = Gen.stringOfN(16, Gen.hexChar.map(_.toLower)).sample.get
+
+      // We should hit the persistence layer on /transit-movements/traders/movements/${movementId.value}/messages?triggerId=messageId
+      server.stubFor(
+        post(new UrlPathPattern(new EqualToPattern(s"/transit-movements/traders/movements/${movementId.value}/messages"), false))
+          .withQueryParam("triggerId", new EqualToPattern(messageId.value))
+          .withHeader("x-message-type", new EqualToPattern("IE015"))
+          .willReturn(
+            aResponse().withStatus(OK).withBody(Json.stringify(Json.obj("messageId" -> outputMessageId)))
+          )
+      )
+
+      server.stubFor(
+        post(s"/transit-movements-push-notifications/traders/movements/${movementId.value}/messages/$outputMessageId/messageReceived")
+          .willReturn(
+            aResponse().withStatus(OK)
+          )
+      )
+      val error = new ClassCastException()
+
+      val eisRequest = FakeRequest(
+        "POST",
+        s"/transit-movements-router/movement/${conversationId.value.toString}/messages",
+        FakeHeaders(
+          Seq(
+            "Authorization"    -> s"Bearer ABC",
+            "x-correlation-id" -> UUID.randomUUID().toString
+          )
+        ),
+        Source.failed(error)
+      )
+
+      running(newApp) {
+        val sut    = newApp.injector.instanceOf[MessagesController]
+        val result = sut.incomingViaEIS(conversationId)(eisRequest)
+
+        Helpers.status(result) mustBe INTERNAL_SERVER_ERROR
       }
     }
 
