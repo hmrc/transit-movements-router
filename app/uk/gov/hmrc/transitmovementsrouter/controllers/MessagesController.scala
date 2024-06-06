@@ -16,10 +16,11 @@
 
 package uk.gov.hmrc.transitmovementsrouter.controllers
 
+import cats.data.EitherT
 import org.apache.pekko.stream.Materializer
+import org.apache.pekko.stream.scaladsl.Sink
 import org.apache.pekko.stream.scaladsl.Source
 import org.apache.pekko.util.ByteString
-import cats.data.EitherT
 import play.api.Logging
 import play.api.http.MimeTypes
 import play.api.libs.Files.TemporaryFileCreator
@@ -122,35 +123,125 @@ class MessagesController @Inject() (
         _               <- sdesService.send(movementId, messageId, objectStoreFile).asPresentation
       } yield Accepted
 
-    internalAuth(predicate).streamWithSize {
-      implicit request => size =>
+    internalAuth(predicate).async(streamFromMemory) {
+
+      implicit request =>
         (for {
+          source             <- reUsableOutgoingSource(request)
           messageType        <- messageTypeExtractor.extractFromHeaders(request.headers).asPresentation
           requestMessageType <- filterRequestMessageType(messageType)
-          customsOffice      <- customOfficeExtractorService.extractCustomOffice(request.body, requestMessageType).asPresentation
-          submitted          <- if (config.eisSizeLimit >= size) viaEIS(messageType, customsOffice, request.body) else viaSDES(request.body)
-        } yield submitted).valueOr(
-          error => Status(error.code.statusCode)(Json.toJson(error))
-        )
+
+          customsOffice <- customOfficeExtractorService.extractCustomOffice(source.headOption.get, requestMessageType).asPresentation
+          size          <- calculateSize(source.lift(1).get)
+          submitted <-
+            if (config.eisSizeLimit >= size) viaEIS(messageType, customsOffice, source.lift(2).get)
+            else viaSDES(source.lift(3).get)
+        } yield submitted)
+          .valueOr(
+            error => Status(error.code.statusCode)(Json.toJson(error))
+          )
     }
+  }
+
+  private def materializeOutgoingSource(source: Source[ByteString, _]): EitherT[Future, PresentationError, Seq[ByteString]] =
+    EitherT(
+      source
+        .runWith(Sink.seq)
+        .map(Right(_): Either[PresentationError, Seq[ByteString]])
+        .recover {
+          error =>
+            Left(PresentationError.internalServiceError(cause = Some(error)))
+        }
+    )
+
+  // Function to materialize the source into a Seq[ByteString] with error handling
+  private def materializeIncomingSource(source: Source[ByteString, _]): EitherT[Future, PresentationError, Seq[ByteString]] =
+    EitherT(
+      source
+        .via(eisMessageTransformers.unwrap)
+        .runWith(Sink.seq)
+        .map(Right(_): Either[PresentationError, Seq[ByteString]])
+        .recover {
+          case error: Throwable if error.toString.contains("IllegalStateException") || error.toString.contains("WFCException") =>
+            if (config.logIncoming) {
+              logger.error(
+                s"""Unable to process message from EIS -- bad request:
+               |
+               |Message: ${error.getMessage}
+               |
+               |Failed to transform XML""".stripMargin,
+                error
+              )
+            }
+            Left(PresentationError.badRequestError(error.getMessage))
+          case error: Throwable =>
+            if (config.logIncoming) {
+              logger.error(
+                s"""Unable to process message from EIS -- internal server error:
+               |
+               |Message: ${error.getMessage}
+               |
+               |Failed to transform """.stripMargin,
+                error
+              )
+            }
+            Left(PresentationError.internalServiceError(cause = Some(error)))
+        }
+    )
+
+  // Function to create a new source from the materialized sequence
+  private def createReusableSource(seq: Seq[ByteString]): Source[ByteString, _] = Source(seq.toList)
+
+  // Materialize the source and create multiple new sources with error handling
+  private def reUsableIncomingSource(request: Request[Source[ByteString, _]]): EitherT[Future, PresentationError, List[Source[ByteString, _]]] = for {
+    byteStringSeq <- materializeIncomingSource(request.body)
+  } yield List.fill(4)(createReusableSource(byteStringSeq))
+
+  private def reUsableOutgoingSource(request: Request[Source[ByteString, _]]): EitherT[Future, PresentationError, List[Source[ByteString, _]]] = for {
+    byteStringSeq <- materializeOutgoingSource(request.body)
+  } yield List.fill(4)(createReusableSource(byteStringSeq))
+
+  // Function to calculate the size using EitherT
+  private def calculateSize(source: Source[ByteString, _]): EitherT[Future, PresentationError, Long] = {
+    val sizeFuture: Future[Either[PresentationError, Long]] = source
+      .map(_.size.toLong)
+      .runWith(Sink.fold(0L)(_ + _))
+      .map(
+        size => Right(size): Either[PresentationError, Long]
+      )
+      .recover {
+        case _: Exception => Left(PresentationError.internalServiceError())
+      }
+
+    EitherT(sizeFuture)
   }
 
   private def extractAuditMessageType(messageType: MessageType): EitherT[Future, PresentationError, AuditType] =
     EitherT.fromOption[Future](messageType.auditType, PresentationError.badRequestError(s"$messageType is not a ResponseMessageType"))
 
   def incomingViaEIS(ids: ConversationId): Action[Source[ByteString, _]] =
-    authenticateEISToken.streamWithSize(transformer = eisMessageTransformers.unwrap) {
-      implicit request => size =>
+    authenticateEISToken.async(streamFromMemory) {
+
+      implicit request =>
         import MessagesController.PresentationEitherTHelper
 
         val (movementId, triggerId) = ids.toMovementAndMessageId
         (for {
-          messageType <- messageTypeExtractor.extract(request.headers, request.body).asPresentationWithMessageType(None)
+          source <- reUsableIncomingSource(request).leftMap(
+            err => (err, None)
+          )
+
+          messageType <- messageTypeExtractor.extract(request.headers, source.headOption.get).asPresentationWithMessageType(None)
+
           auditMsg <- extractAuditMessageType(messageType).leftMap(
             err => (err, Option(messageType))
           )
           _ = statusMonitoringService.incoming(movementId, triggerId, messageType)
-          persistenceResponse <- persistStream(movementId, triggerId, messageType, request.body).leftMap {
+
+          size <- calculateSize(source.lift(1).get).leftMap(
+            err => (err, Option(messageType))
+          )
+          persistenceResponse <- persistStream(movementId, triggerId, messageType, source.lift(2).get).leftMap {
             err =>
               if (err.code.statusCode == NOT_FOUND)
                 auditService.auditStatusEvent(
@@ -168,7 +259,7 @@ class MessagesController @Inject() (
             auditType = auditMsg,
             contentType = MimeTypes.XML,
             contentLength = size,
-            payload = request.body,
+            payload = source.lift(3).get,
             movementId = Some(movementId),
             messageId = Some(persistenceResponse.messageId),
             enrolmentEori = None,
@@ -190,16 +281,17 @@ class MessagesController @Inject() (
             {
               error =>
                 if (config.logIncoming) {
-                  logger.error(s"""Unable to process message from EIS -- bad request:
-                       |
-                       |${generateRequestLog(movementId, triggerId, error._2)}
-                       |
-                       |error is ${Json.toJson(error._1)}""".stripMargin)
+                  logger.error(s"""Unable to process message from EIS :
+                         |
+                         |${generateRequestLog(movementId, triggerId, error._2)}
+
+                         |error is ${Json.toJson(error._1)}""".stripMargin)
                 }
                 Status(error._1.code.statusCode)(Json.toJson(error._1))
             },
             response => Created.withHeaders("X-Message-Id" -> response.messageId.value)
           )
+
     }
 
   def incomingViaUpscan(movementId: MovementId, triggerId: MessageId): Action[JsValue] = Action.async(cc.parsers.json) {
@@ -252,7 +344,7 @@ class MessagesController @Inject() (
       Future.successful {
         upscanResponse match {
           case x: UpscanSuccessResponse => Right(x.downloadUrl)
-          case x: UpscanFailedResponse  => Left(PresentationError.badRequestError("Upscan failed to process file"))
+          case _: UpscanFailedResponse  => Left(PresentationError.badRequestError("Upscan failed to process file"))
         }
       }
     }
