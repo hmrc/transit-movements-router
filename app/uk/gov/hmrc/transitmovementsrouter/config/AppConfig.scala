@@ -66,6 +66,8 @@ class AppConfig @Inject() (config: Configuration, servicesConfig: CTCServicesCon
   lazy val internalAuthEnabled: Boolean = config.get[Boolean]("microservice.services.internal-auth.enabled")
   lazy val internalAuthToken: String    = config.get[String]("internal-auth.token")
 
+  lazy val whiteListEori: String = config.get[String]("whitelist.eori")
+
   lazy val serviceMonitoringUrl         = servicesConfig.baseUrl("ncts")
   lazy val serviceMonitoringEnabled     = config.get[Boolean]("microservice.services.ncts.enabled")
   lazy val serviceMonitoringOutgoingUri = config.get[String]("microservice.services.ncts.outgoing-uri")

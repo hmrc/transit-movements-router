@@ -132,6 +132,7 @@ class MessagesController @Inject() (
           requestMessageType <- filterRequestMessageType(messageType)
 
           customsOffice <- customOfficeExtractorService.extractCustomOffice(source.headOption.get, requestMessageType).asPresentation
+          _             <- whiteListing(eori, customsOffice)
           size          <- calculateSize(source.lift(1).get)
           submitted <-
             if (config.eisSizeLimit >= size) viaEIS(messageType, customsOffice, source.lift(2).get)
@@ -142,6 +143,17 @@ class MessagesController @Inject() (
           )
     }
   }
+
+  private def whiteListing(eori: EoriNumber, customsOffice: CustomsOffice)(implicit
+    hc: HeaderCarrier
+  ): EitherT[Future, PresentationError, Unit] =
+    (eori.value, customsOffice.value) match {
+
+      case (_, customsOffice) if customsOffice.startsWith("XI")                                                     => EitherT.rightT()
+      case (eoriNumber, customsOffice) if customsOffice.startsWith("GB") && eoriNumber.equals(config.whiteListEori) => EitherT.rightT()
+      case (_, customsOffice) if customsOffice.startsWith("GB")                                                     => EitherT.leftT(PresentationError.serviceUnavailable())
+      case _                                                                                                        => EitherT.leftT(PresentationError.internalServiceError())
+    }
 
   private def materializeOutgoingSource(source: Source[ByteString, _]): EitherT[Future, PresentationError, Seq[ByteString]] =
     EitherT(

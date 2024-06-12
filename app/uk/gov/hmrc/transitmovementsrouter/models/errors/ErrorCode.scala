@@ -24,6 +24,7 @@ import play.api.http.Status.INTERNAL_SERVER_ERROR
 import play.api.http.Status.NOT_FOUND
 import play.api.http.Status.NOT_IMPLEMENTED
 import play.api.http.Status.REQUEST_ENTITY_TOO_LARGE
+import play.api.http.Status.SERVICE_UNAVAILABLE
 import play.api.http.Status.UNAUTHORIZED
 import play.api.http.Status.UNSUPPORTED_MEDIA_TYPE
 import play.api.libs.json.JsError
@@ -47,6 +48,7 @@ object ErrorCode {
   case object Unauthorized         extends ErrorCode("UNAUTHORIZED", UNAUTHORIZED)
   case object NotImplemented       extends ErrorCode("NOT_IMPLEMENTED", NOT_IMPLEMENTED)
   case object Conflict             extends ErrorCode("CONFLICT", CONFLICT)
+  case object ServiceUnavailable   extends ErrorCode("SERVICE_UNAVAILABLE", SERVICE_UNAVAILABLE)
 
   lazy val errorCodes: Seq[ErrorCode] = Seq(
     BadRequest,
@@ -60,7 +62,8 @@ object ErrorCode {
     UnsupportedMediaType,
     Unauthorized,
     NotImplemented,
-    Conflict
+    Conflict,
+    ServiceUnavailable
   )
 
   implicit val errorCodeWrites: Writes[ErrorCode] = Writes {

@@ -192,7 +192,8 @@ class MessagesControllerIntegrationSpec
       "microservice.services.eis.gb.retry.max-retries"                  -> 0,
       "microservice.services.eis.message-size-limit"                    -> s"${sampleOutgoingLargeXmlSize}B",
       "microservice.services.internal-auth.enabled"                     -> false,
-      "metrics.jvm"                                                     -> false
+      "metrics.jvm"                                                     -> false,
+      "whitelist.eori"                                                  -> "9999912345"
     )
 
   private val clock   = Clock.fixed(OffsetDateTime.of(2023, 4, 13, 10, 34, 41, 500, ZoneOffset.UTC).toInstant, ZoneOffset.UTC)
@@ -262,7 +263,7 @@ class MessagesControllerIntegrationSpec
 
         val apiRequest = FakeRequest(
           "POST",
-          s"/traders/GB0123456789/movements/departures/${movementId.value}/messages/${messageId.value}",
+          s"/traders/9999912345/movements/departures/${movementId.value}/messages/${messageId.value}",
           FakeHeaders(
             Seq(
               "x-message-type"         -> "IE015",
@@ -275,7 +276,7 @@ class MessagesControllerIntegrationSpec
 
         running(newApp) {
           val sut    = newApp.injector.instanceOf[MessagesController]
-          val result = sut.outgoing(EoriNumber("GB0123456789"), MovementType("departures"), movementId, messageId)(apiRequest)
+          val result = sut.outgoing(EoriNumber("9999912345"), MovementType("departures"), movementId, messageId)(apiRequest)
 
           Helpers.status(result) mustBe CREATED
         }
@@ -308,7 +309,7 @@ class MessagesControllerIntegrationSpec
 
         val apiRequest = FakeRequest(
           "POST",
-          s"/traders/GB0123456789/movements/departures/${movementId.value}/messages/${messageId.value}",
+          s"/traders/XI0123456789/movements/departures/${movementId.value}/messages/${messageId.value}",
           FakeHeaders(
             Seq(
               "Date"                   -> formatted,
@@ -322,7 +323,7 @@ class MessagesControllerIntegrationSpec
 
         running(newApp) {
           val sut    = newApp.injector.instanceOf[MessagesController]
-          val result = sut.outgoing(EoriNumber("GB0123456789"), MovementType("departures"), movementId, messageId)(apiRequest)
+          val result = sut.outgoing(EoriNumber("XI0123456789"), MovementType("departures"), movementId, messageId)(apiRequest)
 
           Helpers.status(result) mustBe CREATED
         }
@@ -352,7 +353,7 @@ class MessagesControllerIntegrationSpec
 
         val apiRequest = FakeRequest(
           "POST",
-          s"/traders/GB0123456789/movements/departures/${movementId.value}/messages/${messageId.value}",
+          s"/traders/9999912345/movements/departures/${movementId.value}/messages/${messageId.value}",
           FakeHeaders(
             Seq(
               "x-message-type"         -> "IE015",
@@ -365,7 +366,7 @@ class MessagesControllerIntegrationSpec
 
         running(newApp) {
           val sut    = newApp.injector.instanceOf[MessagesController]
-          val result = sut.outgoing(EoriNumber("GB0123456789"), MovementType("departures"), movementId, messageId)(apiRequest)
+          val result = sut.outgoing(EoriNumber("9999912345"), MovementType("departures"), movementId, messageId)(apiRequest)
 
           Helpers.status(result) mustBe INTERNAL_SERVER_ERROR
         }
@@ -421,7 +422,7 @@ class MessagesControllerIntegrationSpec
 
         val apiRequest = FakeRequest(
           "POST",
-          s"/traders/GB0123456789/movements/departures/${movementId.value}/messages/${messageId.value}",
+          s"/traders/9999912345/movements/departures/${movementId.value}/messages/${messageId.value}",
           FakeHeaders(
             Seq(
               "x-message-type"         -> "IE015",
@@ -434,7 +435,7 @@ class MessagesControllerIntegrationSpec
 
         running(newApp) {
           val sut    = newApp.injector.instanceOf[MessagesController]
-          val result = sut.outgoing(EoriNumber("GB0123456789"), MovementType("departures"), movementId, messageId)(apiRequest)
+          val result = sut.outgoing(EoriNumber("9999912345"), MovementType("departures"), movementId, messageId)(apiRequest)
 
           Helpers.status(result) mustBe ACCEPTED
         }

@@ -46,6 +46,8 @@ class PresentationErrorSpec extends AnyFreeSpec with Matchers with MockitoSugar 
 
     "for NotImplemented" in testStandard(PresentationError.notImplemented, "Not Implemented", "NOT_IMPLEMENTED")
 
+    "for ServiceUnavailable" in testStandard(PresentationError.serviceUnavailable, "Service Unavailable", "SERVICE_UNAVAILABLE")
+
     "for InvalidOffice" in forAll(Gen.alphaNumStr, Gen.alphaStr) {
       (office, field) =>
         val error  = PresentationError.invalidOfficeError("Invalid Office", CustomsOffice(office), field)

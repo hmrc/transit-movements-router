@@ -105,7 +105,7 @@ class MessageControllerSpec
     with TestSourceProvider
     with ScalaFutures {
 
-  val eori: EoriNumber           = EoriNumber("eori")
+  val eori: EoriNumber           = EoriNumber("9999912345")
   val movementType: MovementType = MovementType("departure")
   val movementId: MovementId     = MovementId("abcdef1234567890")
   val messageId: MessageId       = MessageId("0987654321fedcba")
@@ -230,7 +230,8 @@ class MessageControllerSpec
     reset(mockAuditingService)
     reset(config)
     when(config.logIncoming).thenReturn(true)
-    when(config.eisSizeLimit).thenReturn(5000000) // TODO: vary per test
+    when(config.eisSizeLimit).thenReturn(5000000)       // TODO: vary per test
+    when(config.whiteListEori).thenReturn("9999912345") //
     reset(mockAuditingService)
     resetAuthActionAndStatusMonitoring()
     super.afterEach()
@@ -281,15 +282,44 @@ class MessageControllerSpec
         )(any(), any())
     }
 
+    "must return 503 when declaration is submitted with not allowed Eori via the EIS route" in forAll(
+      arbitrary[RequestMessageType]
+    ) {
+      messageType =>
+        resetAuthActionAndStatusMonitoring()
+        when(
+          mockRoutingService.submitMessage(
+            any[String].asInstanceOf[MovementType],
+            any[String].asInstanceOf[MovementId],
+            any[String].asInstanceOf[MessageId],
+            any[Source[ByteString, _]],
+            any[String].asInstanceOf[CustomsOffice]
+          )(any[HeaderCarrier], any[ExecutionContext])
+        ).thenReturn(submitDeclarationEither)
+
+        when(mockMessageTypeExtractor.extractFromHeaders(any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](messageType))
+
+        when(mockCustomOfficeExtractorService.extractCustomOffice(any(), any()))
+          .thenReturn(EitherT.rightT[Future, CustomOfficeExtractorError](CustomsOffice("GB123456")))
+
+        val result =
+          controller().outgoing(EoriNumber("123"), movementType, movementId, messageId)(
+            fakeRequest(cc015cOfficeOfDepartureGB, outgoing, messageTypeHeader(messageType))
+          )
+
+        status(result) mustBe SERVICE_UNAVAILABLE
+
+    }
+
     "must return ACCEPTED when declaration is submitted successfully via the SDES route" in forAll(
-      arbitrary[EoriNumber],
+      //arbitrary[EoriNumber],
       arbitrary[MovementType],
       arbitrary[MovementId],
       arbitrary[MessageId],
       arbitrary[ObjectSummaryWithMd5],
       arbitrary[RequestMessageType]
     ) {
-      (eori, movementType, movementId, messageId, summary, messageType) =>
+      (movementType, movementId, messageId, summary, messageType) =>
         resetAuthActionAndStatusMonitoring()
         val expectedConversationId = ConversationId(movementId, messageId)
 

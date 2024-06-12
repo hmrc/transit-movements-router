@@ -62,6 +62,9 @@ object PresentationError extends CommonFormats {
   def notImplemented(message: String = "Not Implemented"): PresentationError =
     StandardError(message, ErrorCode.NotImplemented)
 
+  def serviceUnavailable(message: String = "Service Unavailable"): PresentationError =
+    StandardError(message, ErrorCode.ServiceUnavailable)
+
   def internalServiceError(
     message: String = "Internal server error",
     code: ErrorCode = ErrorCode.InternalServerError,
