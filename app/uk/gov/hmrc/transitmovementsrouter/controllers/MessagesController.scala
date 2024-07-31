@@ -251,7 +251,8 @@ class MessagesController @Inject() (
                   None,
                   None,
                   Some(messageType.movementType),
-                  Some(messageType)
+                  Some(messageType),
+                  None
                 )
               (err, Option(messageType))
           }
@@ -262,18 +263,20 @@ class MessagesController @Inject() (
             payload = source.lift(3).get,
             movementId = Some(movementId),
             messageId = Some(persistenceResponse.messageId),
-            enrolmentEori = None,
+            enrolmentEORI = Some(persistenceResponse.eori),
             movementType = Some(messageType.movementType),
-            messageType = Some(messageType)
+            messageType = Some(messageType),
+            clientId = persistenceResponse.clientId
           )
           _ = auditService.auditStatusEvent(
             NCTSToTraderSubmissionSuccessful,
             None,
             Some(movementId),
             Some(persistenceResponse.messageId),
-            None,
+            enrolmentEORI = Some(persistenceResponse.eori),
             Some(messageType.movementType),
-            Some(messageType)
+            Some(messageType),
+            clientId = persistenceResponse.clientId
           )
           _ = logIncomingSuccess(movementId, triggerId, persistenceResponse.messageId, messageType)
         } yield persistenceResponse)

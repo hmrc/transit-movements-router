@@ -75,6 +75,10 @@ trait TestModelGenerators extends BaseGenerators {
       Gen.listOfN(16, Gen.hexChar).map(_.mkString.toLowerCase).map(MessageId(_))
     }
 
+  implicit lazy val arbitraryClientId: Arbitrary[ClientId] = Arbitrary {
+    Gen.stringOfN(24, Gen.alphaNumChar).map(ClientId.apply)
+  }
+
   implicit lazy val arbitraryConversationId: Arbitrary[ConversationId] =
     Arbitrary {
       for {

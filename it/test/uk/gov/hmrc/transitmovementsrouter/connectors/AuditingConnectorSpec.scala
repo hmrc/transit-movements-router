@@ -49,6 +49,7 @@ import test.uk.gov.hmrc.transitmovementsrouter.it.generators.ModelGenerators
 import uk.gov.hmrc.transitmovementsrouter.models._
 import uk.gov.hmrc.transitmovementsrouter.models.requests.Details
 import uk.gov.hmrc.transitmovementsrouter.models.requests.Metadata
+import uk.gov.hmrc.transitmovementsrouter.utils.RouterHeaderNames.CLIENT_ID
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -317,6 +318,7 @@ class AuditingConnectorSpec
             urlEqualTo(targetUrl(AuditType.AmendmentAcceptance))
           )
             .withHeader(HeaderNames.AUTHORIZATION, equalTo(token))
+            .withHeader(CLIENT_ID, equalTo("1234"))
             .withHeader(HeaderNames.CONTENT_TYPE, equalTo("application/json"))
             .withHeader("X-Audit-Source", equalTo("transit-movements-router"))
             .withRequestBody(
@@ -340,7 +342,8 @@ class AuditingConnectorSpec
           messageId,
           eori,
           movementType,
-          messageType
+          messageType,
+          Some(ClientId("1234"))
         )
 
         // then the future should be ready
@@ -365,6 +368,7 @@ class AuditingConnectorSpec
                 urlEqualTo(targetUrl(AuditType.AmendmentAcceptance))
               )
                 .withHeader(HeaderNames.AUTHORIZATION, equalTo(token))
+                .withHeader(CLIENT_ID, equalTo("1234"))
                 .withHeader(HeaderNames.CONTENT_TYPE, equalTo("application/json"))
                 .withHeader("X-Audit-Source", equalTo("transit-movements-router"))
                 .withRequestBody(
@@ -388,7 +392,8 @@ class AuditingConnectorSpec
               messageId,
               eori,
               movementType,
-              messageType
+              messageType,
+              Some(ClientId("1234"))
             )
 
             val result = future

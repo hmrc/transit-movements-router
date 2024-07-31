@@ -19,6 +19,7 @@ package uk.gov.hmrc.transitmovementsrouter.connectors
 import play.api.http.HeaderNames
 import uk.gov.hmrc.http.client.RequestBuilder
 import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
+import uk.gov.hmrc.transitmovementsrouter.models.ClientId
 import uk.gov.hmrc.transitmovementsrouter.models.EoriNumber
 import uk.gov.hmrc.transitmovementsrouter.models.MessageId
 import uk.gov.hmrc.transitmovementsrouter.models.MessageType
@@ -47,6 +48,11 @@ trait BaseConnector {
     def withEoriNumber(eoriNumber: Option[EoriNumber]): RequestBuilder =
       if (eoriNumber.isDefined)
         requestBuilder.setHeader("X-Audit-Meta-EORI" -> eoriNumber.get.value)
+      else requestBuilder
+
+    def withClientId(clientId: Option[ClientId]): RequestBuilder =
+      if (clientId.isDefined)
+        requestBuilder.setHeader("X-Client-Id" -> clientId.get.value)
       else requestBuilder
 
     def withMovementType(movementType: Option[MovementType]): RequestBuilder =

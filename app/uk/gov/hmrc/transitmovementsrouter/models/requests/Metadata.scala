@@ -32,7 +32,7 @@ case class Metadata(
   path: String,
   movementId: Option[MovementId],
   messageId: Option[MessageId],
-  enrolmentEori: Option[EoriNumber],
+  enrolmentEORI: Option[EoriNumber],
   movementType: Option[MovementType],
   messageType: Option[MessageType]
 )
