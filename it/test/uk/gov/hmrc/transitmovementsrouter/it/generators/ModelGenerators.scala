@@ -21,6 +21,7 @@ import org.scalacheck.Gen
 import uk.gov.hmrc.objectstore.client.Md5Hash
 import uk.gov.hmrc.objectstore.client.ObjectSummaryWithMd5
 import uk.gov.hmrc.objectstore.client.Path
+import uk.gov.hmrc.transitmovementsrouter.models.ClientId
 import uk.gov.hmrc.transitmovementsrouter.models.ConversationId
 import uk.gov.hmrc.transitmovementsrouter.models.CustomsOffice
 import uk.gov.hmrc.transitmovementsrouter.models.EoriNumber
@@ -127,6 +128,10 @@ trait ModelGenerators extends BaseGenerators {
 
   implicit lazy val arbitraryMovementType: Arbitrary[MovementType] = Arbitrary {
     Gen.oneOf(Seq(MovementType("departure"), MovementType("arrival")))
+  }
+
+  implicit lazy val arbitraryClientId: Arbitrary[ClientId] = Arbitrary {
+    Gen.stringOfN(24, Gen.alphaNumChar).map(ClientId.apply)
   }
 
   implicit val arbitraryMetadata: Arbitrary[Metadata] = Arbitrary {

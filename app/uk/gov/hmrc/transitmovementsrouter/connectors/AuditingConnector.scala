@@ -38,6 +38,7 @@ import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
 import uk.gov.hmrc.transitmovementsrouter.metrics.HasMetrics
 import uk.gov.hmrc.transitmovementsrouter.metrics.MetricsKeys
 import uk.gov.hmrc.transitmovementsrouter.models.AuditType
+import uk.gov.hmrc.transitmovementsrouter.models.ClientId
 import uk.gov.hmrc.transitmovementsrouter.models.EoriNumber
 import uk.gov.hmrc.transitmovementsrouter.models.MessageId
 import uk.gov.hmrc.transitmovementsrouter.models.MessageType
@@ -60,9 +61,10 @@ trait AuditingConnector {
     payload: Source[ByteString, _],
     movementId: Option[MovementId],
     messageId: Option[MessageId],
-    enrolmentEori: Option[EoriNumber],
+    enrolmentEORI: Option[EoriNumber],
     movementType: Option[MovementType],
-    messageType: Option[MessageType]
+    messageType: Option[MessageType],
+    clientId: Option[ClientId]
   )(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
@@ -73,9 +75,10 @@ trait AuditingConnector {
     payload: Option[JsValue],
     movementId: Option[MovementId],
     messageId: Option[MessageId],
-    enrolmentEori: Option[EoriNumber],
+    enrolmentEORI: Option[EoriNumber],
     movementType: Option[MovementType],
-    messageType: Option[MessageType]
+    messageType: Option[MessageType],
+    clientId: Option[ClientId]
   )(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
@@ -100,7 +103,8 @@ class AuditingConnectorImpl @Inject() (httpClient: HttpClientV2, val metrics: Me
     messageId: Option[MessageId] = None,
     enrolmentEORI: Option[EoriNumber] = None,
     movementType: Option[MovementType] = None,
-    messageType: Option[MessageType] = None
+    messageType: Option[MessageType] = None,
+    clientId: Option[ClientId] = None
   )(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
@@ -115,6 +119,7 @@ class AuditingConnectorImpl @Inject() (httpClient: HttpClientV2, val metrics: Me
         .withEoriNumber(enrolmentEORI)
         .withMovementType(movementType)
         .withAuditMessageType(messageType)
+        .withClientId(clientId)
         .setHeader(
           HeaderNames.CONTENT_TYPE -> contentType,
           "X-ContentLength"        -> contentLength.toString,
@@ -140,20 +145,22 @@ class AuditingConnectorImpl @Inject() (httpClient: HttpClientV2, val metrics: Me
     payload: Option[JsValue],
     movementId: Option[MovementId],
     messageId: Option[MessageId],
-    enrolmentEori: Option[EoriNumber],
+    enrolmentEORI: Option[EoriNumber],
     movementType: Option[MovementType],
-    messageType: Option[MessageType]
+    messageType: Option[MessageType],
+    clientId: Option[ClientId]
   )(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Future[Unit] = withMetricsTimerAsync(MetricsKeys.AuditingBackend.Post) {
     _ =>
       val (url: appConfig.auditingUrl.Self, path: String) = getUrlAndPath(auditType, hc)
-      val metadata                                        = Metadata(path, movementId, messageId, enrolmentEori, movementType, messageType)
+      val metadata                                        = Metadata(path, movementId, messageId, enrolmentEORI, movementType, messageType)
       val details                                         = Details(metadata, payload.map(_.as[JsObject]))
       httpClient
         .post(url"$url")
         .withInternalAuthToken
+        .withClientId(clientId)
         .setHeader(
           "X-Audit-Source"         -> "transit-movements-router",
           HeaderNames.CONTENT_TYPE -> MimeTypes.JSON

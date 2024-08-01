@@ -530,12 +530,18 @@ class MessageControllerSpec
   }
 
   "POST incoming from EIS" - {
-    "must return CREATED when message is successfully forwarded" in forAll(arbitrary[MovementId], arbitrary[MessageId], arbitrary[ResponseMessageType]) {
-      (movementId, messageId, messageType) =>
+    "must return CREATED when message is successfully forwarded" in forAll(
+      arbitrary[MovementId],
+      arbitrary[MessageId],
+      arbitrary[ResponseMessageType],
+      Gen.option(arbitrary[ClientId]),
+      arbitrary[EoriNumber]
+    ) {
+      (movementId, messageId, messageType, clientId, eoriNumber) =>
         when(mockMessageTypeExtractor.extract(any(), any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](messageType))
 
         when(mockPersistenceConnector.postBody(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(messageType), any())(any(), any()))
-          .thenReturn(EitherT.fromEither(Right(PersistenceResponse(messageId))))
+          .thenReturn(EitherT.fromEither(Right(PersistenceResponse(messageId, eoriNumber, clientId))))
 
         when(
           mockPushNotificationsConnector
@@ -553,7 +559,8 @@ class MessageControllerSpec
             eqTo(None),
             eqTo(None),
             eqTo(Some(messageType.movementType)),
-            eqTo(Some(messageType))
+            eqTo(Some(messageType)),
+            eqTo(None)
           )(any[HeaderCarrier], any[ExecutionContext])
         ).thenReturn(Future.successful(()))
 
@@ -563,9 +570,10 @@ class MessageControllerSpec
             eqTo(None),
             eqTo(Some(movementId)),
             eqTo(Some(messageId)),
-            eqTo(None),
+            eqTo(Some(eoriNumber)),
             eqTo(Some(messageType.movementType)),
-            eqTo(Some(messageType))
+            eqTo(Some(messageType)),
+            eqTo(clientId)
           )(any[HeaderCarrier], any[ExecutionContext])
         ).thenReturn(Future.successful(()))
 
@@ -591,18 +599,20 @@ class MessageControllerSpec
           any(),
           eqTo(Some(movementId)),
           eqTo(Some(messageId)),
-          eqTo(None),
+          eqTo(Some(eoriNumber)),
           eqTo(Some(messageType.movementType)),
-          eqTo(Some(messageType))
+          eqTo(Some(messageType)),
+          eqTo(clientId)
         )(any[HeaderCarrier](), any[ExecutionContext]())
         verify(mockAuditingService, times(1)).auditStatusEvent(
           eqTo(NCTSToTraderSubmissionSuccessful),
           eqTo(None),
           eqTo(Some(movementId)),
           eqTo(Some(messageId)),
-          eqTo(None),
+          eqTo(Some(eoriNumber)),
           eqTo(Some(messageType.movementType)),
-          eqTo(Some(messageType))
+          eqTo(Some(messageType)),
+          eqTo(clientId)
         )(any[HeaderCarrier], any[ExecutionContext])
 
         verify(mockAuditingService, times(0)).auditStatusEvent(
@@ -612,7 +622,8 @@ class MessageControllerSpec
           eqTo(None),
           eqTo(None),
           eqTo(Some(messageType.movementType)),
-          eqTo(Some(messageType))
+          eqTo(Some(messageType)),
+          eqTo(None)
         )(any[HeaderCarrier], any[ExecutionContext])
     }
     "must return BAD_REQUEST when the X-Message-Type header is missing or body seems to not contain an appropriate root tag" in {
@@ -670,7 +681,8 @@ class MessageControllerSpec
           eqTo(None),
           eqTo(None),
           eqTo(Some(MessageType.MrnAllocated.movementType)),
-          eqTo(Some(MessageType.MrnAllocated))
+          eqTo(Some(MessageType.MrnAllocated)),
+          eqTo(None)
         )(any[HeaderCarrier], any[ExecutionContext])
       ).thenReturn(Future.successful(()))
 
@@ -682,7 +694,8 @@ class MessageControllerSpec
           eqTo(Some(messageId)),
           eqTo(None),
           eqTo(Some(MessageType.MrnAllocated.movementType)),
-          eqTo(Some(MessageType.MrnAllocated))
+          eqTo(Some(MessageType.MrnAllocated)),
+          eqTo(None)
         )(any[HeaderCarrier], any[ExecutionContext])
       ).thenReturn(Future.successful(()))
 
@@ -702,7 +715,8 @@ class MessageControllerSpec
         eqTo(Some(messageId)),
         eqTo(None),
         eqTo(Some(MessageType.MrnAllocated.movementType)),
-        eqTo(Some(MessageType.MrnAllocated))
+        eqTo(Some(MessageType.MrnAllocated)),
+        eqTo(None)
       )(any[HeaderCarrier], any[ExecutionContext])
       verify(mockAuditingService, times(1)).auditStatusEvent(
         eqTo(NCTSRequestedMissingMovement),
@@ -711,7 +725,8 @@ class MessageControllerSpec
         eqTo(None),
         eqTo(None),
         eqTo(Some(MessageType.MrnAllocated.movementType)),
-        eqTo(Some(MessageType.MrnAllocated))
+        eqTo(Some(MessageType.MrnAllocated)),
+        eqTo(None)
       )(any[HeaderCarrier], any[ExecutionContext])
 
       verify(mockAuditingService, times(0)).auditMessageEvent(
@@ -723,7 +738,8 @@ class MessageControllerSpec
         eqTo(Some(messageId)),
         eqTo(None),
         eqTo(Some(MessageType.MrnAllocated.movementType)),
-        eqTo(Some(MessageType.MrnAllocated))
+        eqTo(Some(MessageType.MrnAllocated)),
+        eqTo(None)
       )(any[HeaderCarrier](), any[ExecutionContext]())
     }
 
@@ -740,7 +756,8 @@ class MessageControllerSpec
           eqTo(None),
           eqTo(None),
           eqTo(Some(MessageType.MrnAllocated.movementType)),
-          eqTo(Some(MessageType.DeclarationAmendment))
+          eqTo(Some(MessageType.DeclarationAmendment)),
+          eqTo(None)
         )(any[HeaderCarrier], any[ExecutionContext])
       ).thenReturn(Future.successful(()))
 
@@ -752,7 +769,8 @@ class MessageControllerSpec
           eqTo(Some(messageId)),
           eqTo(None),
           eqTo(Some(MessageType.MrnAllocated.movementType)),
-          eqTo(Some(MessageType.DeclarationAmendment))
+          eqTo(Some(MessageType.DeclarationAmendment)),
+          eqTo(None)
         )(any[HeaderCarrier], any[ExecutionContext])
       ).thenReturn(Future.successful(()))
 
@@ -779,7 +797,8 @@ class MessageControllerSpec
       eqTo(Some(messageId)),
       eqTo(None),
       eqTo(Some(MessageType.MrnAllocated.movementType)),
-      eqTo(Some(MessageType.MrnAllocated))
+      eqTo(Some(MessageType.MrnAllocated)),
+      eqTo(None)
     )(any[HeaderCarrier], any[ExecutionContext])
     verify(mockAuditingService, times(0)).auditStatusEvent(
       eqTo(NCTSRequestedMissingMovement),
@@ -788,7 +807,8 @@ class MessageControllerSpec
       eqTo(None),
       eqTo(None),
       eqTo(Some(MessageType.MrnAllocated.movementType)),
-      eqTo(Some(MessageType.MrnAllocated))
+      eqTo(Some(MessageType.MrnAllocated)),
+      eqTo(None)
     )(any[HeaderCarrier], any[ExecutionContext])
   }
 
@@ -798,9 +818,11 @@ class MessageControllerSpec
       arbitrary[UpscanSuccessResponse],
       arbitraryMovementId.arbitrary,
       arbitraryMessageId.arbitrary,
-      arbitrary[MessageType]
+      arbitrary[MessageType],
+      Gen.option(arbitrary[ClientId]),
+      arbitrary[EoriNumber]
     ) {
-      (successUpscanResponse, movementId, messageId, messageType) =>
+      (successUpscanResponse, movementId, messageId, messageType, clientId, eoriNumber) =>
         val source: Source[ByteString, _] = singleUseStringSource("abc")
 
         when(mockUpscanConnector.streamFile(DownloadUrl(eqTo(successUpscanResponse.downloadUrl.value)))(any(), any(), any()))
@@ -809,7 +831,7 @@ class MessageControllerSpec
         when(mockMessageTypeExtractor.extractFromBody(any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](messageType))
 
         when(mockPersistenceConnector.postBody(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(messageType), any())(any(), any()))
-          .thenReturn(EitherT.fromEither(Right(PersistenceResponse(messageId))))
+          .thenReturn(EitherT.fromEither(Right(PersistenceResponse(messageId, eoriNumber, clientId))))
 
         when(
           mockPushNotificationsConnector

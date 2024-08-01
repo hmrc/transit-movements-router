@@ -41,6 +41,7 @@ import uk.gov.hmrc.transitmovementsrouter.connectors.AuditingConnector
 import uk.gov.hmrc.transitmovementsrouter.generators.TestModelGenerators
 import uk.gov.hmrc.transitmovementsrouter.models.AuditType.AmendmentAcceptance
 import uk.gov.hmrc.transitmovementsrouter.models.AuditType
+import uk.gov.hmrc.transitmovementsrouter.models.ClientId
 import uk.gov.hmrc.transitmovementsrouter.models.EoriNumber
 import uk.gov.hmrc.transitmovementsrouter.models.MessageId
 import uk.gov.hmrc.transitmovementsrouter.models.MessageType
@@ -76,9 +77,10 @@ class AuditingServiceSpec
             Gen.option(arbitrary[MovementType]),
             Gen.option(arbitrary[MovementId]),
             Gen.option(arbitrary[MessageId]),
-            Gen.option(arbitrary[MessageType])
+            Gen.option(arbitrary[MessageType]),
+            Gen.option(arbitrary[ClientId])
           ) {
-            (eoriNumber, movementType, movementId, messageId, messageType) =>
+            (eoriNumber, movementType, movementId, messageId, messageType, clientId) =>
               when(
                 mockConnector.postMessageType(
                   eqTo(AmendmentAcceptance),
@@ -89,7 +91,8 @@ class AuditingServiceSpec
                   eqTo(messageId),
                   eqTo(eoriNumber),
                   eqTo(movementType),
-                  eqTo(messageType)
+                  eqTo(messageType),
+                  eqTo(clientId)
                 )(any(), any())
               )
                 .thenReturn(Future.successful(()))
@@ -104,7 +107,8 @@ class AuditingServiceSpec
                   messageId,
                   eoriNumber,
                   movementType,
-                  messageType
+                  messageType,
+                  clientId
                 )
               ) {
                 _ =>
@@ -117,7 +121,8 @@ class AuditingServiceSpec
                     eqTo(messageId),
                     eqTo(eoriNumber),
                     eqTo(movementType),
-                    eqTo(messageType)
+                    eqTo(messageType),
+                    eqTo(clientId)
                   )(any(), any())
               }
           }
@@ -127,9 +132,10 @@ class AuditingServiceSpec
             Gen.option(arbitrary[MovementType]),
             Gen.option(arbitrary[MovementId]),
             Gen.option(arbitrary[MessageId]),
-            Gen.option(arbitrary[MessageType])
+            Gen.option(arbitrary[MessageType]),
+            Gen.option(arbitrary[ClientId])
           ) {
-            (eoriNumber, movementType, movementId, messageId, messageType) =>
+            (eoriNumber, movementType, movementId, messageId, messageType, clientId) =>
               val exception = new IllegalStateException("failed")
               when(
                 mockConnector.postMessageType(
@@ -141,7 +147,8 @@ class AuditingServiceSpec
                   eqTo(messageId),
                   eqTo(eoriNumber),
                   eqTo(movementType),
-                  eqTo(messageType)
+                  eqTo(messageType),
+                  eqTo(clientId)
                 )(any(), any())
               ).thenReturn(Future.failed(exception))
 
@@ -161,7 +168,8 @@ class AuditingServiceSpec
                   messageId,
                   eoriNumber,
                   movementType,
-                  messageType
+                  messageType,
+                  clientId
                 )
               ) {
                 _ =>
@@ -174,7 +182,8 @@ class AuditingServiceSpec
                     eqTo(messageId),
                     eqTo(eoriNumber),
                     eqTo(movementType),
-                    eqTo(messageType)
+                    eqTo(messageType),
+                    eqTo(clientId)
                   )(any(), any())
                   verify(Harness.logger0, times(1)).warn(eqTo("Unable to audit payload due to an exception"), eqTo(exception))
               }
@@ -205,7 +214,8 @@ class AuditingServiceSpec
             eqTo(messageId),
             eqTo(eoriNumber),
             eqTo(movementType),
-            eqTo(messageType)
+            eqTo(messageType),
+            eqTo(Some(ClientId("2345")))
           )(any(), any())
         )
           .thenReturn(Future.successful(()))
@@ -218,7 +228,8 @@ class AuditingServiceSpec
             messageId,
             eoriNumber,
             movementType,
-            messageType
+            messageType,
+            Some(ClientId("2345"))
           )
         ) {
           _ =>
@@ -229,7 +240,8 @@ class AuditingServiceSpec
               eqTo(messageId),
               eqTo(eoriNumber),
               eqTo(movementType),
-              eqTo(messageType)
+              eqTo(messageType),
+              eqTo(Some(ClientId("2345")))
             )(any(), any())
         }
     }
@@ -252,7 +264,8 @@ class AuditingServiceSpec
             eqTo(messageId),
             eqTo(eoriNumber),
             eqTo(movementType),
-            eqTo(messageType)
+            eqTo(messageType),
+            eqTo(Some(ClientId("2345")))
           )(any(), any())
         ).thenReturn(Future.failed(exception))
 
@@ -270,7 +283,8 @@ class AuditingServiceSpec
             messageId,
             eoriNumber,
             movementType,
-            messageType
+            messageType,
+            Some(ClientId("2345"))
           )
         ) {
           _ =>
@@ -281,7 +295,8 @@ class AuditingServiceSpec
               eqTo(messageId),
               eqTo(eoriNumber),
               eqTo(movementType),
-              eqTo(messageType)
+              eqTo(messageType),
+              eqTo(Some(ClientId("2345")))
             )(any(), any())
             verify(Harness.logger0, times(1)).warn(eqTo("Unable to audit payload due to an exception"), eqTo(exception))
         }

@@ -66,6 +66,8 @@ class PersistenceConnectorSpec
 
   val movementId     = arbitraryMovementId.arbitrary.sample.get
   val messageId      = arbitraryMessageId.arbitrary.sample.get
+  val eoriNumber     = arbitraryEoriNumber.arbitrary.sample.get
+  val clientId       = arbitraryClientId.arbitrary.sample.get
   val objectStoreURI = s"common-transit-convention-traders/movements/${movementId.value}/${ConversationId(movementId, messageId).value.toString}.xml"
 
   val uriPersistence = Url(
@@ -135,13 +137,13 @@ class PersistenceConnectorSpec
   "post" should {
     "return messageId when post is successful" in {
 
-      val body = Json.obj("messageId" -> messageId.value).toString()
+      val body = Json.obj("messageId" -> messageId.value, "eori" -> eoriNumber, "clientId" -> Option(clientId)).toString()
 
       stubForPostBody(OK, Some(body))
       whenReady(connector.postBody(movementId, messageId, DeclarationAmendment, source).value) {
         x =>
           x.isRight mustBe true
-          x mustBe Right(PersistenceResponse(messageId))
+          x mustBe Right(PersistenceResponse(messageId, eoriNumber, Option(clientId)))
       }
     }
 

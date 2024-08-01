@@ -519,6 +519,8 @@ class MessagesControllerIntegrationSpec
           val conversationId          = ConversationId(UUID.randomUUID())
           val (movementId, messageId) = conversationId.toMovementAndMessageId
           val outputMessageId         = Gen.stringOfN(16, Gen.hexChar.map(_.toLower)).sample.get
+          val eoriNumber              = Gen.stringOfN(16, Gen.hexChar.map(_.toLower)).sample.get
+          val clientId                = Gen.stringOfN(16, Gen.hexChar.map(_.toLower)).sample.get
 
           // We should hit the persistence layer on /transit-movements/traders/movements/${movementId.value}/messages?triggerId=messageId
           server.stubFor(
@@ -526,7 +528,7 @@ class MessagesControllerIntegrationSpec
               .withQueryParam("triggerId", new EqualToPattern(messageId.value))
               .withHeader("x-message-type", new EqualToPattern("IE004"))
               .willReturn(
-                aResponse().withStatus(OK).withBody(Json.stringify(Json.obj("messageId" -> outputMessageId)))
+                aResponse().withStatus(OK).withBody(Json.stringify(Json.obj("messageId" -> outputMessageId, "eori" -> eoriNumber, "clientId" -> clientId)))
               )
           )
 
@@ -563,6 +565,8 @@ class MessagesControllerIntegrationSpec
       val conversationId          = ConversationId(UUID.randomUUID())
       val (movementId, messageId) = conversationId.toMovementAndMessageId
       val outputMessageId         = Gen.stringOfN(16, Gen.hexChar.map(_.toLower)).sample.get
+      val eoriNumber              = Gen.stringOfN(16, Gen.hexChar.map(_.toLower)).sample.get
+      val clientId                = Gen.stringOfN(16, Gen.hexChar.map(_.toLower)).sample.get
 
       // We should hit the persistence layer on /transit-movements/traders/movements/${movementId.value}/messages?triggerId=messageId
       server.stubFor(
@@ -570,7 +574,7 @@ class MessagesControllerIntegrationSpec
           .withQueryParam("triggerId", new EqualToPattern(messageId.value))
           .withHeader("x-message-type", new EqualToPattern("IE015"))
           .willReturn(
-            aResponse().withStatus(OK).withBody(Json.stringify(Json.obj("messageId" -> outputMessageId)))
+            aResponse().withStatus(OK).withBody(Json.stringify(Json.obj("messageId" -> outputMessageId, "eori" -> eoriNumber, "clientId" -> clientId)))
           )
       )
 
@@ -606,14 +610,15 @@ class MessagesControllerIntegrationSpec
       val conversationId          = ConversationId(UUID.randomUUID())
       val (movementId, messageId) = conversationId.toMovementAndMessageId
       val outputMessageId         = Gen.stringOfN(16, Gen.hexChar.map(_.toLower)).sample.get
-
+      val eoriNumber              = Gen.stringOfN(16, Gen.hexChar.map(_.toLower)).sample.get
+      val clientId                = Gen.stringOfN(16, Gen.hexChar.map(_.toLower)).sample.get
       // We should hit the persistence layer on /transit-movements/traders/movements/${movementId.value}/messages?triggerId=messageId
       server.stubFor(
         post(new UrlPathPattern(new EqualToPattern(s"/transit-movements/traders/movements/${movementId.value}/messages"), false))
           .withQueryParam("triggerId", new EqualToPattern(messageId.value))
           .withHeader("x-message-type", new EqualToPattern("IE015"))
           .willReturn(
-            aResponse().withStatus(OK).withBody(Json.stringify(Json.obj("messageId" -> outputMessageId)))
+            aResponse().withStatus(OK).withBody(Json.stringify(Json.obj("messageId" -> outputMessageId, "eori" -> eoriNumber, "clientId" -> clientId)))
           )
       )
 
@@ -649,6 +654,8 @@ class MessagesControllerIntegrationSpec
       val conversationId          = ConversationId(UUID.randomUUID())
       val (movementId, messageId) = conversationId.toMovementAndMessageId
       val outputMessageId         = Gen.stringOfN(16, Gen.hexChar.map(_.toLower)).sample.get
+      val eoriNumber              = Gen.stringOfN(16, Gen.hexChar.map(_.toLower)).sample.get
+      val clientId                = Gen.stringOfN(16, Gen.hexChar.map(_.toLower)).sample.get
 
       // We should hit the persistence layer on /transit-movements/traders/movements/${movementId.value}/messages?triggerId=messageId
       server.stubFor(
@@ -656,7 +663,7 @@ class MessagesControllerIntegrationSpec
           .withQueryParam("triggerId", new EqualToPattern(messageId.value))
           .withHeader("x-message-type", new EqualToPattern("IE015"))
           .willReturn(
-            aResponse().withStatus(OK).withBody(Json.stringify(Json.obj("messageId" -> outputMessageId)))
+            aResponse().withStatus(OK).withBody(Json.stringify(Json.obj("messageId" -> outputMessageId, "eori" -> eoriNumber, "clientId" -> clientId)))
           )
       )
 
