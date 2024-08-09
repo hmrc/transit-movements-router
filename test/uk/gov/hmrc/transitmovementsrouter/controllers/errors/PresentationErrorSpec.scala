@@ -65,7 +65,7 @@ class PresentationErrorSpec extends AnyFreeSpec with Matchers with MockitoSugar 
           // Given this exception
           val exception = new IllegalStateException("message")
 
-          // when we create a error for this
+          // when we create an error for this
           val sut = InternalServiceError.causedBy(exception)
 
           // and when we turn it to Json
@@ -80,7 +80,7 @@ class PresentationErrorSpec extends AnyFreeSpec with Matchers with MockitoSugar 
       // Given this upstream error
       val upstreamErrorResponse = UpstreamErrorResponse("error", 500)
 
-      // when we create a error for this
+      // when we create an error for this
       val sut = UpstreamServiceError.causedBy(upstreamErrorResponse)
 
       // and when we turn it to Json

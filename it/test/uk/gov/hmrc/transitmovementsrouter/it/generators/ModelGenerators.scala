@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package test.uk.gov.hmrc.transitmovementsrouter.it.generators
+package uk.gov.hmrc.transitmovementsrouter.it.generators
 
 import org.scalacheck.Arbitrary
 import org.scalacheck.Gen
@@ -122,7 +122,7 @@ trait ModelGenerators extends BaseGenerators {
 
   implicit lazy val arbitraryEoriNumber: Arbitrary[EoriNumber] = Arbitrary {
     Gen.alphaNumStr.map(
-      alphaNum => if (alphaNum.trim.size == 0) EoriNumber("abc123") else EoriNumber(alphaNum) // guard against the empty string
+      alphaNum => if (alphaNum.trim.isEmpty) EoriNumber("abc123") else EoriNumber(alphaNum) // guard against the empty string
     )
   }
 

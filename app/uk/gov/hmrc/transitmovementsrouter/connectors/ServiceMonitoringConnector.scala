@@ -85,7 +85,7 @@ class ServiceMonitoringConnectorImpl @Inject() (appConfig: AppConfig, httpClient
       )
       .execute[Either[UpstreamErrorResponse, Unit]]
       .flatMap {
-        case Right(x)    => Future.successful((): Unit)
+        case Right(_)    => Future.successful((): Unit)
         case Left(error) => Future.failed(error)
       }
   }
@@ -107,7 +107,7 @@ class ServiceMonitoringConnectorImpl @Inject() (appConfig: AppConfig, httpClient
       )
       .execute[Either[UpstreamErrorResponse, Unit]]
       .flatMap {
-        case Right(x)    => Future.successful((): Unit)
+        case Right(_)    => Future.successful(())
         case Left(error) => Future.failed(error)
       }
 }

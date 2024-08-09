@@ -88,7 +88,7 @@ object UpscanResponse {
       }
   }
 
-  implicit val upscanResponsWrites: OWrites[UpscanResponse] = OWrites[UpscanResponse] {
+  implicit val upscanResponseWrites: OWrites[UpscanResponse] = OWrites[UpscanResponse] {
     case x: UpscanSuccessResponse => upscanSuccessResponseFormat.writes(x) ++ Json.obj("fileStatus" -> "READY")
     case x: UpscanFailedResponse  => upscanFailedResponseFormat.writes(x) ++ Json.obj("fileStatus" -> "FAILED")
   }

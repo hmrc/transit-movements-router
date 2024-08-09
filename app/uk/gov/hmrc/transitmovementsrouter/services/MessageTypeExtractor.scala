@@ -56,7 +56,7 @@ trait MessageTypeExtractor {
 @Singleton
 class MessageTypeExtractorImpl @Inject() (implicit ec: ExecutionContext, mat: Materializer) extends MessageTypeExtractor {
 
-  type MaybeMessageType = Either[MessageTypeExtractionError, MessageType]
+  private type MaybeMessageType = Either[MessageTypeExtractionError, MessageType]
 
   lazy val messageTypeExtractor: Sink[ByteString, Future[MaybeMessageType]] = Flow[ByteString]
     .via(XmlParsing.parser)

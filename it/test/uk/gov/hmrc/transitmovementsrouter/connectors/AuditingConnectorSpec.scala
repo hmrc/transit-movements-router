@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package test.uk.gov.hmrc.transitmovementsrouter.connectors
+package uk.gov.hmrc.transitmovementsrouter.connectors
 
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.lemonlabs.uri.Url
@@ -38,14 +38,13 @@ import play.api.libs.json.JsObject
 import play.api.libs.json.JsValue
 import play.api.libs.json.Json
 import play.mvc.Http.MimeTypes
-import test.uk.gov.hmrc.transitmovementsrouter.it.base.TestMetrics
+import uk.gov.hmrc.transitmovementsrouter.it.base.TestMetrics
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.UpstreamErrorResponse
 import uk.gov.hmrc.http.test.HttpClientV2Support
 import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
-import uk.gov.hmrc.transitmovementsrouter.connectors.AuditingConnectorImpl
-import test.uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuite
-import test.uk.gov.hmrc.transitmovementsrouter.it.generators.ModelGenerators
+import uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuite
+import uk.gov.hmrc.transitmovementsrouter.it.generators.ModelGenerators
 import uk.gov.hmrc.transitmovementsrouter.models._
 import uk.gov.hmrc.transitmovementsrouter.models.requests.Details
 import uk.gov.hmrc.transitmovementsrouter.models.requests.Metadata
@@ -64,8 +63,8 @@ class AuditingConnectorSpec
     with ScalaCheckDrivenPropertyChecks
     with ModelGenerators {
 
-  val token                  = Gen.alphaNumStr.sample.get
-  implicit val mockAppConfig = mock[AppConfig]
+  val token: String                     = Gen.alphaNumStr.sample.get
+  implicit val mockAppConfig: AppConfig = mock[AppConfig]
   when(mockAppConfig.internalAuthToken).thenReturn(token)
   when(mockAppConfig.auditingUrl).thenAnswer(
     _ => Url.parse(server.baseUrl())
@@ -105,7 +104,7 @@ class AuditingConnectorSpec
                   .willReturn(aResponse().withStatus(ACCEPTED))
               )
 
-              implicit val hc = HeaderCarrier(otherHeaders = Seq("path" -> "/customs/transits/movements"))
+              implicit val hc: HeaderCarrier = HeaderCarrier(otherHeaders = Seq("path" -> "/customs/transits/movements"))
               // when we call the audit service
               val future = sut.postMessageType(
                 AuditType.AmendmentAcceptance,
@@ -146,7 +145,7 @@ class AuditingConnectorSpec
                   .willReturn(aResponse().withStatus(ACCEPTED))
               )
 
-              implicit val hc = HeaderCarrier(otherHeaders = Seq("path" -> "/customs/transits/movements"))
+              implicit val hc: HeaderCarrier = HeaderCarrier(otherHeaders = Seq("path" -> "/customs/transits/movements"))
               // when we call the audit service
               val future = sut.postMessageType(
                 AuditType.AmendmentAcceptance,
@@ -185,7 +184,7 @@ class AuditingConnectorSpec
                   .willReturn(aResponse().withStatus(ACCEPTED))
               )
 
-              implicit val hc = HeaderCarrier(otherHeaders = Seq("path" -> "/customs/transits/movements"))
+              implicit val hc: HeaderCarrier = HeaderCarrier(otherHeaders = Seq("path" -> "/customs/transits/movements"))
               // when we call the audit service
               val future = sut.postMessageType(
                 AuditType.AmendmentAcceptance,
@@ -218,7 +217,7 @@ class AuditingConnectorSpec
                 .willReturn(aResponse().withStatus(ACCEPTED))
             )
 
-            implicit val hc = HeaderCarrier(otherHeaders = Seq("path" -> "/customs/transits/movements"))
+            implicit val hc: HeaderCarrier = HeaderCarrier(otherHeaders = Seq("path" -> "/customs/transits/movements"))
             // when we call the audit service
             val future = sut.postMessageType(
               AuditType.AmendmentAcceptance,
@@ -266,7 +265,7 @@ class AuditingConnectorSpec
                       .willReturn(aResponse().withStatus(statusCode))
                   )
 
-                  implicit val hc = HeaderCarrier(otherHeaders = Seq("path" -> "/customs/transits/movements"))
+                  implicit val hc: HeaderCarrier = HeaderCarrier(otherHeaders = Seq("path" -> "/customs/transits/movements"))
                   // when we call the audit service
                   val future = sut.postMessageType(
                     AuditType.AmendmentAcceptance,
@@ -333,7 +332,7 @@ class AuditingConnectorSpec
             .willReturn(aResponse().withStatus(ACCEPTED))
         )
 
-        implicit val hc = HeaderCarrier(otherHeaders = Seq("path" -> "/customs/transits/movements"))
+        implicit val hc: HeaderCarrier = HeaderCarrier(otherHeaders = Seq("path" -> "/customs/transits/movements"))
         // when we call the audit service
         val future = sut.postStatus(
           AuditType.AmendmentAcceptance,
@@ -383,7 +382,7 @@ class AuditingConnectorSpec
                 .willReturn(aResponse().withStatus(statusCode))
             )
 
-            implicit val hc = HeaderCarrier(otherHeaders = Seq("path" -> "/customs/transits/movements"))
+            implicit val hc: HeaderCarrier = HeaderCarrier(otherHeaders = Seq("path" -> "/customs/transits/movements"))
             // when we call the audit service
             val future = sut.postStatus(
               AuditType.AmendmentAcceptance,

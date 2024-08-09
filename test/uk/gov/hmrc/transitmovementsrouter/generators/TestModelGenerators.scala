@@ -41,6 +41,7 @@ import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.util.Base64
+import scala.language.implicitConversions
 
 trait TestModelGenerators extends BaseGenerators {
 

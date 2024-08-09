@@ -17,10 +17,11 @@
 package uk.gov.hmrc.transitmovementsrouter.models.requests
 
 import play.api.libs.json.Json
+import play.api.libs.json.OFormat
 import uk.gov.hmrc.transitmovementsrouter.models.MessageStatus
 
 case class MessageUpdate(status: MessageStatus)
 
 object MessageUpdate {
-  implicit val format = Json.format[MessageUpdate]
+  implicit val format: OFormat[MessageUpdate] = Json.format[MessageUpdate]
 }

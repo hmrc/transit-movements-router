@@ -29,6 +29,7 @@ import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 import play.api.Logging
 import play.api.http.HeaderNames
 import play.api.mvc.Action
+import play.api.mvc.AnyContent
 import play.api.mvc.AnyContentAsEmpty
 import play.api.mvc.ControllerComponents
 import play.api.test.DefaultAwaitTimeout
@@ -60,7 +61,7 @@ class ContentTypeRoutingSpec
       with StreamingParsers
       with Logging {
 
-    def testWithContentType = contentTypeRoute {
+    def testWithContentType: Action[Source[ByteString, _]] = contentTypeRoute {
       case Some(_) => contentActionOne
       case None    => contentActionTwo
     }
@@ -69,7 +70,7 @@ class ContentTypeRoutingSpec
       _ => Future.successful(Ok("One"))
     }
 
-    def contentActionTwo = Action.async {
+    def contentActionTwo: Action[AnyContent] = Action.async {
       _ => Future.successful(Ok("Two"))
     }
 
@@ -77,9 +78,9 @@ class ContentTypeRoutingSpec
     when(config.logIncoming).thenReturn(false)
   }
 
-  private def generateSource(string: String): Source[ByteString, NotUsed] =
+  private def generateSource: Source[ByteString, NotUsed] =
     Source.fromIterator(
-      () => ByteString.fromString(string, StandardCharsets.UTF_8).grouped(1024)
+      () => ByteString.fromString("<test>test</test>", StandardCharsets.UTF_8).grouped(1024)
     )
 
   "ContentTypeRouting" - {
@@ -88,7 +89,7 @@ class ContentTypeRoutingSpec
       val cc                = stubControllerComponents()
       val sut               = new Harness(cc)
       val contentTypeHeader = FakeHeaders(Seq(HeaderNames.CONTENT_TYPE -> "application/xml"))
-      val request           = FakeRequest(POST, "/", contentTypeHeader, generateSource("<test>test</test>"))
+      val request           = FakeRequest(POST, "/", contentTypeHeader, generateSource)
 
       val result = sut.testWithContentType(request)
       contentAsString(result) mustBe "One"

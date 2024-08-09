@@ -61,8 +61,8 @@ class RoutingServiceSpec
 
   implicit val hc: HeaderCarrier = HeaderCarrier()
 
-  val mockMessageConnectorProvider = mock[EISConnectorProvider]
-  val mockMessageConnector         = mock[EISConnector]
+  val mockMessageConnectorProvider: EISConnectorProvider = mock[EISConnectorProvider]
+  val mockMessageConnector: EISConnector                 = mock[EISConnector]
 
   "Submitting a payload" - {
 

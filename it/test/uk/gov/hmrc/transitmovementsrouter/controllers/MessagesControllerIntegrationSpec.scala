@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package test.uk.gov.hmrc.transitmovementsrouter.controllers
+package uk.gov.hmrc.transitmovementsrouter.controllers
 
 import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.matching.EqualToPattern
@@ -42,9 +42,9 @@ import play.api.test.FakeRequest
 import play.api.test.Helpers
 import play.api.test.Helpers.defaultAwaitTimeout
 import play.api.test.Helpers.running
-import test.uk.gov.hmrc.transitmovementsrouter.it.base.RegexPatterns
-import test.uk.gov.hmrc.transitmovementsrouter.it.base.TestMetrics
-import test.uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuiteWithGuice
+import uk.gov.hmrc.transitmovementsrouter.it.base.RegexPatterns
+import uk.gov.hmrc.transitmovementsrouter.it.base.TestMetrics
+import uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuiteWithGuice
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.objectstore.client.Md5Hash
 import uk.gov.hmrc.objectstore.client.ObjectSummaryWithMd5

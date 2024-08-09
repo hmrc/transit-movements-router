@@ -78,7 +78,7 @@ class ObjectStoreServiceSpec
 
   lazy val objectStoreStub: ObjectStoreStub      = spy(new ObjectStoreStub(config))
   val appConfig: AppConfig                       = mock[AppConfig]
-  val objectStoreService: ObjectStoreServiceImpl = new ObjectStoreServiceImpl(Clock.systemUTC(), appConfig, objectStoreStub)
+  val objectStoreService: ObjectStoreServiceImpl = new ObjectStoreServiceImpl(Clock.systemUTC(), objectStoreStub)
 
   override def beforeEach(): Unit =
     reset(objectStoreStub)
@@ -107,7 +107,7 @@ class ObjectStoreServiceSpec
           )(any(), any())
         )
           .thenReturn(Future.successful(Right(summary)))
-        val objectStoreService: ObjectStoreServiceImpl = new ObjectStoreServiceImpl(clock, appConfig, mockObjectStore)
+        val objectStoreService: ObjectStoreServiceImpl = new ObjectStoreServiceImpl(clock, mockObjectStore)
 
         when(appConfig.objectStoreUrl).thenReturn("http://localhost:8084/object-store/object")
         val result = objectStoreService.storeOutgoing(
@@ -153,7 +153,7 @@ class ObjectStoreServiceSpec
           )(any(), any())
         )
           .thenReturn(Future.successful(Left(exception)))
-        val objectStoreService: ObjectStoreServiceImpl = new ObjectStoreServiceImpl(clock, appConfig, mockObjectStore)
+        val objectStoreService: ObjectStoreServiceImpl = new ObjectStoreServiceImpl(clock, mockObjectStore)
 
         when(appConfig.objectStoreUrl).thenReturn("http://localhost:8084/object-store/object")
 

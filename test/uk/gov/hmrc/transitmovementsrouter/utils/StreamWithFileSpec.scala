@@ -76,7 +76,7 @@ class StreamWithFileSpec
               .runWith(Sink.ignore)
               .map {
                 _ =>
-                  // we now load the file and it should contain the string
+                  // we now load the file, and it should contain the string
                   val fileContents = Source.fromFile(temporaryFileCreator.temporaryFile.toFile)
                   try fileContents.mkString mustBe string
                   finally fileContents.close()
