@@ -28,20 +28,15 @@ sealed trait MessageStatus
 object MessageStatus {
   final case object Received extends MessageStatus
 
-  final case object Pending extends MessageStatus
-
   final case object Processing extends MessageStatus
 
   final case object Success extends MessageStatus
 
   final case object Failed extends MessageStatus
 
-  val statusValues = Seq(Received, Pending, Processing, Success, Failed)
+  final private case object Pending extends MessageStatus
 
-  implicit val messageStatusWrites = new Writes[MessageStatus] {
-
-    def writes(status: MessageStatus) = Json.toJson(status.toString())
-  }
+  implicit val messageStatusWrites: Writes[MessageStatus] = (status: MessageStatus) => Json.toJson(status.toString)
 
   implicit val statusReads: Reads[MessageStatus] = Reads {
     case JsString("Received")   => JsSuccess(Received)

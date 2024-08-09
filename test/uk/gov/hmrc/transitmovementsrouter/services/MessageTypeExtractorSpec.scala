@@ -36,8 +36,8 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 class MessageTypeExtractorSpec extends AnyFreeSpec with ScalaFutures with Matchers with ScalaCheckPropertyChecks with TestActorSystem with TestSourceProvider {
 
-  val sut                  = new MessageTypeExtractorImpl
-  val messageTypeGenerator = Gen.oneOf(MessageType.values.toSeq)
+  val sut                                    = new MessageTypeExtractorImpl
+  val messageTypeGenerator: Gen[MessageType] = Gen.oneOf(MessageType.values.toSeq)
 
   def validBody(mt: MessageType): Source[ByteString, _] =
     Source.single(

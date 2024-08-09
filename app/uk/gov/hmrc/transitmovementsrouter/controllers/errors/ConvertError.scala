@@ -48,7 +48,7 @@ trait ConvertError {
     def convert(input: E): PresentationError
   }
 
-  implicit val routingErrorConverter = new Converter[RoutingError] {
+  implicit val routingErrorConverter: Converter[RoutingError] = new Converter[RoutingError] {
 
     def convert(routingError: RoutingError): PresentationError = routingError match {
       case Upstream(upstreamErrorResponse)    => PresentationError.internalServiceError(cause = Some(upstreamErrorResponse.getCause))
@@ -59,7 +59,7 @@ trait ConvertError {
     }
   }
 
-  implicit val customOfficeErrorConverter = new Converter[CustomOfficeExtractorError] {
+  implicit val customOfficeErrorConverter: Converter[CustomOfficeExtractorError] = new Converter[CustomOfficeExtractorError] {
 
     def convert(customOfficeError: CustomOfficeExtractorError): PresentationError = customOfficeError match {
       case NoElementFound(element)                    => PresentationError.badRequestError(s"Element $element not found")
@@ -69,7 +69,7 @@ trait ConvertError {
 
   }
 
-  implicit val persistenceErrorConverter = new Converter[PersistenceError] {
+  implicit val persistenceErrorConverter: Converter[PersistenceError] = new Converter[PersistenceError] {
     import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError._
 
     def convert(error: PersistenceError): PresentationError = error match {
@@ -80,7 +80,7 @@ trait ConvertError {
     }
   }
 
-  implicit val pushNotificationsErrorConverter = new Converter[PushNotificationError] {
+  implicit val pushNotificationsErrorConverter: Converter[PushNotificationError] = new Converter[PushNotificationError] {
     import uk.gov.hmrc.transitmovementsrouter.models.errors.PushNotificationError._
 
     def convert(error: PushNotificationError): PresentationError = error match {
@@ -89,7 +89,7 @@ trait ConvertError {
     }
   }
 
-  implicit val headerExtractErrorConverter = new Converter[MessageTypeExtractionError] {
+  implicit val headerExtractErrorConverter: Converter[MessageTypeExtractionError] = new Converter[MessageTypeExtractionError] {
     import uk.gov.hmrc.transitmovementsrouter.models.errors.MessageTypeExtractionError._
 
     def convert(error: MessageTypeExtractionError): PresentationError = error match {
@@ -100,7 +100,7 @@ trait ConvertError {
     }
   }
 
-  implicit val objectStoreErrorConverter = new Converter[ObjectStoreError] {
+  implicit val objectStoreErrorConverter: Converter[ObjectStoreError] = new Converter[ObjectStoreError] {
     import uk.gov.hmrc.transitmovementsrouter.models.errors.ObjectStoreError._
 
     override def convert(objectStoreError: ObjectStoreError): PresentationError = objectStoreError match {
@@ -109,7 +109,7 @@ trait ConvertError {
     }
   }
 
-  implicit val sdesErrorConverter = new Converter[SDESError] {
+  implicit val sdesErrorConverter: Converter[SDESError] = new Converter[SDESError] {
 
     import uk.gov.hmrc.transitmovementsrouter.models.errors.SDESError._
 
@@ -118,7 +118,7 @@ trait ConvertError {
     }
   }
 
-  implicit val upscanErrorConverter = new Converter[UpscanError] {
+  implicit val upscanErrorConverter: Converter[UpscanError] = new Converter[UpscanError] {
 
     import uk.gov.hmrc.transitmovementsrouter.models.errors.UpscanError._
 

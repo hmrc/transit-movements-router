@@ -30,9 +30,9 @@ import uk.gov.hmrc.transitmovementsrouter.models.formats.CommonFormats
 
 object PresentationError extends CommonFormats {
 
-  val MessageFieldName = "message"
-  val CodeFieldName    = "code"
-  val LrnFieldName     = "lrn"
+  private val MessageFieldName = "message"
+  private val CodeFieldName    = "code"
+  private val LrnFieldName     = "lrn"
 
   def forbiddenError(message: String): PresentationError =
     StandardError(message, ErrorCode.Forbidden)
@@ -69,9 +69,6 @@ object PresentationError extends CommonFormats {
   ): PresentationError =
     InternalServiceError(message, code, cause)
 
-  def entityTooLargeError(message: String): PresentationError =
-    StandardError(message, ErrorCode.EntityTooLarge)
-
   def duplicateLRNError(message: String, lrn: LocalReferenceNumber): PresentationError =
     DuplicateLRNError(message, ErrorCode.Conflict, lrn)
 
@@ -83,7 +80,7 @@ object PresentationError extends CommonFormats {
     case presentationError: PresentationError   => basePresentationErrorWrites.writes(presentationError)
   }
 
-  lazy val invalidOfficeWrites: OWrites[InvalidOfficeError] =
+  private lazy val invalidOfficeWrites: OWrites[InvalidOfficeError] =
     (
       (__ \ MessageFieldName).write[String] and
         (__ \ "office").write[String] and
@@ -91,7 +88,7 @@ object PresentationError extends CommonFormats {
         (__ \ CodeFieldName).write[ErrorCode]
     )(unlift(InvalidOfficeError.unapply))
 
-  lazy val basePresentationErrorWrites: OWrites[PresentationError] =
+  private lazy val basePresentationErrorWrites: OWrites[PresentationError] =
     (
       (__ \ MessageFieldName).write[String] and
         (__ \ CodeFieldName).write[ErrorCode]

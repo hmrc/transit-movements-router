@@ -33,12 +33,12 @@ case class SdesNotification(
   properties: Seq[SdesProperties]
 ) {
 
-  val conversationId = properties
+  val conversationId: Option[SdesProperties] = properties
     .find(
       p => p.name == RouterHeaderNames.CONVERSATION_ID.toLowerCase()
     )
 }
 
 object SdesNotification {
-  implicit val sdesNotification = Json.format[SdesNotification]
+  implicit val sdesNotification: OFormat[SdesNotification] = Json.format[SdesNotification]
 }

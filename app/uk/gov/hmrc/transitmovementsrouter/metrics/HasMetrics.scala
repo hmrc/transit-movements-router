@@ -16,9 +16,10 @@
 
 package uk.gov.hmrc.transitmovementsrouter.metrics
 
+import com.codahale.metrics.Counter
 import com.codahale.metrics.MetricRegistry
+import com.codahale.metrics.Timer
 import uk.gov.hmrc.play.bootstrap.metrics.Metrics
-import uk.gov.hmrc.http.HttpResponse
 import play.api.mvc.Action
 import play.api.mvc.BaseController
 import play.api.mvc.Result
@@ -26,7 +27,6 @@ import play.api.mvc.Result
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.util.control.NonFatal
-
 import java.util.concurrent.atomic.AtomicBoolean
 
 trait HasActionMetrics extends HasMetrics {
@@ -52,17 +52,14 @@ trait HasMetrics {
 
   lazy val registry: MetricRegistry = metrics.defaultRegistry
 
-  def histo(metricKey: String) =
-    registry.histogram(metricKey)
-
-  def counter(metricsKey: String) =
+  def counter(metricsKey: String): Counter =
     registry.counter(metricsKey)
 
   class MetricsTimer(metricKey: String) {
-    val timerContext   = registry.timer(s"$metricKey-timer").time()
-    val successCounter = registry.counter(s"$metricKey-success-counter")
-    val failureCounter = registry.counter(s"$metricKey-failed-counter")
-    val timerRunning   = new AtomicBoolean(true)
+    val timerContext: Timer.Context = registry.timer(s"$metricKey-timer").time()
+    val successCounter: Counter     = registry.counter(s"$metricKey-success-counter")
+    val failureCounter: Counter     = registry.counter(s"$metricKey-failed-counter")
+    private val timerRunning        = new AtomicBoolean(true)
 
     def completeWithSuccess(): Unit =
       if (timerRunning.compareAndSet(true, false)) {
@@ -76,36 +73,6 @@ trait HasMetrics {
         failureCounter.inc()
       }
   }
-
-  /** Execute a block of code with a metrics timer.
-    * Intended for use in controllers that return HTTP responses.
-    *
-    * @param metric The id of the metric to be collected
-    * @param block The block of code to execute asynchronously
-    * @param ec The [[scala.concurrent.ExecutionContext]] on which the block of code should run
-    * @return The result of the block of code
-    */
-  def withMetricsTimerResponse(metricKey: String)(block: => Future[HttpResponse])(implicit ec: ExecutionContext): Future[HttpResponse] =
-    withMetricsTimer(metricKey) {
-      timer =>
-        val response = block
-
-        // Clean up timer according to server response
-        response.foreach {
-          response =>
-            if (isFailureStatus(response.status))
-              timer.completeWithFailure()
-            else
-              timer.completeWithSuccess()
-        }
-
-        // Clean up timer for unhandled exceptions
-        response.failed.foreach(
-          _ => timer.completeWithFailure()
-        )
-
-        response
-    }
 
   /** Execute a block of code with a metrics timer.
     * Intended for use in controllers that return HTTP responses.
@@ -173,7 +140,7 @@ trait HasMetrics {
         result
     }
 
-  def withMetricsTimer[T](metricKey: String)(block: MetricsTimer => T): T = {
+  private def withMetricsTimer[T](metricKey: String)(block: MetricsTimer => T): T = {
     val timer = new MetricsTimer(metricKey)
 
     try block(timer)

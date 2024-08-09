@@ -24,7 +24,7 @@ case class MovementType(value: String) extends AnyVal
 object MovementType {
   implicit lazy val movementTypeFormat: Format[MovementType] = Json.valueFormat[MovementType]
 
-  val Departure = MovementType("departure")
-  val Arrival   = MovementType("arrival")
+  val Departure: MovementType = MovementType("departure")
+  val Arrival: MovementType   = MovementType("arrival")
 
 }

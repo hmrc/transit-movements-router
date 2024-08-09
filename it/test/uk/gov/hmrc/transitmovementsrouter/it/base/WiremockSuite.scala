@@ -14,10 +14,11 @@
  * limitations under the License.
  */
 
-package test.uk.gov.hmrc.transitmovementsrouter.it.base
+package uk.gov.hmrc.transitmovementsrouter.it.base
 
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.common.ConsoleNotifier
+import com.github.tomakehurst.wiremock.core.WireMockConfiguration
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.BeforeAndAfterEach
@@ -36,7 +37,7 @@ trait WiremockSuite extends BeforeAndAfterAll with BeforeAndAfterEach {
   this: Suite =>
   protected val wiremockPort = 11111
 
-  protected val wiremockConfig =
+  protected val wiremockConfig: WireMockConfiguration =
     wireMockConfig().dynamicPort().port(wiremockPort).notifier(new ConsoleNotifier(false))
 
   protected val server: WireMockServer = new WireMockServer(wiremockConfig)
@@ -67,6 +68,8 @@ trait WiremockSuiteWithGuice extends WiremockSuite {
       .configure(
         "microservice.services.eis.gb.port"                     -> server.port().toString,
         "microservice.services.eis.xi.port"                     -> server.port().toString,
+        "microservice.services.eis.gb_v2_1.port"                -> server.port().toString,
+        "microservice.services.eis.xi_v2_1.port"                -> server.port().toString,
         "microservice.services.ncts-monitoring.port"            -> server.port().toString,
         "microservice.services.secure-data-exchange-proxy.port" -> server.port().toString
       )

@@ -38,7 +38,8 @@ trait RoutingService {
     movementId: MovementId,
     messageId: MessageId,
     payload: Source[ByteString, _],
-    customsOffice: CustomsOffice
+    customsOffice: CustomsOffice,
+    isTransitional: Boolean
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): EitherT[Future, RoutingError, Unit]
 
 }
@@ -55,15 +56,20 @@ class RoutingServiceImpl @Inject() (
     movementId: MovementId,
     messageId: MessageId,
     payload: Source[ByteString, _],
-    customsOffice: CustomsOffice
+    customsOffice: CustomsOffice,
+    isTransitional: Boolean
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): EitherT[Future, RoutingError, Unit] =
     for {
-      connector <- eisConnectorSelector(customsOffice)
+      connector <- eisConnectorSelector(customsOffice, isTransitional)
       _         <- EitherT(connector.post(movementId, messageId, payload.via(eisMessageTransformers.wrap), hc))
     } yield ()
 
-  private def eisConnectorSelector(customsOffice: CustomsOffice): EitherT[Future, RoutingError, EISConnector] = EitherT {
-    if (customsOffice.isGB) Future.successful(Right(messageConnectorProvider.gb))
-    else Future.successful(Right(messageConnectorProvider.xi))
+  private def eisConnectorSelector(customsOffice: CustomsOffice, isTransitional: Boolean): EitherT[Future, RoutingError, EISConnector] = EitherT {
+    (customsOffice.isGB, isTransitional) match {
+      case (true, true)   => Future.successful(Right(messageConnectorProvider.gb))
+      case (true, false)  => Future.successful(Right(messageConnectorProvider.gbV2_1))
+      case (false, true)  => Future.successful(Right(messageConnectorProvider.xi))
+      case (false, false) => Future.successful(Right(messageConnectorProvider.xiV2_1))
+    }
   }
 }

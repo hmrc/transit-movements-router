@@ -45,7 +45,7 @@ trait UpscanResponseParser {
         }
     }
 
-  private def logResponse(upscanResponse: Option[UpscanResponse]) =
+  private def logResponse(upscanResponse: Option[UpscanResponse]): Unit =
     upscanResponse match {
       case Some(UpscanSuccessResponse(reference, _, _)) =>
         logger.info(s"Received a successful response from Upscan callback for the following reference: $reference")

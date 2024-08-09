@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-package test.uk.gov.hmrc.transitmovementsrouter.connectors
+package uk.gov.hmrc.transitmovementsrouter.connectors
 
 import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.stubbing.Scenario
 import org.apache.pekko.stream.scaladsl.Source
+import org.mockito.ArgumentMatchers.any
 import org.apache.pekko.util.ByteString
-import org.mockito.ArgumentMatchers
 import org.mockito.Mockito.when
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
@@ -38,9 +38,11 @@ import play.api.test.Helpers._
 import retry.RetryPolicies
 import retry.RetryPolicy
 import uk.gov.hmrc.http.HeaderCarrier
+import uk.gov.hmrc.http.HttpResponse
 import uk.gov.hmrc.http.RequestId
 import uk.gov.hmrc.http.UpstreamErrorResponse
 import uk.gov.hmrc.http.client.HttpClientV2
+import uk.gov.hmrc.http.client.RequestBuilder
 import uk.gov.hmrc.http.test.HttpClientV2Support
 import uk.gov.hmrc.transitmovementsrouter.config.CircuitBreakerConfig
 import uk.gov.hmrc.transitmovementsrouter.config.EISInstanceConfig
@@ -49,10 +51,10 @@ import uk.gov.hmrc.transitmovementsrouter.config.RetryConfig
 import uk.gov.hmrc.transitmovementsrouter.connectors.EISConnector
 import uk.gov.hmrc.transitmovementsrouter.connectors.EISConnectorImpl
 import uk.gov.hmrc.transitmovementsrouter.connectors.Retries
-import test.uk.gov.hmrc.transitmovementsrouter.it.base.RegexPatterns
-import test.uk.gov.hmrc.transitmovementsrouter.it.base.TestActorSystem
-import test.uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuite
-import test.uk.gov.hmrc.transitmovementsrouter.it.generators.ModelGenerators
+import uk.gov.hmrc.transitmovementsrouter.it.base.RegexPatterns
+import uk.gov.hmrc.transitmovementsrouter.it.base.TestActorSystem
+import uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuite
+import uk.gov.hmrc.transitmovementsrouter.it.generators.ModelGenerators
 import uk.gov.hmrc.transitmovementsrouter.models.ConversationId
 import uk.gov.hmrc.transitmovementsrouter.models.LocalReferenceNumber
 import uk.gov.hmrc.transitmovementsrouter.models.MessageId
@@ -119,7 +121,7 @@ class EISConnectorSpec
       1.second,
       5.seconds
     ),
-    false
+    forwardClientId = false
   )
 
   private val clock = Clock.fixed(OffsetDateTime.of(2023, 4, 13, 10, 34, 41, 500, ZoneOffset.UTC).toInstant, ZoneOffset.UTC)
@@ -384,7 +386,12 @@ class EISConnectorSpec
       val hc        = HeaderCarrier()
       val connector = new EISConnectorImpl("Failure", connectorConfig, httpClientV2, NoRetries, clock, true)
 
-      when(httpClientV2.post(ArgumentMatchers.any[URL])(ArgumentMatchers.any[HeaderCarrier])).thenReturn(new FakeRequestBuilder)
+      val mockRequestBuilder = mock[RequestBuilder]
+
+      when(mockRequestBuilder.setHeader(any)).thenReturn(mockRequestBuilder)
+      when(mockRequestBuilder.execute[HttpResponse](any(), any())).thenReturn(Future.failed(new RuntimeException))
+      when(mockRequestBuilder.withBody(any())(any(), any(), any())).thenReturn(mockRequestBuilder)
+      when(httpClientV2.post(any[URL])(any[HeaderCarrier])).thenReturn(mockRequestBuilder)
 
       whenReady(connector.post(movementId, messageId, source, hc)) {
         case Left(x) if x.isInstanceOf[RoutingError.Unexpected] => x.asInstanceOf[RoutingError.Unexpected].cause.get mustBe a[RuntimeException]

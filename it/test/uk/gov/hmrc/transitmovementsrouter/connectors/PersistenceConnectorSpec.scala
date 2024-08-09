@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package test.uk.gov.hmrc.transitmovementsrouter.connectors
+package uk.gov.hmrc.transitmovementsrouter.connectors
 
 import org.apache.pekko.stream.scaladsl.Source
 import org.apache.pekko.util.ByteString
@@ -41,8 +41,8 @@ import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.test.HttpClientV2Support
 import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
 import uk.gov.hmrc.transitmovementsrouter.connectors.PersistenceConnectorImpl
-import test.uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuite
-import test.uk.gov.hmrc.transitmovementsrouter.it.generators.ModelGenerators
+import uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuite
+import uk.gov.hmrc.transitmovementsrouter.it.generators.ModelGenerators
 import uk.gov.hmrc.transitmovementsrouter.models.MessageType.DeclarationAmendment
 import uk.gov.hmrc.transitmovementsrouter.models._
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.MessageNotFound
@@ -64,34 +64,34 @@ class PersistenceConnectorSpec
     with ModelGenerators
     with ScalaCheckPropertyChecks {
 
-  val movementId     = arbitraryMovementId.arbitrary.sample.get
-  val messageId      = arbitraryMessageId.arbitrary.sample.get
-  val eoriNumber     = arbitraryEoriNumber.arbitrary.sample.get
-  val clientId       = arbitraryClientId.arbitrary.sample.get
-  val objectStoreURI = s"common-transit-convention-traders/movements/${movementId.value}/${ConversationId(movementId, messageId).value.toString}.xml"
+  val movementId: MovementId = arbitraryMovementId.arbitrary.sample.get
+  val messageId: MessageId   = arbitraryMessageId.arbitrary.sample.get
+  val eoriNumber: EoriNumber = arbitraryEoriNumber.arbitrary.sample.get
+  val clientId: ClientId     = arbitraryClientId.arbitrary.sample.get
+  val objectStoreURI         = s"common-transit-convention-traders/movements/${movementId.value}/${ConversationId(movementId, messageId).value.toString}.xml"
 
-  val uriPersistence = Url(
+  val uriPersistence: String = Url(
     path = s"/transit-movements/traders/movements/${movementId.value}/messages",
     query = QueryString.fromPairs("triggerId" -> messageId.value)
   ).toStringRaw
 
-  val uriStatus = Url(
+  val uriStatus: String = Url(
     path = s"/transit-movements/traders/movements/${movementId.value}/messages/${messageId.value}"
   ).toStringRaw
 
-  val token = Gen.alphaNumStr.sample.get
+  val token: String = Gen.alphaNumStr.sample.get
 
-  implicit val appConfig = mock[AppConfig]
+  implicit val appConfig: AppConfig = mock[AppConfig]
   when(appConfig.internalAuthToken).thenReturn(token)
   when(appConfig.persistenceServiceBaseUrl).thenAnswer {
     _ =>
       Url.parse(server.baseUrl())
   }
 
-  implicit val hc    = HeaderCarrier()
-  lazy val connector = new PersistenceConnectorImpl(httpClientV2)
+  implicit val hc: HeaderCarrier = HeaderCarrier()
+  lazy val connector             = new PersistenceConnectorImpl(httpClientV2)
 
-  val errorCodes = Gen.oneOf(
+  val errorCodes: Gen[Int] = Gen.oneOf(
     Seq(
       BAD_REQUEST,
       INTERNAL_SERVER_ERROR,

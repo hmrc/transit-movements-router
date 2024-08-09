@@ -31,6 +31,7 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AsyncWordSpecLike
 import org.scalatestplus.mockito.MockitoSugar
 import play.api.mvc.AbstractController
+import play.api.mvc.AnyContentAsEmpty
 import play.api.mvc.Results
 import play.api.test.FakeRequest
 import play.api.test.Helpers
@@ -43,12 +44,12 @@ class HasMetricsSpec extends AsyncWordSpecLike with Matchers with OptionValues w
 
   trait MockHasMetrics {
     self: HasMetrics =>
-    val timerContext                           = mock[Timer.Context]
-    val timer                                  = mock[Timer]
-    val successCounter                         = mock[Counter]
-    val failureCounter                         = mock[Counter]
-    val histogram                              = mock[Histogram]
-    val metrics                                = mock[Metrics]
+    val timerContext: Timer.Context            = mock[Timer.Context]
+    val timer: Timer                           = mock[Timer]
+    val successCounter: Counter                = mock[Counter]
+    val failureCounter: Counter                = mock[Counter]
+    val histogram: Histogram                   = mock[Histogram]
+    val metrics: Metrics                       = mock[Metrics]
     override lazy val registry: MetricRegistry = mock[MetricRegistry]
     when(registry.timer(anyString())) thenReturn timer
     when(registry.counter(endsWith("success-counter"))) thenReturn successCounter
@@ -68,7 +69,7 @@ class HasMetricsSpec extends AsyncWordSpecLike with Matchers with OptionValues w
   def withTestActionMetrics[A](test: TestHasActionMetrics => A): A =
     test(new TestHasActionMetrics)
 
-  def verifyCompletedWithSuccess(metricName: String, metrics: MockHasMetrics): Assertion = {
+  def verifyCompletedWithSuccess(metrics: MockHasMetrics): Assertion = {
     val inOrder = Mockito.inOrder(metrics.timer, metrics.timerContext, metrics.successCounter)
     inOrder.verify(metrics.timer, times(1)).time()
     inOrder.verify(metrics.timerContext, times(1)).stop()
@@ -80,7 +81,7 @@ class HasMetricsSpec extends AsyncWordSpecLike with Matchers with OptionValues w
     succeed
   }
 
-  def verifyCompletedWithFailure(metricName: String, metrics: MockHasMetrics): Assertion = {
+  def verifyCompletedWithFailure(metrics: MockHasMetrics): Assertion = {
     val inOrder = Mockito.inOrder(metrics.timer, metrics.timerContext, metrics.failureCounter)
     inOrder.verify(metrics.timer, times(1)).time()
     inOrder.verify(metrics.timerContext, times(1)).stop()
@@ -104,7 +105,7 @@ class HasMetricsSpec extends AsyncWordSpecLike with Matchers with OptionValues w
             )
             .map {
               _ =>
-                verifyCompletedWithSuccess(TestMetric, metrics)
+                verifyCompletedWithSuccess(metrics)
             }
       }
 
@@ -117,7 +118,7 @@ class HasMetricsSpec extends AsyncWordSpecLike with Matchers with OptionValues w
                 Future.successful(())
             }
             .map(
-              _ => verifyCompletedWithSuccess(TestMetric, metrics)
+              _ => verifyCompletedWithSuccess(metrics)
             )
       }
 
@@ -129,7 +130,7 @@ class HasMetricsSpec extends AsyncWordSpecLike with Matchers with OptionValues w
             )
             .recover {
               case _ =>
-                verifyCompletedWithFailure(TestMetric, metrics)
+                verifyCompletedWithFailure(metrics)
             }
       }
 
@@ -142,7 +143,7 @@ class HasMetricsSpec extends AsyncWordSpecLike with Matchers with OptionValues w
                 Future.successful(())
             }
             .map(
-              _ => verifyCompletedWithFailure(TestMetric, metrics)
+              _ => verifyCompletedWithFailure(metrics)
             )
       }
 
@@ -158,7 +159,7 @@ class HasMetricsSpec extends AsyncWordSpecLike with Matchers with OptionValues w
                 Future.successful(())
             }
             .map(
-              _ => verifyCompletedWithSuccess(TestMetric, metrics)
+              _ => verifyCompletedWithSuccess(metrics)
             )
       }
 
@@ -175,7 +176,7 @@ class HasMetricsSpec extends AsyncWordSpecLike with Matchers with OptionValues w
                 Future.successful(())
             }
             .map(
-              _ => verifyCompletedWithFailure(TestMetric, metrics)
+              _ => verifyCompletedWithFailure(metrics)
             )
       }
 
@@ -187,7 +188,7 @@ class HasMetricsSpec extends AsyncWordSpecLike with Matchers with OptionValues w
             )
           }
 
-          Future.successful(verifyCompletedWithFailure(TestMetric, metrics))
+          Future.successful(verifyCompletedWithFailure(metrics))
       }
     }
 
@@ -199,7 +200,7 @@ class HasMetricsSpec extends AsyncWordSpecLike with Matchers with OptionValues w
               Future.successful(Results.Continue)
             }
             .map(
-              _ => verifyCompletedWithSuccess(TestMetric, metrics)
+              _ => verifyCompletedWithSuccess(metrics)
             )
       }
 
@@ -210,7 +211,7 @@ class HasMetricsSpec extends AsyncWordSpecLike with Matchers with OptionValues w
               Future.successful(Results.Ok)
             }
             .map(
-              _ => verifyCompletedWithSuccess(TestMetric, metrics)
+              _ => verifyCompletedWithSuccess(metrics)
             )
       }
 
@@ -221,7 +222,7 @@ class HasMetricsSpec extends AsyncWordSpecLike with Matchers with OptionValues w
               Future.successful(Results.NotModified)
             }
             .map(
-              _ => verifyCompletedWithSuccess(TestMetric, metrics)
+              _ => verifyCompletedWithSuccess(metrics)
             )
       }
 
@@ -232,7 +233,7 @@ class HasMetricsSpec extends AsyncWordSpecLike with Matchers with OptionValues w
               Future.successful(Results.EntityTooLarge)
             }
             .map(
-              _ => verifyCompletedWithFailure(TestMetric, metrics)
+              _ => verifyCompletedWithFailure(metrics)
             )
       }
 
@@ -243,7 +244,7 @@ class HasMetricsSpec extends AsyncWordSpecLike with Matchers with OptionValues w
               Future.successful(Results.BadGateway)
             }
             .map(
-              _ => verifyCompletedWithFailure(TestMetric, metrics)
+              _ => verifyCompletedWithFailure(metrics)
             )
       }
 
@@ -253,10 +254,9 @@ class HasMetricsSpec extends AsyncWordSpecLike with Matchers with OptionValues w
             .withMetricsTimerResult(TestMetric) {
               Future.failed(new Exception)
             }
-            .transformWith {
-              case _ =>
-                verifyCompletedWithFailure(TestMetric, metrics)
-            }
+            .transformWith(
+              _ => verifyCompletedWithFailure(metrics)
+            )
       }
 
       "increment failure counter when the user throws an exception constructing their code block" in withTestMetrics {
@@ -267,12 +267,12 @@ class HasMetricsSpec extends AsyncWordSpecLike with Matchers with OptionValues w
             }
           }
 
-          Future.successful(verifyCompletedWithFailure(TestMetric, metrics))
+          Future.successful(verifyCompletedWithFailure(metrics))
       }
     }
 
     "withMetricsTimerAction" should {
-      def fakeRequest = FakeRequest()
+      def fakeRequest: FakeRequest[AnyContentAsEmpty.type] = FakeRequest()
 
       "increment success counter for an informational Result" in withTestActionMetrics {
         metrics =>
@@ -282,7 +282,7 @@ class HasMetricsSpec extends AsyncWordSpecLike with Matchers with OptionValues w
             }
             .apply(fakeRequest)
             .map(
-              _ => verifyCompletedWithSuccess(TestMetric, metrics)
+              _ => verifyCompletedWithSuccess(metrics)
             )
       }
 
@@ -294,7 +294,7 @@ class HasMetricsSpec extends AsyncWordSpecLike with Matchers with OptionValues w
             }
             .apply(fakeRequest)
             .map(
-              _ => verifyCompletedWithSuccess(TestMetric, metrics)
+              _ => verifyCompletedWithSuccess(metrics)
             )
       }
 
@@ -306,7 +306,7 @@ class HasMetricsSpec extends AsyncWordSpecLike with Matchers with OptionValues w
             }
             .apply(fakeRequest)
             .map(
-              _ => verifyCompletedWithSuccess(TestMetric, metrics)
+              _ => verifyCompletedWithSuccess(metrics)
             )
       }
 
@@ -318,7 +318,7 @@ class HasMetricsSpec extends AsyncWordSpecLike with Matchers with OptionValues w
             }
             .apply(fakeRequest)
             .map(
-              _ => verifyCompletedWithFailure(TestMetric, metrics)
+              _ => verifyCompletedWithFailure(metrics)
             )
       }
 
@@ -330,7 +330,7 @@ class HasMetricsSpec extends AsyncWordSpecLike with Matchers with OptionValues w
             }
             .apply(fakeRequest)
             .map(
-              _ => verifyCompletedWithFailure(TestMetric, metrics)
+              _ => verifyCompletedWithFailure(metrics)
             )
       }
     }

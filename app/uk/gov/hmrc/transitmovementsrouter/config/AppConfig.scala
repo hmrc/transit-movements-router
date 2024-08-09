@@ -19,7 +19,6 @@ package uk.gov.hmrc.transitmovementsrouter.config
 import io.lemonlabs.uri.Url
 import io.lemonlabs.uri.UrlPath
 import play.api.Configuration
-import uk.gov.hmrc.http.HeaderCarrier
 
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -29,16 +28,16 @@ class AppConfig @Inject() (config: Configuration, servicesConfig: CTCServicesCon
 
   lazy val appName: String = config.get[String]("appName")
 
-  lazy val eisXi: EISInstanceConfig = config.get[EISInstanceConfig]("microservice.services.eis.xi")
-  lazy val eisGb: EISInstanceConfig = config.get[EISInstanceConfig]("microservice.services.eis.gb")
-
-  lazy val headerCarrierConfig: HeaderCarrier.Config = HeaderCarrier.Config.fromConfig(config.underlying)
+  lazy val eisXi: EISInstanceConfig     = config.get[EISInstanceConfig]("microservice.services.eis.xi")
+  lazy val eisGb: EISInstanceConfig     = config.get[EISInstanceConfig]("microservice.services.eis.gb")
+  lazy val eisGbV2_1: EISInstanceConfig = config.get[EISInstanceConfig]("microservice.services.eis.gb_v2_1")
+  lazy val eisXiV2_1: EISInstanceConfig = config.get[EISInstanceConfig]("microservice.services.eis.xi_v2_1")
 
   lazy val persistenceServiceBaseUrl: Url = Url.parse(servicesConfig.baseUrl("transit-movements"))
 
-  val transitMovementsPushNotificationsUrl = Url.parse(servicesConfig.baseUrl("transit-movements-push-notifications"))
+  val transitMovementsPushNotificationsUrl: Url = Url.parse(servicesConfig.baseUrl("transit-movements-push-notifications"))
 
-  val pushNotificationsEnabled = servicesConfig.config("transit-movements-push-notifications").get[Boolean]("enabled")
+  val pushNotificationsEnabled: Boolean = servicesConfig.config("transit-movements-push-notifications").get[Boolean]("enabled")
 
   lazy val incomingAuth: IncomingAuthConfig = config.get[IncomingAuthConfig]("incomingRequestAuth")
 
@@ -50,7 +49,7 @@ class AppConfig @Inject() (config: Configuration, servicesConfig: CTCServicesCon
   lazy val logIncoming: Boolean     = config.get[Boolean]("log-incoming-errors")
 
   // SDES configuration
-  lazy val sdesServiceBaseUrl          = Url.parse(servicesConfig.baseUrl("secure-data-exchange-proxy"))
+  lazy val sdesServiceBaseUrl: Url     = Url.parse(servicesConfig.baseUrl("secure-data-exchange-proxy"))
   lazy val sdesInformationType: String = config.get[String]("sdes.information-type")
   lazy val sdesSrn: String             = config.get[String]("sdes.srn")
   lazy val sdesClientId: String        = config.get[String]("sdes.client-id")
@@ -66,10 +65,10 @@ class AppConfig @Inject() (config: Configuration, servicesConfig: CTCServicesCon
   lazy val internalAuthEnabled: Boolean = config.get[Boolean]("microservice.services.internal-auth.enabled")
   lazy val internalAuthToken: String    = config.get[String]("internal-auth.token")
 
-  lazy val serviceMonitoringUrl         = servicesConfig.baseUrl("ncts")
-  lazy val serviceMonitoringEnabled     = config.get[Boolean]("microservice.services.ncts.enabled")
-  lazy val serviceMonitoringOutgoingUri = config.get[String]("microservice.services.ncts.outgoing-uri")
-  lazy val serviceMonitoringIncomingUri = config.get[String]("microservice.services.ncts.incoming-uri")
+  lazy val serviceMonitoringUrl: String         = servicesConfig.baseUrl("ncts")
+  lazy val serviceMonitoringEnabled: Boolean    = config.get[Boolean]("microservice.services.ncts.enabled")
+  lazy val serviceMonitoringOutgoingUri: String = config.get[String]("microservice.services.ncts.outgoing-uri")
+  lazy val serviceMonitoringIncomingUri: String = config.get[String]("microservice.services.ncts.incoming-uri")
 
-  lazy val auditingUrl = Url.parse(servicesConfig.baseUrl("transit-movements-auditing"))
+  lazy val auditingUrl: Url = Url.parse(servicesConfig.baseUrl("transit-movements-auditing"))
 }

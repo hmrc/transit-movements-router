@@ -21,6 +21,7 @@ import org.apache.pekko.util.ByteString
 import com.google.inject.ImplementedBy
 import com.google.inject.Inject
 import uk.gov.hmrc.play.bootstrap.metrics.Metrics
+import io.lemonlabs.uri.Url
 import io.lemonlabs.uri.UrlPath
 import play.api.Logging
 import play.api.http.HeaderNames
@@ -46,6 +47,7 @@ import uk.gov.hmrc.transitmovementsrouter.models.MovementId
 import uk.gov.hmrc.transitmovementsrouter.models.MovementType
 import uk.gov.hmrc.transitmovementsrouter.models.requests.Details
 import uk.gov.hmrc.transitmovementsrouter.models.requests.Metadata
+import uk.gov.hmrc.http.HttpReads.Implicits._
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
@@ -92,7 +94,7 @@ class AuditingConnectorImpl @Inject() (httpClient: HttpClientV2, val metrics: Me
     with HasMetrics
     with Logging {
 
-  val auditingBaseRoute: String = "/transit-movements-auditing"
+  private val auditingBaseRoute: String = "/transit-movements-auditing"
 
   def postMessageType(
     auditType: AuditType,
@@ -110,7 +112,7 @@ class AuditingConnectorImpl @Inject() (httpClient: HttpClientV2, val metrics: Me
     ec: ExecutionContext
   ): Future[Unit] = withMetricsTimerAsync(MetricsKeys.AuditingBackend.Post) {
     _ =>
-      val (url: appConfig.auditingUrl.Self, path: String) = getUrlAndPath(auditType, hc)
+      val (url: Url, path: String) = getUrlAndPath(auditType, hc)
       httpClient
         .post(url"$url")
         .withInternalAuthToken
@@ -128,13 +130,7 @@ class AuditingConnectorImpl @Inject() (httpClient: HttpClientV2, val metrics: Me
         )
         .withBody(payload)
         .execute[HttpResponse]
-        .flatMap {
-          response =>
-            response.status match {
-              case ACCEPTED => Future.successful(())
-              case _        => Future.failed(UpstreamErrorResponse(response.body, response.status))
-            }
-        }
+        .flatMap(handleResponse)
         .recover {
           case NonFatal(thr) => Future.failed(thr)
         }
@@ -154,9 +150,9 @@ class AuditingConnectorImpl @Inject() (httpClient: HttpClientV2, val metrics: Me
     ec: ExecutionContext
   ): Future[Unit] = withMetricsTimerAsync(MetricsKeys.AuditingBackend.Post) {
     _ =>
-      val (url: appConfig.auditingUrl.Self, path: String) = getUrlAndPath(auditType, hc)
-      val metadata                                        = Metadata(path, movementId, messageId, enrolmentEORI, movementType, messageType)
-      val details                                         = Details(metadata, payload.map(_.as[JsObject]))
+      val (url: Url, path: String) = getUrlAndPath(auditType, hc)
+      val metadata                 = Metadata(path, movementId, messageId, enrolmentEORI, movementType, messageType)
+      val details                  = Details(metadata, payload.map(_.as[JsObject]))
       httpClient
         .post(url"$url")
         .withInternalAuthToken
@@ -167,21 +163,21 @@ class AuditingConnectorImpl @Inject() (httpClient: HttpClientV2, val metrics: Me
         )
         .withBody(Json.toJson(details))
         .execute[HttpResponse]
-        .flatMap {
-          response =>
-            response.status match {
-              case ACCEPTED => Future.successful(())
-              case _        => Future.failed(UpstreamErrorResponse(response.body, response.status))
-            }
-        }
+        .flatMap(handleResponse)
         .recover {
           case NonFatal(thr) => Future.failed(thr)
         }
   }
 
-  private def getUrlAndPath(auditType: AuditType, hc: HeaderCarrier) = {
+  private def handleResponse(response: HttpResponse): Future[Unit] =
+    response.status match {
+      case ACCEPTED => Future.successful(())
+      case _        => Future.failed(UpstreamErrorResponse(response.body, response.status))
+    }
+
+  private def getUrlAndPath(auditType: AuditType, hc: HeaderCarrier): (Url, String) = {
     val auditRoute = UrlPath.parse(s"$auditingBaseRoute/audit/${auditType.name}")
-    val url        = appConfig.auditingUrl.withPath(auditRoute)
+    val url        = appConfig.auditingUrl.withPath(auditRoute).toUrl
     val path = hc.otherHeaders
       .collectFirst {
         case ("path", value) => value

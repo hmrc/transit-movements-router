@@ -18,7 +18,7 @@ lazy val microservice = Project(appName, file("."))
     )
   )
   .settings(resolvers += Resolver.jcenterRepo)
-  .settings(CodeCoverageSettings.settings: _*)
+  .settings(CodeCoverageSettings.settings *)
   .settings(inThisBuild(buildSettings))
 
 lazy val it = project
@@ -28,7 +28,7 @@ lazy val it = project
   .settings(
     libraryDependencies ++= AppDependencies.test
   )
-  .settings(CodeCoverageSettings.settings: _*)
+  .settings(CodeCoverageSettings.settings *)
 
 // Settings for the whole build
 lazy val buildSettings = Def.settings(

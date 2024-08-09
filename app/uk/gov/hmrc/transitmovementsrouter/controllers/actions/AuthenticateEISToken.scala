@@ -54,7 +54,7 @@ class AuthenticateEISTokenImpl @Inject() (appConfig: AppConfig, parsers: BodyPar
         token = tokenMatch.group(1)
         if incomingAuthConfig.acceptedTokens.contains(token)
       } yield token) match {
-        case Some(t) => Future.successful(None)
+        case Some(_) => Future.successful(None)
         case None    => Future.successful(Some(createUnauthorisedResponse(request.headers)))
       }
 

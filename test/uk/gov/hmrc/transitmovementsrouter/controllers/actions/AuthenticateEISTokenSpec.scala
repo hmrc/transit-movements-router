@@ -35,10 +35,10 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 class AuthenticateEISTokenSpec extends AnyFreeSpec with Matchers with OptionValues with ScalaFutures with MockitoSugar with ScalaCheckDrivenPropertyChecks {
 
-  val enabledConfig  = IncomingAuthConfig(enabled = true, Seq("ABC", "123"))
-  val disabledConfig = IncomingAuthConfig(enabled = false, Seq("ABC", "123"))
+  val enabledConfig: IncomingAuthConfig  = IncomingAuthConfig(enabled = true, Seq("ABC", "123"))
+  val disabledConfig: IncomingAuthConfig = IncomingAuthConfig(enabled = false, Seq("ABC", "123"))
 
-  val mockParsers = mock[BodyParsers.Default]
+  val mockParsers: BodyParsers.Default = mock[BodyParsers.Default]
 
   "When authentication is disabled" - {
 

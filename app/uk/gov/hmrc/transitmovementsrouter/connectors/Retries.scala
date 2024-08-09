@@ -49,7 +49,7 @@ class RetriesImpl extends Retries {
         .constantDelay[Future](config.delay)
     )
 
-  def limitRetriesByTotalTime[M[_]: Applicative](
+  private def limitRetriesByTotalTime[M[_]: Applicative](
     threshold: FiniteDuration,
     policy: RetryPolicy[M]
   ): RetryPolicy[M] = {

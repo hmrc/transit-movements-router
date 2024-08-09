@@ -26,16 +26,14 @@ import play.api.libs.json.Writes
 sealed trait SdesNotificationType
 
 object SdesNotificationType {
-  case object FileReady             extends SdesNotificationType
-  case object FileReceived          extends SdesNotificationType
+  private case object FileReady     extends SdesNotificationType
+  private case object FileReceived  extends SdesNotificationType
   case object FileProcessed         extends SdesNotificationType
   case object FileProcessingFailure extends SdesNotificationType
 
-  val values = Seq(FileProcessed, FileProcessingFailure)
+  val values: Seq[SdesNotificationType] = Seq(FileProcessed, FileProcessingFailure)
 
-  implicit val writes = new Writes[SdesNotificationType] {
-    def writes(sdesNotificationType: SdesNotificationType) = Json.toJson(sdesNotificationType.toString())
-  }
+  implicit val writes: Writes[SdesNotificationType] = (sdesNotificationType: SdesNotificationType) => Json.toJson(sdesNotificationType.toString)
 
   implicit val reads: Reads[SdesNotificationType] = Reads {
     case JsString(x) if x.toLowerCase == "fileready"             => JsSuccess(FileReady)

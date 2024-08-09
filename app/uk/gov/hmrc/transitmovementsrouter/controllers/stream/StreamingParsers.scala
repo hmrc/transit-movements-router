@@ -46,7 +46,7 @@ trait StreamingParsers {
   implicit val materializer: Materializer
 
   /*
-    This keeps Play's connection thread pool outside of our streaming, and uses a cached thread pool
+    This keeps Play's connection thread pool outside our streaming, and uses a cached thread pool
     to spin things up as needed.
    */
   implicit val materializerExecutionContext: ExecutionContext =

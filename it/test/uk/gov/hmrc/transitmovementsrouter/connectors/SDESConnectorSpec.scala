@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package test.uk.gov.hmrc.transitmovementsrouter.connectors
+package uk.gov.hmrc.transitmovementsrouter.connectors
 
 import com.github.tomakehurst.wiremock.client.WireMock.aResponse
 import com.github.tomakehurst.wiremock.client.WireMock.equalTo
@@ -39,18 +39,20 @@ import play.api.libs.json.JsSuccess
 import play.api.libs.json.Json
 import play.mvc.Http.MimeTypes
 import uk.gov.hmrc.http.HeaderCarrier
+import uk.gov.hmrc.http.HttpResponse
 import uk.gov.hmrc.http.UpstreamErrorResponse
 import uk.gov.hmrc.http.client.HttpClientV2
+import uk.gov.hmrc.http.client.RequestBuilder
 import uk.gov.hmrc.http.test.HttpClientV2Support
 import uk.gov.hmrc.objectstore.client.ObjectSummaryWithMd5
-import test.uk.gov.hmrc.transitmovementsrouter.it.base.TestActorSystem
+import uk.gov.hmrc.transitmovementsrouter.it.base.TestActorSystem
 import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
 import uk.gov.hmrc.transitmovementsrouter.connectors.SDESConnector
 import uk.gov.hmrc.transitmovementsrouter.connectors.SDESConnectorImpl
 import uk.gov.hmrc.transitmovementsrouter.controllers.errors.PresentationError
 import uk.gov.hmrc.transitmovementsrouter.controllers.errors.StandardError
-import test.uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuite
-import test.uk.gov.hmrc.transitmovementsrouter.it.generators.ModelGenerators
+import uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuite
+import uk.gov.hmrc.transitmovementsrouter.it.generators.ModelGenerators
 import uk.gov.hmrc.transitmovementsrouter.models.ConversationId
 import uk.gov.hmrc.transitmovementsrouter.models.MessageId
 import uk.gov.hmrc.transitmovementsrouter.models.MovementId
@@ -65,6 +67,7 @@ import uk.gov.hmrc.transitmovementsrouter.utils.UUIDGenerator
 import java.net.URL
 import java.util.UUID
 import scala.concurrent.ExecutionContext
+import scala.concurrent.Future
 
 class SDESConnectorSpec
     extends AnyFreeSpec
@@ -230,8 +233,13 @@ class SDESConnectorSpec
       (movementId, messageId, objectSummaryWithMd5) =>
         server.resetAll()
 
-        val mockHttpClientV2 = mock[HttpClientV2]
-        when(mockHttpClientV2.post(any[URL])(any[HeaderCarrier])).thenReturn(new FakeRequestBuilder)
+        val mockHttpClientV2   = mock[HttpClientV2]
+        val mockRequestBuilder = mock[RequestBuilder]
+
+        when(mockRequestBuilder.setHeader(any)).thenReturn(mockRequestBuilder)
+        when(mockRequestBuilder.execute[HttpResponse](any(), any())).thenReturn(Future.failed(new RuntimeException))
+        when(mockRequestBuilder.withBody(any())(any(), any(), any())).thenReturn(mockRequestBuilder)
+        when(mockHttpClientV2.post(any[URL])(any[HeaderCarrier])).thenReturn(mockRequestBuilder)
 
         val sut: SDESConnector = new SDESConnectorImpl(mockHttpClientV2, appConfig, SingleUUIDGenerator)
         val future = sut.send(

@@ -35,7 +35,7 @@ trait CircuitBreakers { self: Logging =>
   def withCircuitBreaker[T](defineFailureFn: Try[T] => Boolean)(block: => Future[T]): Future[T] =
     circuitBreaker.withCircuitBreaker(block, defineFailureFn)
 
-  lazy val circuitBreaker = new CircuitBreaker(
+  private lazy val circuitBreaker = new CircuitBreaker(
     scheduler = materializer.system.scheduler,
     maxFailures = eisInstanceConfig.circuitBreaker.maxFailures,
     callTimeout = eisInstanceConfig.circuitBreaker.callTimeout,

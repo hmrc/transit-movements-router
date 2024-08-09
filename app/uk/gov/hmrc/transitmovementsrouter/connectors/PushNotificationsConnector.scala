@@ -22,6 +22,7 @@ import cats.data.EitherT
 import com.google.inject.ImplementedBy
 import com.google.inject.Inject
 import com.google.inject.Singleton
+import io.lemonlabs.uri.Url
 import io.lemonlabs.uri.UrlPath
 import play.api.http.HeaderNames
 import play.api.http.MimeTypes
@@ -69,7 +70,7 @@ class PushNotificationsConnectorImpl @Inject() (httpClientV2: HttpClientV2)(impl
     extends PushNotificationsConnector
     with BaseConnector {
 
-  val baseUrl           = appConfig.transitMovementsPushNotificationsUrl
+  val baseUrl: Url      = appConfig.transitMovementsPushNotificationsUrl
   val baseRoute: String = "/transit-movements-push-notifications"
 
   private val messageReceivedPath: String = "messageReceived"

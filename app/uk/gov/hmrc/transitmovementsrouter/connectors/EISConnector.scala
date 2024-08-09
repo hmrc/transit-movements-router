@@ -104,7 +104,7 @@ class EISConnectorImpl(
   private def nowFormatted(): String =
     s"${HTTP_DATE_FORMATTER.format(OffsetDateTime.now(clock.withZone(ZoneOffset.UTC)))} UTC"
 
-  def shouldCauseCircuitBreakerStrike(result: Try[Either[RoutingError, Unit]]): Boolean =
+  private def shouldCauseCircuitBreakerStrike(result: Try[Either[RoutingError, Unit]]): Boolean =
     result match {
       case Success(Left(DuplicateLRNError(_, _, _))) => false // If we have a duplicate LRN error, we don't trigger a circuit break strike
       case Success(Left(_))                          => true
@@ -219,7 +219,7 @@ class EISConnectorImpl(
                     )
                     .runWith(Sink.headOption)
                     .recover {
-                      case NonFatal(ex) => None // If we get an error, it's probably a parsing error, so treat it as if we got nothing.
+                      case NonFatal(_) => None // If we get an error, it's probably a parsing error, so treat it as if we got nothing.
                     }
                     .map {
                       case Some(lrn) =>
