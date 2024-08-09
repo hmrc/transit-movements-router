@@ -36,6 +36,7 @@ import uk.gov.hmrc.internalauth.client._
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
 import uk.gov.hmrc.play.http.HeaderCarrierConverter
 import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
+import uk.gov.hmrc.transitmovementsrouter.config.Constants
 import uk.gov.hmrc.transitmovementsrouter.connectors.PersistenceConnector
 import uk.gov.hmrc.transitmovementsrouter.connectors.PushNotificationsConnector
 import uk.gov.hmrc.transitmovementsrouter.connectors.UpscanConnector
@@ -109,11 +110,11 @@ class MessagesController @Inject() (
     Predicate.Permission(Resource(ResourceType("transit-movements-router"), ResourceLocation("message")), IAAction("WRITE"))
 
   def outgoing(@unused eori: EoriNumber, movementType: MovementType, movementId: MovementId, messageId: MessageId): Action[Source[ByteString, _]] = {
-    def viaEIS(messageType: MessageType, customsOffice: CustomsOffice, source: Source[ByteString, _])(implicit
+    def viaEIS(messageType: MessageType, customsOffice: CustomsOffice, source: Source[ByteString, _], isTransitional: Boolean)(implicit
       hc: HeaderCarrier
     ): EitherT[Future, PresentationError, Status] =
       for {
-        _ <- routingService.submitMessage(movementType, movementId, messageId, source, customsOffice).asPresentation
+        _ <- routingService.submitMessage(movementType, movementId, messageId, source, customsOffice, isTransitional).asPresentation
         _ = statusMonitoringService.outgoing(movementId, messageId, messageType, customsOffice)
       } yield Created
 
@@ -130,11 +131,10 @@ class MessagesController @Inject() (
           source             <- reUsableOutgoingSource(request)
           messageType        <- messageTypeExtractor.extractFromHeaders(request.headers).asPresentation
           requestMessageType <- filterRequestMessageType(messageType)
-
-          customsOffice <- customOfficeExtractorService.extractCustomOffice(source.headOption.get, requestMessageType).asPresentation
-          size          <- calculateSize(source.lift(1).get)
+          customsOffice      <- customOfficeExtractorService.extractCustomOffice(source.headOption.get, requestMessageType).asPresentation
+          size               <- calculateSize(source.lift(1).get)
           submitted <-
-            if (config.eisSizeLimit >= size) viaEIS(messageType, customsOffice, source.lift(2).get)
+            if (config.eisSizeLimit >= size) viaEIS(messageType, customsOffice, source.lift(2).get, isTransitional)
             else viaSDES(source.lift(3).get)
         } yield submitted)
           .valueOr(
@@ -142,6 +142,12 @@ class MessagesController @Inject() (
           )
     }
   }
+
+  private def isTransitional(implicit request: Request[_]) =
+    request.headers.get(Constants.APIVersionHeaderKey).map(_.trim.toLowerCase) match {
+      case Some(Constants.APIVersionFinalHeaderValue) => false
+      case _                                          => true
+    }
 
   private def materializeOutgoingSource(source: Source[ByteString, _]): EitherT[Future, PresentationError, Seq[ByteString]] =
     EitherT(
