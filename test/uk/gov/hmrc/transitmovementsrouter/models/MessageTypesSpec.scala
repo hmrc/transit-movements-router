@@ -29,7 +29,7 @@ import uk.gov.hmrc.transitmovementsrouter.models.MessageType.DeclarationData
 import uk.gov.hmrc.transitmovementsrouter.models.MessageType.UnloadingPermission
 import uk.gov.hmrc.transitmovementsrouter.models.MessageType.UnloadingRemarks
 
-class MessageTypeSpec extends AnyFreeSpec with Matchers with MockitoSugar with OptionValues with ScalaCheckDrivenPropertyChecks {
+class MessageTypesSpec extends AnyFreeSpec with Matchers with MockitoSugar with OptionValues with ScalaCheckDrivenPropertyChecks {
   "MessageType must contain" - {
     "UnloadingRemarks" in {
       MessageType.values must contain(UnloadingRemarks)

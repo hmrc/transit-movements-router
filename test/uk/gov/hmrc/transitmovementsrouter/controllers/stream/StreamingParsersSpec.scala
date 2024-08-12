@@ -32,6 +32,7 @@ import play.api.http.HeaderNames
 import play.api.http.Status.BAD_REQUEST
 import play.api.http.Status.INTERNAL_SERVER_ERROR
 import play.api.http.Status.OK
+import play.api.libs.Files
 import play.api.libs.Files.SingletonTemporaryFileCreator
 import play.api.libs.json.Json
 import play.api.mvc.Action
@@ -40,6 +41,7 @@ import play.api.mvc.ActionRefiner
 import play.api.mvc.AnyContent
 import play.api.mvc.BaseController
 import play.api.mvc.BodyParser
+import play.api.mvc.ControllerComponents
 import play.api.mvc.Request
 import play.api.mvc.Result
 import play.api.test.FakeHeaders
@@ -75,9 +77,9 @@ class StreamingParsersSpec extends AnyFreeSpec with Matchers with TestActorSyste
 
   object Harness extends BaseController with StreamingParsers with Logging {
 
-    override val controllerComponents = stubControllerComponents()
-    implicit val temporaryFileCreator = SingletonTemporaryFileCreator
-    implicit val materializer         = Materializer(TestActorSystem.system)
+    override val controllerComponents: ControllerComponents                     = stubControllerComponents()
+    implicit val temporaryFileCreator: Files.SingletonTemporaryFileCreator.type = SingletonTemporaryFileCreator
+    implicit val materializer: Materializer                                     = Materializer(TestActorSystem.system)
 
     def testFromMemory: Action[Source[ByteString, _]] = Action.async(streamFromMemory) {
       request => result.apply(request).run(request.body)(materializer)

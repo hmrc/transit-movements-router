@@ -97,8 +97,8 @@ class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers with 
 
   trait Setup {
 
-    val referenceNumber        = arbitraryCustomsOffice.arbitrary.sample.get
-    val preparationDateAndTime = arbitraryOffsetDateTime.arbitrary.sample.get.toLocalDateTime.format(DateTimeFormatter.ISO_DATE_TIME)
+    val referenceNumber: CustomsOffice = arbitraryCustomsOffice.arbitrary.sample.get
+    val preparationDateAndTime: String = arbitraryOffsetDateTime.arbitrary.sample.get.toLocalDateTime.format(DateTimeFormatter.ISO_DATE_TIME)
 
     def messageWithoutMessageSender(messageType: RequestMessageType): NodeSeq = {
       val strMessage =
@@ -118,7 +118,7 @@ class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers with 
       XML.loadString(strMessage)
     }
 
-    val cc015cWithoutMessageSenderValue = {
+    val cc015cWithoutMessageSenderValue: Elem = {
       val strMessage =
         s"""<ncts:CC015C PhaseID="NCTS5.0" xmlns:ncts="http://ncts.dgtaxud.ec"><messageSender></messageSender><preparationDateAndTime>$preparationDateAndTime</preparationDateAndTime><CustomsOfficeOfDeparture><referenceNumber>${referenceNumber.value}</referenceNumber></CustomsOfficeOfDeparture></ncts:CC015C>"""
       XML.loadString(strMessage)

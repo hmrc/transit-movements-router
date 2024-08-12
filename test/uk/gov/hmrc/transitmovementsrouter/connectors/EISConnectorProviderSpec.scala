@@ -42,8 +42,8 @@ class EISConnectorProviderSpec extends AnyFreeSpec with HttpClientV2Support with
 
   implicit val materializer: Materializer = NoMaterializer
 
-  val appConfig = mock[AppConfig]
-  val retries   = new RetriesImpl()
+  val appConfig: AppConfig = mock[AppConfig]
+  val retries              = new RetriesImpl()
 
   override def beforeEach(): Unit = {
     when(appConfig.logBodyOnEIS500).thenReturn(true)

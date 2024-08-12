@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package test.uk.gov.hmrc.transitmovementsrouter.it.base
+package uk.gov.hmrc.transitmovementsrouter.it.base
 
 object RegexPatterns {
 

@@ -18,10 +18,9 @@ package uk.gov.hmrc.transitmovementsrouter.utils
 
 object RouterHeaderNames {
 
-  val CLIENT_ID        = "X-Client-Id"
-  val CORRELATION_ID   = "X-Correlation-Id"
-  val CONVERSATION_ID  = "X-Conversation-Id"
-  val MESSAGE_TYPE     = "X-Message-Type"
-  val OBJECT_STORE_URI = "X-Object-Store-Uri"
+  val CLIENT_ID       = "X-Client-Id"
+  val CORRELATION_ID  = "X-Correlation-Id"
+  val CONVERSATION_ID = "X-Conversation-Id"
+  val MESSAGE_TYPE    = "X-Message-Type"
 
 }

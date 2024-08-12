@@ -78,7 +78,7 @@ trait PersistenceConnector {
 @Singleton
 class PersistenceConnectorImpl @Inject() (httpClientV2: HttpClientV2)(implicit appConfig: AppConfig) extends PersistenceConnector with BaseConnector {
 
-  val baseUrl           = appConfig.persistenceServiceBaseUrl
+  val baseUrl: Url      = appConfig.persistenceServiceBaseUrl
   val baseRoute: String = "/transit-movements"
 
   private def persistenceSendMessage(movementId: MovementId): UrlPath =
