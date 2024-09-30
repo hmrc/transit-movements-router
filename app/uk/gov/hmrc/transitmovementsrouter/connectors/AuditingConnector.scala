@@ -36,6 +36,7 @@ import uk.gov.hmrc.http.StringContextOps
 import uk.gov.hmrc.http.UpstreamErrorResponse
 import uk.gov.hmrc.http.client.HttpClientV2
 import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
+import uk.gov.hmrc.transitmovementsrouter.config.Constants
 import uk.gov.hmrc.transitmovementsrouter.metrics.HasMetrics
 import uk.gov.hmrc.transitmovementsrouter.metrics.MetricsKeys
 import uk.gov.hmrc.transitmovementsrouter.models.AuditType
@@ -66,7 +67,8 @@ trait AuditingConnector {
     enrolmentEORI: Option[EoriNumber],
     movementType: Option[MovementType],
     messageType: Option[MessageType],
-    clientId: Option[ClientId]
+    clientId: Option[ClientId],
+    isTransitional: Boolean
   )(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
@@ -106,13 +108,28 @@ class AuditingConnectorImpl @Inject() (httpClient: HttpClientV2, val metrics: Me
     enrolmentEORI: Option[EoriNumber] = None,
     movementType: Option[MovementType] = None,
     messageType: Option[MessageType] = None,
-    clientId: Option[ClientId] = None
+    clientId: Option[ClientId] = None,
+    isTransitional: Boolean
   )(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Future[Unit] = withMetricsTimerAsync(MetricsKeys.AuditingBackend.Post) {
     _ =>
       val (url: Url, path: String) = getUrlAndPath(auditType, hc)
+
+      val finalHeader: Option[(String, String)] = if (isTransitional) {
+        Some(Constants.APIVersionHeaderKey -> Constants.APIVersionFinalHeaderValue)
+      } else None
+
+      val originalHeaders: Seq[(String, String)] = Seq(
+        HeaderNames.CONTENT_TYPE -> contentType,
+        "X-ContentLength"        -> contentLength.toString,
+        "X-Audit-Meta-Path"      -> path,
+        "X-Audit-Source"         -> "transit-movements-router"
+      )
+
+      val allHeaders: Seq[(String, String)] = originalHeaders ++ finalHeader
+
       httpClient
         .post(url"$url")
         .withInternalAuthToken
@@ -123,10 +140,7 @@ class AuditingConnectorImpl @Inject() (httpClient: HttpClientV2, val metrics: Me
         .withAuditMessageType(messageType)
         .withClientId(clientId)
         .setHeader(
-          HeaderNames.CONTENT_TYPE -> contentType,
-          "X-ContentLength"        -> contentLength.toString,
-          "X-Audit-Meta-Path"      -> path,
-          "X-Audit-Source"         -> "transit-movements-router"
+          allHeaders: _*
         )
         .withBody(payload)
         .execute[HttpResponse]
