@@ -117,7 +117,7 @@ class AuditingConnectorImpl @Inject() (httpClient: HttpClientV2, val metrics: Me
     _ =>
       val (url: Url, path: String) = getUrlAndPath(auditType, hc)
 
-      val finalHeader: Option[(String, String)] = if (isTransitional) {
+      val finalHeader: Option[(String, String)] = if (!isTransitional) {
         Some(Constants.APIVersionHeaderKey -> Constants.APIVersionFinalHeaderValue)
       } else None
 
