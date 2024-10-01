@@ -623,7 +623,9 @@ class MessagesControllerIntegrationSpec
               .withQueryParam("triggerId", new EqualToPattern(messageId.value))
               .withHeader("x-message-type", new EqualToPattern("IE004"))
               .willReturn(
-                aResponse().withStatus(OK).withBody(Json.stringify(Json.obj("messageId" -> outputMessageId, "eori" -> eoriNumber, "clientId" -> clientId)))
+                aResponse()
+                  .withStatus(OK)
+                  .withBody(Json.stringify(Json.obj("messageId" -> outputMessageId, "eori" -> eoriNumber, "clientId" -> clientId, "isTransitional" -> true)))
               )
           )
 

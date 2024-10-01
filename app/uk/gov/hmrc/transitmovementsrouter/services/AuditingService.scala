@@ -63,7 +63,8 @@ trait AuditingService {
     enrolmentEORI: Option[EoriNumber],
     movementType: Option[MovementType],
     messageType: Option[MessageType],
-    clientId: Option[ClientId]
+    clientId: Option[ClientId],
+    isTransitional: Boolean
   )(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
@@ -83,13 +84,26 @@ class AuditingServiceImpl @Inject() (auditingConnector: AuditingConnector) exten
     enrolmentEORI: Option[EoriNumber],
     movementType: Option[MovementType],
     messageType: Option[MessageType],
-    clientId: Option[ClientId]
+    clientId: Option[ClientId],
+    isTransitional: Boolean
   )(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Future[Unit] =
     auditingConnector
-      .postMessageType(auditType, contentType, contentLength, payload, movementId, messageId, enrolmentEORI, movementType, messageType, clientId)
+      .postMessageType(
+        auditType,
+        contentType,
+        contentLength,
+        payload,
+        movementId,
+        messageId,
+        enrolmentEORI,
+        movementType,
+        messageType,
+        clientId,
+        isTransitional
+      )
       .recover {
         case NonFatal(e) =>
           logger.warn("Unable to audit payload due to an exception", e)

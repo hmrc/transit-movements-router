@@ -43,6 +43,7 @@ import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.UpstreamErrorResponse
 import uk.gov.hmrc.http.test.HttpClientV2Support
 import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
+import uk.gov.hmrc.transitmovementsrouter.config.Constants
 import uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuite
 import uk.gov.hmrc.transitmovementsrouter.it.generators.ModelGenerators
 import uk.gov.hmrc.transitmovementsrouter.models._
@@ -101,6 +102,7 @@ class AuditingConnectorSpec
                   .withHeader("X-Audit-Meta-Message-Type", equalTo(messageType.code))
                   .withHeader("X-Audit-Meta-Movement-Type", equalTo(movementType.value))
                   .withHeader("X-Audit-Source", equalTo("transit-movements-router"))
+                  .withHeader(Constants.APIVersionHeaderKey, equalTo(Constants.APIVersionFinalHeaderValue))
                   .willReturn(aResponse().withStatus(ACCEPTED))
               )
 
@@ -115,7 +117,8 @@ class AuditingConnectorSpec
                 Some(messageId),
                 Some(eori),
                 Some(movementType),
-                Some(messageType)
+                Some(messageType),
+                isTransitional = false
               )
 
               // then the future should be ready
@@ -156,7 +159,8 @@ class AuditingConnectorSpec
                 Some(messageId),
                 Some(eori),
                 None,
-                None
+                None,
+                isTransitional = false
               )
 
               // then the future should be ready
@@ -195,7 +199,8 @@ class AuditingConnectorSpec
                 None,
                 None,
                 Some(movementType),
-                Some(messageType)
+                Some(messageType),
+                isTransitional = false
               )
 
               // then the future should be ready
@@ -228,7 +233,8 @@ class AuditingConnectorSpec
               None,
               None,
               None,
-              None
+              None,
+              isTransitional = false
             )
 
             // then the future should be ready
@@ -276,7 +282,8 @@ class AuditingConnectorSpec
                     Some(messageId),
                     Some(eori),
                     Some(movementType),
-                    Some(messageType)
+                    Some(messageType),
+                    isTransitional = false
                   )
 
                   val result = future

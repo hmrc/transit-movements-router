@@ -65,6 +65,7 @@ class AuditingServiceSpec
   val sut                              = new AuditingServiceImpl(mockConnector)
   implicit val hc: HeaderCarrier       = HeaderCarrier()
   val smallMessageSize                 = 49999
+  val isTransitional: Boolean          = true
 
   override def beforeEach(): Unit =
     reset(mockConnector)
@@ -93,7 +94,8 @@ class AuditingServiceSpec
                   eqTo(eoriNumber),
                   eqTo(movementType),
                   eqTo(messageType),
-                  eqTo(clientId)
+                  eqTo(clientId),
+                  eqTo(isTransitional)
                 )(any(), any())
               )
                 .thenReturn(Future.successful(()))
@@ -109,7 +111,8 @@ class AuditingServiceSpec
                   eoriNumber,
                   movementType,
                   messageType,
-                  clientId
+                  clientId,
+                  isTransitional
                 )
               ) {
                 _ =>
@@ -123,7 +126,8 @@ class AuditingServiceSpec
                     eqTo(eoriNumber),
                     eqTo(movementType),
                     eqTo(messageType),
-                    eqTo(clientId)
+                    eqTo(clientId),
+                    eqTo(isTransitional)
                   )(any(), any())
               }
           }
@@ -138,6 +142,7 @@ class AuditingServiceSpec
           ) {
             (eoriNumber, movementType, movementId, messageId, messageType, clientId) =>
               val exception = new IllegalStateException("failed")
+
               when(
                 mockConnector.postMessageType(
                   eqTo(AmendmentAcceptance),
@@ -149,7 +154,8 @@ class AuditingServiceSpec
                   eqTo(eoriNumber),
                   eqTo(movementType),
                   eqTo(messageType),
-                  eqTo(clientId)
+                  eqTo(clientId),
+                  eqTo(isTransitional)
                 )(any(), any())
               ).thenReturn(Future.failed(exception))
 
@@ -170,7 +176,8 @@ class AuditingServiceSpec
                   eoriNumber,
                   movementType,
                   messageType,
-                  clientId
+                  clientId,
+                  isTransitional
                 )
               ) {
                 _ =>
@@ -184,7 +191,8 @@ class AuditingServiceSpec
                     eqTo(eoriNumber),
                     eqTo(movementType),
                     eqTo(messageType),
-                    eqTo(clientId)
+                    eqTo(clientId),
+                    eqTo(isTransitional)
                   )(any(), any())
                   verify(Harness.logger0, times(1)).warn(eqTo("Unable to audit payload due to an exception"), eqTo(exception))
               }
