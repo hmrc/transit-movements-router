@@ -79,6 +79,42 @@ class EISConnectorProviderSpec extends AnyFreeSpec with HttpClientV2Support with
 
   "When creating the provider" - {
 
+    "getting the GB v2.1 connector will get the GB v2.1 connector" in {
+      val sut = new EISConnectorProviderImpl(appConfig, retries, httpClientV2, Clock.systemUTC())
+      sut.gbV2_1
+
+      verify(appConfig, times(1)).eisGbV2_1
+      verify(appConfig, times(0)).eisGb
+    }
+
+    "getting the GB v2.1 connector will get the GB v2.0 connect if forceTransitionalInflight is 'true'" in {
+      when(appConfig.forceTransitionalInflight).thenReturn(true)
+      val sut = new EISConnectorProviderImpl(appConfig, retries, httpClientV2, Clock.systemUTC())
+
+      sut.gbV2_1
+
+      verify(appConfig, times(1)).eisGb
+      verify(appConfig, times(0)).eisGbV2_1
+    }
+
+    "getting the XI v2.1 connector will get the XI v2.0 connector if forceTransitionalInflight is 'true'" in {
+      when(appConfig.forceTransitionalInflight).thenReturn(true)
+      val sut = new EISConnectorProviderImpl(appConfig, retries, httpClientV2, Clock.systemUTC())
+
+      sut.xiV2_1
+
+      verify(appConfig, times(1)).eisXi
+      verify(appConfig, times(0)).eisXiV2_1
+    }
+
+    "getting the XI v2.1 connector will get the XI v2.1 connector" in {
+      val sut = new EISConnectorProviderImpl(appConfig, retries, httpClientV2, Clock.systemUTC())
+      sut.xiV2_1
+
+      verify(appConfig, times(1)).eisXiV2_1
+      verify(appConfig, times(0)).eisGb
+    }
+
     "getting the GB connector will get the GB config" in {
 
       // Given this message connector

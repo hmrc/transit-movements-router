@@ -48,8 +48,8 @@ class EISConnectorProviderImpl @Inject() (
 
   lazy val gb: EISConnector     = createConnector("GB", appConfig.eisGb)
   lazy val xi: EISConnector     = createConnector("XI", appConfig.eisXi)
-  lazy val gbV2_1: EISConnector = createConnector("GB", appConfig.eisGbV2_1)
-  lazy val xiV2_1: EISConnector = createConnector("XI", appConfig.eisXiV2_1)
+  lazy val gbV2_1: EISConnector = if (appConfig.forceTransitionalInflight) gb else createConnector("GB", appConfig.eisGbV2_1)
+  lazy val xiV2_1: EISConnector = if (appConfig.forceTransitionalInflight) xi else createConnector("XI", appConfig.eisXiV2_1)
 
   private def createConnector(code: String, config: EISInstanceConfig) =
     new EISConnectorImpl(code, config, httpClientV2, retries, clock, appConfig.logBodyOnEIS500)
