@@ -137,13 +137,13 @@ class PersistenceConnectorSpec
   "post" should {
     "return messageId when post is successful" in {
 
-      val body = Json.obj("messageId" -> messageId.value, "eori" -> eoriNumber, "clientId" -> Option(clientId)).toString()
+      val body = Json.obj("messageId" -> messageId.value, "eori" -> eoriNumber, "clientId" -> Option(clientId), "isTransitional" -> true).toString()
 
       stubForPostBody(OK, Some(body))
       whenReady(connector.postBody(movementId, messageId, DeclarationAmendment, source).value) {
         x =>
           x.isRight mustBe true
-          x mustBe Right(PersistenceResponse(messageId, eoriNumber, Option(clientId)))
+          x mustBe Right(PersistenceResponse(messageId, eoriNumber, Option(clientId), isTransitional = true))
       }
     }
 

@@ -20,7 +20,7 @@ import play.api.libs.json.Json
 import play.api.libs.json.OFormat
 import uk.gov.hmrc.transitmovementsrouter.models.formats.CommonFormats
 
-case class PersistenceResponse(messageId: MessageId, eori: EoriNumber, clientId: Option[ClientId])
+case class PersistenceResponse(messageId: MessageId, eori: EoriNumber, clientId: Option[ClientId], isTransitional: Boolean)
 
 object PersistenceResponse extends CommonFormats {
   implicit val format: OFormat[PersistenceResponse] = Json.format[PersistenceResponse]

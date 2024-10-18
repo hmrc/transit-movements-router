@@ -272,7 +272,8 @@ class MessagesController @Inject() (
             enrolmentEORI = Some(persistenceResponse.eori),
             movementType = Some(messageType.movementType),
             messageType = Some(messageType),
-            clientId = persistenceResponse.clientId
+            clientId = persistenceResponse.clientId,
+            isTransitional = persistenceResponse.isTransitional
           )
           _ = auditService.auditStatusEvent(
             NCTSToTraderSubmissionSuccessful,

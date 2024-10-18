@@ -109,6 +109,7 @@ class MessageControllerSpec
   val movementType: MovementType = MovementType("departure")
   val movementId: MovementId     = MovementId("abcdef1234567890")
   val messageId: MessageId       = MessageId("0987654321fedcba")
+  val isTransitional: Boolean    = true
 
   val cc015cOfficeOfDepartureGB: NodeSeq =
     <ncts:CC015C PhaseID="NCTS5.0" xmlns:ncts="http://ncts.dgtaxud.ec">
@@ -538,13 +539,14 @@ class MessageControllerSpec
       arbitrary[MessageId],
       arbitrary[ResponseMessageType],
       Gen.option(arbitrary[ClientId]),
-      arbitrary[EoriNumber]
+      arbitrary[EoriNumber],
+      arbitrary[Boolean]
     ) {
-      (movementId, messageId, messageType, clientId, eoriNumber) =>
+      (movementId, messageId, messageType, clientId, eoriNumber, isTransitional) =>
         when(mockMessageTypeExtractor.extract(any(), any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](messageType))
 
         when(mockPersistenceConnector.postBody(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(messageType), any())(any(), any()))
-          .thenReturn(EitherT.fromEither(Right(PersistenceResponse(messageId, eoriNumber, clientId))))
+          .thenReturn(EitherT.fromEither(Right(PersistenceResponse(messageId, eoriNumber, clientId, isTransitional))))
 
         when(
           mockPushNotificationsConnector
@@ -605,7 +607,8 @@ class MessageControllerSpec
           eqTo(Some(eoriNumber)),
           eqTo(Some(messageType.movementType)),
           eqTo(Some(messageType)),
-          eqTo(clientId)
+          eqTo(clientId),
+          eqTo(isTransitional)
         )(any[HeaderCarrier](), any[ExecutionContext]())
         verify(mockAuditingService, times(1)).auditStatusEvent(
           eqTo(NCTSToTraderSubmissionSuccessful),
@@ -742,7 +745,8 @@ class MessageControllerSpec
         eqTo(None),
         eqTo(Some(MessageType.MrnAllocated.movementType)),
         eqTo(Some(MessageType.MrnAllocated)),
-        eqTo(None)
+        eqTo(None),
+        any()
       )(any[HeaderCarrier](), any[ExecutionContext]())
     }
 
@@ -834,7 +838,7 @@ class MessageControllerSpec
         when(mockMessageTypeExtractor.extractFromBody(any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](messageType))
 
         when(mockPersistenceConnector.postBody(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(messageType), any())(any(), any()))
-          .thenReturn(EitherT.fromEither(Right(PersistenceResponse(messageId, eoriNumber, clientId))))
+          .thenReturn(EitherT.fromEither(Right(PersistenceResponse(messageId, eoriNumber, clientId, isTransitional))))
 
         when(
           mockPushNotificationsConnector
