@@ -299,7 +299,7 @@ class MessagesControllerIntegrationSpec
           post(
             urlEqualTo("/gb_v2_1")
           )
-            .withHeader(HeaderNames.AUTHORIZATION, equalTo(s"Bearer bearertoken"))
+            .withHeader(HeaderNames.AUTHORIZATION, equalTo(s"bearertoken"))
             .withHeader("Date", equalTo("Thu, 13 Apr 2023 10:34:41 UTC"))
             .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
             .withHeader("X-Conversation-Id", equalTo(conversationId.value.toString))
@@ -343,7 +343,7 @@ class MessagesControllerIntegrationSpec
           post(
             urlEqualTo("/xi_v2_1")
           )
-            .withHeader(HeaderNames.AUTHORIZATION, equalTo(s"Bearer bearertoken"))
+            .withHeader(HeaderNames.AUTHORIZATION, equalTo(s"bearertoken"))
             .withHeader("Date", equalTo("Thu, 13 Apr 2023 10:34:41 UTC"))
             .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
             .withHeader("X-Conversation-Id", equalTo(conversationId.value.toString))
