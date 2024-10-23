@@ -94,11 +94,7 @@ class EISConnectorImpl(
         case element => LocalReferenceNumber(element.getTextContent.trim)
       }
 
-  private lazy val authorization = {
-    if (eisInstanceConfig.removeLeadingBearer) {
-      eisInstanceConfig.headers.bearerToken
-    } else s"Bearer ${eisInstanceConfig.headers.bearerToken}"
-  }
+  private lazy val authorization = s"Bearer ${eisInstanceConfig.headers.bearerToken}"
 
   // Used when setting a stream body -- forces the correct content type (default chooses application/octet-stream)
   implicit private val xmlSourceWriter: BodyWritable[Source[ByteString, _]] = BodyWritable(SourceBody, MimeTypes.XML)
