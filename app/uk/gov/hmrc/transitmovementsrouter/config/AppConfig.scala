@@ -31,8 +31,8 @@ class AppConfig @Inject() (config: Configuration, servicesConfig: CTCServicesCon
   lazy val forceTransitionalInflight: Boolean = config.get[Boolean]("microservice.services.eis.force-transitional-inflight")
   lazy val eisXi: EISInstanceConfig           = config.get[EISInstanceConfig]("microservice.services.eis.xi")
   lazy val eisGb: EISInstanceConfig           = config.get[EISInstanceConfig]("microservice.services.eis.gb")
-  lazy val eisGbV2_1: EISInstanceConfig       = config.get[EISInstanceConfig]("microservice.services.eis.gb_v2_1").copy(removeLeadingBearer = true)
-  lazy val eisXiV2_1: EISInstanceConfig       = config.get[EISInstanceConfig]("microservice.services.eis.xi_v2_1").copy(removeLeadingBearer = true)
+  lazy val eisGbV2_1: EISInstanceConfig       = config.get[EISInstanceConfig]("microservice.services.eis.gb_v2_1")
+  lazy val eisXiV2_1: EISInstanceConfig       = config.get[EISInstanceConfig]("microservice.services.eis.xi_v2_1")
 
   lazy val persistenceServiceBaseUrl: Url = Url.parse(servicesConfig.baseUrl("transit-movements"))
 

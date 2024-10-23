@@ -94,11 +94,7 @@ class EISConnectorImpl(
         case element => LocalReferenceNumber(element.getTextContent.trim)
       }
 
-  private lazy val authorization = {
-    if (eisInstanceConfig.removeLeadingBearer) {
-      eisInstanceConfig.headers.bearerToken
-    } else s"Bearer ${eisInstanceConfig.headers.bearerToken}"
-  }
+  private lazy val authorization = s"Bearer ${eisInstanceConfig.headers.bearerToken}"
 
   // Used when setting a stream body -- forces the correct content type (default chooses application/octet-stream)
   implicit private val xmlSourceWriter: BodyWritable[Source[ByteString, _]] = BodyWritable(SourceBody, MimeTypes.XML)
@@ -150,9 +146,7 @@ class EISConnectorImpl(
 
       // The router required this to be supplied so will be in the carrier in "otherHeaders". headersForUrl only seems to care about
       // "explicitHeaders", so we need to use "headers" here and filter on what's returned.
-      val messageType      = hc.headers(Seq(RouterHeaderNames.MESSAGE_TYPE)).headOption.map(_._2).getOrElse("undefined")
-      val obfuscatedBearer = authorization.take(2) + "..." + authorization.takeRight(3) //TODO: REMOVE AFTER DEBUGGING
-
+      val messageType = hc.headers(Seq(RouterHeaderNames.MESSAGE_TYPE)).headOption.map(_._2).getOrElse("undefined")
       lazy val logMessage =
         s"""|transit-movements-router-eis
             |
@@ -166,8 +160,6 @@ class EISConnectorImpl(
             |
             |Submission Information:
             |
-            |Context Path: ${eisInstanceConfig.url}
-            |Obfuscated Bearer: $obfuscatedBearer
             |${HMRCHeaderNames.xRequestId}: ${requestId.getOrElse("undefined")}
             |${RouterHeaderNames.CORRELATION_ID}: $correlationId
             |${RouterHeaderNames.CONVERSATION_ID}: ${conversationId.value.toString}

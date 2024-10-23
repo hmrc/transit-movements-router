@@ -47,8 +47,7 @@ case class EISInstanceConfig(
   headers: Headers,
   circuitBreaker: CircuitBreakerConfig,
   retryConfig: RetryConfig,
-  forwardClientId: Boolean,
-  removeLeadingBearer: Boolean = false
+  forwardClientId: Boolean
 ) {
 
   lazy val url: String = s"$protocol://$host:$port$uri"
