@@ -146,7 +146,7 @@ class EISConnectorImpl(
 
       // The router required this to be supplied so will be in the carrier in "otherHeaders". headersForUrl only seems to care about
       // "explicitHeaders", so we need to use "headers" here and filter on what's returned.
-      val messageType      = hc.headers(Seq(RouterHeaderNames.MESSAGE_TYPE)).headOption.map(_._2).getOrElse("undefined")
+      val messageType = hc.headers(Seq(RouterHeaderNames.MESSAGE_TYPE)).headOption.map(_._2).getOrElse("undefined")
       val obfuscatedBearer = authorization.take(2) + "..." + authorization.takeRight(3) //TODO: REMOVE AFTER DEBUGGING
 
       lazy val logMessage =
@@ -163,7 +163,7 @@ class EISConnectorImpl(
             |Submission Information:
             |
             |Context Path: ${eisInstanceConfig.url}
-            |Obfuscated Bearer: $obfuscatedBearer
+            |Obfuscated Bearer: ${obfuscatedBearer}
             |${HMRCHeaderNames.xRequestId}: ${requestId.getOrElse("undefined")}
             |${RouterHeaderNames.CORRELATION_ID}: $correlationId
             |${RouterHeaderNames.CONVERSATION_ID}: ${conversationId.value.toString}
@@ -171,6 +171,8 @@ class EISConnectorImpl(
             |${HeaderNames.CONTENT_TYPE}: ${xmlSourceWriter.contentType}
             |${HeaderNames.DATE}: $date
             |""".stripMargin
+
+
 
       withCircuitBreaker[Either[RoutingError, Unit]](shouldCauseCircuitBreakerStrike) {
         httpClientV2
