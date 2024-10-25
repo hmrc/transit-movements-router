@@ -87,8 +87,28 @@ class EISConnectorProviderSpec extends AnyFreeSpec with HttpClientV2Support with
       verify(appConfig, times(0)).eisGb
     }
 
+    "getting the GB v2.0 connector will get the GB v2.1 connect if transitionalToSit2 is 'true'" in {
+      when(appConfig.transitionalToSit2).thenReturn(true)
+      val sut = new EISConnectorProviderImpl(appConfig, retries, httpClientV2, Clock.systemUTC())
+
+      sut.gb
+
+      verify(appConfig, times(1)).eisGbV2_1
+      verify(appConfig, times(0)).eisGb
+    }
+
+    "getting the XI v2.0 connector will get the XI v2.1 connector if transitionalToSit2 is 'true'" in {
+      when(appConfig.transitionalToSit2).thenReturn(true)
+      val sut = new EISConnectorProviderImpl(appConfig, retries, httpClientV2, Clock.systemUTC())
+
+      sut.xi
+
+      verify(appConfig, times(1)).eisXiV2_1
+      verify(appConfig, times(0)).eisXi
+    }
+
     "getting the GB v2.1 connector will get the GB v2.0 connect if forceTransitionalInflight is 'true'" in {
-      when(appConfig.forceTransitionalInflight).thenReturn(true)
+      when(appConfig.finalToSit1).thenReturn(true)
       val sut = new EISConnectorProviderImpl(appConfig, retries, httpClientV2, Clock.systemUTC())
 
       sut.gbV2_1
@@ -97,8 +117,8 @@ class EISConnectorProviderSpec extends AnyFreeSpec with HttpClientV2Support with
       verify(appConfig, times(0)).eisGbV2_1
     }
 
-    "getting the XI v2.1 connector will get the XI v2.0 connector if forceTransitionalInflight is 'true'" in {
-      when(appConfig.forceTransitionalInflight).thenReturn(true)
+    "getting the XI v2.1 connector will get the XI v2.0 connector if finalToSit1 is 'true'" in {
+      when(appConfig.finalToSit1).thenReturn(true)
       val sut = new EISConnectorProviderImpl(appConfig, retries, httpClientV2, Clock.systemUTC())
 
       sut.xiV2_1
