@@ -154,6 +154,7 @@ class EISConnectorImpl(
             |
             |Message Metadata (not submitted to EIS):
             |
+            |Obfuscated Token: ${authorization.replace("Bearer ", "").take(2)}...${authorization.replace("Bearer ", "").takeRight(2)}
             |Movement ID: ${movementId.value}
             |Message ID: ${messageId.value}
             |Message Type: $messageType
