@@ -22,6 +22,7 @@ import com.google.inject.Singleton
 import play.api.Logging
 import play.api.http.Status.NO_CONTENT
 import play.api.libs.json.Json
+import play.api.libs.ws.JsonBodyWritables
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.HttpReads.Implicits.readRaw
 import uk.gov.hmrc.http.HttpResponse
@@ -59,7 +60,10 @@ trait SDESConnector {
 }
 
 @Singleton
-class SDESConnectorImpl @Inject() (httpClientV2: HttpClientV2, appConfig: AppConfig, uuidGenerator: UUIDGenerator) extends SDESConnector with Logging {
+class SDESConnectorImpl @Inject() (httpClientV2: HttpClientV2, appConfig: AppConfig, uuidGenerator: UUIDGenerator)
+    extends SDESConnector
+    with JsonBodyWritables
+    with Logging {
 
   private lazy val sdesFileReadyUrl =
     appConfig.sdesServiceBaseUrl.withPath(appConfig.sdesFileReadyUri)
