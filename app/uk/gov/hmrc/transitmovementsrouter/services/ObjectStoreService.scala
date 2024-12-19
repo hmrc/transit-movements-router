@@ -27,9 +27,9 @@ import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.objectstore.client.ObjectSummaryWithMd5
 import uk.gov.hmrc.objectstore.client.Path
 import uk.gov.hmrc.objectstore.client.RetentionPeriod
-import uk.gov.hmrc.objectstore.client.play.Implicits._
+import uk.gov.hmrc.objectstore.client.play.Implicits.*
 import uk.gov.hmrc.objectstore.client.play.PlayObjectStoreClientEither
-import uk.gov.hmrc.transitmovementsrouter.models._
+import uk.gov.hmrc.transitmovementsrouter.models.*
 import uk.gov.hmrc.transitmovementsrouter.models.errors.ObjectStoreError
 
 import java.time.Clock
@@ -45,7 +45,7 @@ import scala.util.control.NonFatal
 @ImplementedBy(classOf[ObjectStoreServiceImpl])
 trait ObjectStoreService {
 
-  def storeOutgoing(conversationId: ConversationId, stream: Source[ByteString, _])(implicit
+  def storeOutgoing(conversationId: ConversationId, stream: Source[ByteString, ?])(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): EitherT[Future, ObjectStoreError, ObjectSummaryWithMd5]
@@ -56,12 +56,12 @@ trait ObjectStoreService {
 class ObjectStoreServiceImpl @Inject() (clock: Clock, client: PlayObjectStoreClientEither)(implicit mat: Materializer) extends ObjectStoreService with Logging {
   private val dateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").withZone(ZoneOffset.UTC)
 
-  override def storeOutgoing(conversationId: ConversationId, stream: Source[ByteString, _])(implicit
+  override def storeOutgoing(conversationId: ConversationId, stream: Source[ByteString, ?])(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): EitherT[Future, ObjectStoreError, ObjectSummaryWithMd5] =
-    EitherT {
-      client.putObject[Source[ByteString, _]](
+    EitherT[Future, Exception, ObjectSummaryWithMd5](
+      client.putObject[Source[ByteString, ?]](
         Path.File(s"sdes/${conversationId.value.toString}-$dateFormat.xml"),
         stream,
         retentionPeriod = RetentionPeriod.OneWeek,
@@ -69,12 +69,8 @@ class ObjectStoreServiceImpl @Inject() (clock: Clock, client: PlayObjectStoreCli
         owner = "transit-movements-router",
         contentMd5 = None
       )
-    }.leftMap {
-      error =>
-        // avoids exhaustive warnings
-        (error: @unchecked) match {
-          case NonFatal(thr) => ObjectStoreError.UnexpectedError(thr = Some(thr))
-        }
+    ).leftMap[ObjectStoreError] {
+      case NonFatal(thr) => ObjectStoreError.UnexpectedError(thr = Some(thr))
     }
 
   private def dateFormat: String =

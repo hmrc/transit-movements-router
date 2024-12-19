@@ -36,9 +36,9 @@ trait StreamWithFile {
   self: Logging =>
 
   def withReusableSource[R](
-    src: Source[ByteString, _]
+    src: Source[ByteString, ?]
   )(
-    block: Source[ByteString, _] => EitherT[Future, PresentationError, R]
+    block: Source[ByteString, ?] => EitherT[Future, PresentationError, R]
   )(implicit temporaryFileCreator: TemporaryFileCreator, mat: Materializer, ec: ExecutionContext): EitherT[Future, PresentationError, R] = {
     val file = temporaryFileCreator.create()
     (for {
@@ -53,7 +53,7 @@ trait StreamWithFile {
 
   }
 
-  private def writeToFile(file: Path, src: Source[ByteString, _])(implicit
+  private def writeToFile(file: Path, src: Source[ByteString, ?])(implicit
     mat: Materializer,
     ec: ExecutionContext
   ): EitherT[Future, PresentationError, IOResult] =

@@ -69,7 +69,7 @@ import scala.util.control.NonFatal
 
 trait EISConnector {
 
-  def post(movementId: MovementId, messageId: MessageId, body: Source[ByteString, _], hc: HeaderCarrier): Future[Either[RoutingError, Unit]]
+  def post(movementId: MovementId, messageId: MessageId, body: Source[ByteString, ?], hc: HeaderCarrier): Future[Either[RoutingError, Unit]]
 
 }
 
@@ -97,7 +97,7 @@ class EISConnectorImpl(
   private lazy val authorization = s"Bearer ${eisInstanceConfig.headers.bearerToken}"
 
   // Used when setting a stream body -- forces the correct content type (default chooses application/octet-stream)
-  implicit private val xmlSourceWriter: BodyWritable[Source[ByteString, _]] = BodyWritable(SourceBody, MimeTypes.XML)
+  implicit private val xmlSourceWriter: BodyWritable[Source[ByteString, ?]] = BodyWritable(SourceBody.apply, MimeTypes.XML)
 
   private val HTTP_DATE_FORMATTER = DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss", Locale.ENGLISH).withZone(ZoneOffset.UTC)
 
@@ -120,7 +120,7 @@ class EISConnectorImpl(
         Future.failed(new IllegalStateException(s"An unexpected error occurred - got a ${x.getClass}"))
     }
 
-  override def post(movementId: MovementId, messageId: MessageId, body: Source[ByteString, _], hc: HeaderCarrier): Future[Either[RoutingError, Unit]] =
+  override def post(movementId: MovementId, messageId: MessageId, body: Source[ByteString, ?], hc: HeaderCarrier): Future[Either[RoutingError, Unit]] =
     retryingOnFailures(
       retries.createRetryPolicy(eisInstanceConfig.retryConfig),
       (t: Either[RoutingError, Unit]) =>

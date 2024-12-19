@@ -16,14 +16,13 @@
 
 package uk.gov.hmrc.transitmovementsrouter.controllers.actions
 
-import org.mockito.ArgumentMatchers.any
-import org.mockito.ArgumentMatchers.{eq => eqTo}
-import org.mockito.MockitoSugar
+import org.mockito.Mockito.times
+import org.mockito.Mockito.verify
+import org.mockito.Mockito.when
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
+import org.scalatestplus.mockito.MockitoSugar
 import play.api.mvc.ActionBuilder
-import play.api.mvc.AnyContent
-import play.api.mvc.DefaultActionBuilder
 import play.api.test.Helpers.stubControllerComponents
 import uk.gov.hmrc.internalauth.client.AuthenticatedRequest
 import uk.gov.hmrc.internalauth.client.BackendAuthComponents
@@ -32,7 +31,6 @@ import uk.gov.hmrc.internalauth.client.Predicate
 import uk.gov.hmrc.internalauth.client.Resource
 import uk.gov.hmrc.internalauth.client.ResourceLocation
 import uk.gov.hmrc.internalauth.client.ResourceType
-import uk.gov.hmrc.internalauth.client.Retrieval.EmptyRetrieval
 import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -50,14 +48,12 @@ class InternalAuthActionProviderSpec extends AnyFreeSpec with Matchers with Mock
         val appConfig = mock[AppConfig]
         when(appConfig.internalAuthEnabled).thenReturn(false)
 
-        val mockActionBuilder         = mock[ActionBuilder[AuthReq, AnyContent]]
         val mockBackendAuthComponents = mock[BackendAuthComponents]
-        when(mockBackendAuthComponents.authorizedAction(any[Predicate], eqTo(EmptyRetrieval), any(), any())).thenReturn(mockActionBuilder)
 
         val samplePermission = Predicate.Permission(Resource(ResourceType("transit-movements-auditing"), ResourceLocation("audit")), IAAction("WRITE"))
-        val sut              = new InternalAuthActionProviderImpl(appConfig, mockBackendAuthComponents, stubControllerComponents())
 
-        sut(samplePermission) mustBe a[DefaultActionBuilder]
+        val _ = new InternalAuthActionProviderImpl(appConfig, mockBackendAuthComponents, stubControllerComponents()).apply(samplePermission)
+        verify(mockBackendAuthComponents, times(0)).authorizedAction(samplePermission)
       }
 
     }
@@ -69,14 +65,12 @@ class InternalAuthActionProviderSpec extends AnyFreeSpec with Matchers with Mock
         val appConfig = mock[AppConfig]
         when(appConfig.internalAuthEnabled).thenReturn(true)
 
-        val mockActionBuilder         = mock[ActionBuilder[AuthReq, AnyContent]]
         val mockBackendAuthComponents = mock[BackendAuthComponents]
-        when(mockBackendAuthComponents.authorizedAction(any[Predicate], eqTo(EmptyRetrieval), any(), any())).thenReturn(mockActionBuilder)
 
         val samplePermission = Predicate.Permission(Resource(ResourceType("transit-movements-auditing"), ResourceLocation("audit")), IAAction("WRITE"))
-        val sut              = new InternalAuthActionProviderImpl(appConfig, mockBackendAuthComponents, stubControllerComponents())
 
-        sut(samplePermission) mustBe mockActionBuilder
+        val _ = new InternalAuthActionProviderImpl(appConfig, mockBackendAuthComponents, stubControllerComponents()).apply(samplePermission)
+        verify(mockBackendAuthComponents, times(1)).authorizedAction(samplePermission)
       }
 
     }
