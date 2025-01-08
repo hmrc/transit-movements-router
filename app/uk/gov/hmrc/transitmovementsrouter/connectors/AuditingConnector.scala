@@ -30,8 +30,6 @@ import play.api.http.Status.ACCEPTED
 import play.api.libs.json.JsObject
 import play.api.libs.json.JsValue
 import play.api.libs.json.Json
-import play.api.libs.ws.DefaultBodyWritables
-import play.api.libs.ws.JsonBodyWritables
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.HttpResponse
 import uk.gov.hmrc.http.StringContextOps
@@ -50,7 +48,7 @@ import uk.gov.hmrc.transitmovementsrouter.models.MovementId
 import uk.gov.hmrc.transitmovementsrouter.models.MovementType
 import uk.gov.hmrc.transitmovementsrouter.models.requests.Details
 import uk.gov.hmrc.transitmovementsrouter.models.requests.Metadata
-import uk.gov.hmrc.http.HttpReads.Implicits.*
+import uk.gov.hmrc.http.HttpReads.Implicits._
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
@@ -63,7 +61,7 @@ trait AuditingConnector {
     auditType: AuditType,
     contentType: String,
     contentLength: Long,
-    payload: Source[ByteString, ?],
+    payload: Source[ByteString, _],
     movementId: Option[MovementId],
     messageId: Option[MessageId],
     enrolmentEORI: Option[EoriNumber],
@@ -94,8 +92,6 @@ trait AuditingConnector {
 
 class AuditingConnectorImpl @Inject() (httpClient: HttpClientV2, val metrics: Metrics)(implicit appConfig: AppConfig)
     extends AuditingConnector
-    with DefaultBodyWritables
-    with JsonBodyWritables
     with BaseConnector
     with HasMetrics
     with Logging {
@@ -106,7 +102,7 @@ class AuditingConnectorImpl @Inject() (httpClient: HttpClientV2, val metrics: Me
     auditType: AuditType,
     contentType: String,
     contentLength: Long,
-    payload: Source[ByteString, ?],
+    payload: Source[ByteString, _],
     movementId: Option[MovementId] = None,
     messageId: Option[MessageId] = None,
     enrolmentEORI: Option[EoriNumber] = None,
@@ -144,7 +140,7 @@ class AuditingConnectorImpl @Inject() (httpClient: HttpClientV2, val metrics: Me
         .withAuditMessageType(messageType)
         .withClientId(clientId)
         .setHeader(
-          allHeaders *
+          allHeaders: _*
         )
         .withBody(payload)
         .execute[HttpResponse]

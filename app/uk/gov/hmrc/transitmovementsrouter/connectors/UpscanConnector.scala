@@ -29,7 +29,6 @@ import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.HttpResponse
 import uk.gov.hmrc.http.StringContextOps
 import uk.gov.hmrc.http.UpstreamErrorResponse
-import uk.gov.hmrc.http.client.readStreamEitherHttpResponse
 import uk.gov.hmrc.http.client.HttpClientV2
 import uk.gov.hmrc.transitmovementsrouter.models.errors.UpscanError
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.DownloadUrl
@@ -41,7 +40,7 @@ import scala.util.control.NonFatal
 @ImplementedBy(classOf[UpscanConnectorImpl])
 trait UpscanConnector {
 
-  def streamFile(url: DownloadUrl)(implicit hc: HeaderCarrier, mat: Materializer, ec: ExecutionContext): EitherT[Future, UpscanError, Source[ByteString, ?]]
+  def streamFile(url: DownloadUrl)(implicit hc: HeaderCarrier, mat: Materializer, ec: ExecutionContext): EitherT[Future, UpscanError, Source[ByteString, _]]
 
 }
 
@@ -50,7 +49,7 @@ class UpscanConnectorImpl @Inject() (httpClientV2: HttpClientV2) extends UpscanC
 
   override def streamFile(
     url: DownloadUrl
-  )(implicit hc: HeaderCarrier, mat: Materializer, ec: ExecutionContext): EitherT[Future, UpscanError, Source[ByteString, ?]] =
+  )(implicit hc: HeaderCarrier, mat: Materializer, ec: ExecutionContext): EitherT[Future, UpscanError, Source[ByteString, _]] =
     EitherT {
       httpClientV2
         .get(url"${url.value}")

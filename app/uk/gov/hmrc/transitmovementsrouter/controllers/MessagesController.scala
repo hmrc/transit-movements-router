@@ -109,8 +109,8 @@ class MessagesController @Inject() (
   private val predicate: Predicate.Permission =
     Predicate.Permission(Resource(ResourceType("transit-movements-router"), ResourceLocation("message")), IAAction("WRITE"))
 
-  def outgoing(@unused eori: EoriNumber, movementType: MovementType, movementId: MovementId, messageId: MessageId): Action[Source[ByteString, ?]] = {
-    def viaEIS(messageType: MessageType, customsOffice: CustomsOffice, source: Source[ByteString, ?], isTransitional: Boolean)(implicit
+  def outgoing(@unused eori: EoriNumber, movementType: MovementType, movementId: MovementId, messageId: MessageId): Action[Source[ByteString, _]] = {
+    def viaEIS(messageType: MessageType, customsOffice: CustomsOffice, source: Source[ByteString, _], isTransitional: Boolean)(implicit
       hc: HeaderCarrier
     ): EitherT[Future, PresentationError, Status] =
       for {
@@ -118,7 +118,7 @@ class MessagesController @Inject() (
         _ = statusMonitoringService.outgoing(movementId, messageId, messageType, customsOffice)
       } yield Created
 
-    def viaSDES(source: Source[ByteString, ?])(implicit hc: HeaderCarrier): EitherT[Future, PresentationError, Status] =
+    def viaSDES(source: Source[ByteString, _])(implicit hc: HeaderCarrier): EitherT[Future, PresentationError, Status] =
       for {
         objectStoreFile <- objectStoreService.storeOutgoing(ConversationId(movementId, messageId), source).asPresentation
         _               <- sdesService.send(movementId, messageId, objectStoreFile).asPresentation
@@ -143,13 +143,13 @@ class MessagesController @Inject() (
     }
   }
 
-  private def isTransitional(implicit request: Request[?]) =
+  private def isTransitional(implicit request: Request[_]) =
     request.headers.get(Constants.APIVersionHeaderKey).map(_.trim.toLowerCase) match {
       case Some(Constants.APIVersionFinalHeaderValue) => false
       case _                                          => true
     }
 
-  private def materializeOutgoingSource(source: Source[ByteString, ?]): EitherT[Future, PresentationError, Seq[ByteString]] =
+  private def materializeOutgoingSource(source: Source[ByteString, _]): EitherT[Future, PresentationError, Seq[ByteString]] =
     EitherT(
       source
         .runWith(Sink.seq)
@@ -161,7 +161,7 @@ class MessagesController @Inject() (
     )
 
   // Function to materialize the source into a Seq[ByteString] with error handling
-  private def materializeIncomingSource(source: Source[ByteString, ?]): EitherT[Future, PresentationError, Seq[ByteString]] =
+  private def materializeIncomingSource(source: Source[ByteString, _]): EitherT[Future, PresentationError, Seq[ByteString]] =
     EitherT(
       source
         .via(eisMessageTransformers.unwrap)
@@ -196,19 +196,19 @@ class MessagesController @Inject() (
     )
 
   // Function to create a new source from the materialized sequence
-  private def createReusableSource(seq: Seq[ByteString]): Source[ByteString, ?] = Source(seq.toList)
+  private def createReusableSource(seq: Seq[ByteString]): Source[ByteString, _] = Source(seq.toList)
 
   // Materialize the source and create multiple new sources with error handling
-  private def reUsableIncomingSource(request: Request[Source[ByteString, ?]]): EitherT[Future, PresentationError, List[Source[ByteString, ?]]] = for {
+  private def reUsableIncomingSource(request: Request[Source[ByteString, _]]): EitherT[Future, PresentationError, List[Source[ByteString, _]]] = for {
     byteStringSeq <- materializeIncomingSource(request.body)
   } yield List.fill(4)(createReusableSource(byteStringSeq))
 
-  private def reUsableOutgoingSource(request: Request[Source[ByteString, ?]]): EitherT[Future, PresentationError, List[Source[ByteString, ?]]] = for {
+  private def reUsableOutgoingSource(request: Request[Source[ByteString, _]]): EitherT[Future, PresentationError, List[Source[ByteString, _]]] = for {
     byteStringSeq <- materializeOutgoingSource(request.body)
   } yield List.fill(4)(createReusableSource(byteStringSeq))
 
   // Function to calculate the size using EitherT
-  private def calculateSize(source: Source[ByteString, ?]): EitherT[Future, PresentationError, Long] = {
+  private def calculateSize(source: Source[ByteString, _]): EitherT[Future, PresentationError, Long] = {
     val sizeFuture: Future[Either[PresentationError, Long]] = source
       .map(_.size.toLong)
       .runWith(Sink.fold(0L)(_ + _))
@@ -225,7 +225,7 @@ class MessagesController @Inject() (
   private def extractAuditMessageType(messageType: MessageType): EitherT[Future, PresentationError, AuditType] =
     EitherT.fromOption[Future](messageType.auditType, PresentationError.badRequestError(s"$messageType is not a ResponseMessageType"))
 
-  def incomingViaEIS(ids: ConversationId): Action[Source[ByteString, ?]] =
+  def incomingViaEIS(ids: ConversationId): Action[Source[ByteString, _]] =
     authenticateEISToken.async(streamFromMemory) {
 
       implicit request =>
@@ -323,7 +323,7 @@ class MessagesController @Inject() (
         )
   }
 
-  private def withUpscanSource(movementId: MovementId, triggerId: MessageId, source: Source[ByteString, ?])(implicit
+  private def withUpscanSource(movementId: MovementId, triggerId: MessageId, source: Source[ByteString, _])(implicit
     hc: HeaderCarrier
   ): EitherT[Future, PresentationError, PersistenceResponse] =
     withReusableSource(source) {
@@ -335,7 +335,7 @@ class MessagesController @Inject() (
         } yield persistenceResponse
     }
 
-  private def persistStream(movementId: MovementId, triggerId: MessageId, messageType: MessageType, source: Source[ByteString, ?])(implicit
+  private def persistStream(movementId: MovementId, triggerId: MessageId, messageType: MessageType, source: Source[ByteString, _])(implicit
     hc: HeaderCarrier
   ): EitherT[Future, PresentationError, PersistenceResponse] =
     for {
@@ -434,7 +434,7 @@ class MessagesController @Inject() (
 
   // Logging methods
 
-  private def generateRequestLog(movementId: MovementId, triggerId: MessageId, messageType: Option[MessageType])(implicit request: Request[?]): String =
+  private def generateRequestLog(movementId: MovementId, triggerId: MessageId, messageType: Option[MessageType])(implicit request: Request[_]): String =
     s"""Message Type: ${messageType.map(_.code).getOrElse("unknown")}
        |Movement ID: ${movementId.value}
        |Trigger ID: ${triggerId.value}
@@ -443,7 +443,7 @@ class MessagesController @Inject() (
        |Conversation ID: ${request.headers.get(RouterHeaderNames.CONVERSATION_ID).getOrElse("unavailable")}""".stripMargin
 
   private def logIncomingSuccess(movementId: MovementId, triggerId: MessageId, newMessageId: MessageId, messageType: MessageType)(implicit
-    request: Request[?]
+    request: Request[_]
   ): Unit =
     if (config.logIncoming) {
       logger.info(s"""Received message from EIS

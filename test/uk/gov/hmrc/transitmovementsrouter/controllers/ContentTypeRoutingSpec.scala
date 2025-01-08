@@ -61,7 +61,7 @@ class ContentTypeRoutingSpec
       with StreamingParsers
       with Logging {
 
-    def testWithContentType: Action[Source[ByteString, ?]] = contentTypeRoute {
+    def testWithContentType: Action[Source[ByteString, _]] = contentTypeRoute {
       case Some(_) => contentActionOne
       case None    => contentActionTwo
     }

@@ -25,13 +25,13 @@ object TestSourceProvider extends TestSourceProvider
 
 trait TestSourceProvider {
 
-  def singleUseStringSource(str: => String): Source[ByteString, ?] =
+  def singleUseStringSource(str: => String): Source[ByteString, _] =
     singleUseSource0(Seq(ByteString(str, StandardCharsets.UTF_8)).iterator)
 
-  def singleUseSource[A](a: => Iterable[A]): Source[A, ?] =
+  def singleUseSource[A](a: => Iterable[A]): Source[A, _] =
     singleUseSource0(a.iterator)
 
-  private def singleUseSource0[A](iterator: => Iterator[A]): Source[A, ?] = {
+  private def singleUseSource0[A](iterator: => Iterator[A]): Source[A, _] = {
     lazy val singleUseIterator = iterator
     Source.fromIterator {
       () =>

@@ -81,7 +81,7 @@ class StreamingParsersSpec extends AnyFreeSpec with Matchers with TestActorSyste
     implicit val temporaryFileCreator: Files.SingletonTemporaryFileCreator.type = SingletonTemporaryFileCreator
     implicit val materializer: Materializer                                     = Materializer(TestActorSystem.system)
 
-    def testFromMemory: Action[Source[ByteString, ?]] = Action.async(streamFromMemory) {
+    def testFromMemory: Action[Source[ByteString, _]] = Action.async(streamFromMemory) {
       request => result.apply(request).run(request.body)(materializer)
     }
 
@@ -90,7 +90,7 @@ class StreamingParsersSpec extends AnyFreeSpec with Matchers with TestActorSyste
         Future.successful(Ok(request.body))
     }
 
-    def resultStream: Action[Source[ByteString, ?]] = Action.andThen(TestActionBuilder).streamWithSize {
+    def resultStream: Action[Source[ByteString, _]] = Action.andThen(TestActionBuilder).streamWithSize {
       request => _ =>
         (for {
           a <- request.body.runWith(Sink.last)
@@ -101,7 +101,7 @@ class StreamingParsersSpec extends AnyFreeSpec with Matchers with TestActorSyste
           )
     }
 
-    def transformStream: Action[Source[ByteString, ?]] = Action
+    def transformStream: Action[Source[ByteString, _]] = Action
       .andThen(TestActionBuilder)
       .streamWithSize(
         Flow.fromFunction[ByteString, ByteString](
@@ -118,7 +118,7 @@ class StreamingParsersSpec extends AnyFreeSpec with Matchers with TestActorSyste
             )
       }
 
-    def errorStream: Action[Source[ByteString, ?]] = Action
+    def errorStream: Action[Source[ByteString, _]] = Action
       .andThen(TestActionBuilder)
       .streamWithSize(
         Flow.fromFunction[ByteString, ByteString](
@@ -129,7 +129,7 @@ class StreamingParsersSpec extends AnyFreeSpec with Matchers with TestActorSyste
           Future.successful(Ok("but should never happen"))
       }
 
-    def internalErrorStream: Action[Source[ByteString, ?]] = Action
+    def internalErrorStream: Action[Source[ByteString, _]] = Action
       .andThen(TestActionBuilder)
       .streamWithSize(
         Flow.fromFunction[ByteString, ByteString](

@@ -7,9 +7,9 @@ This microservice is in [Beta](https://www.gov.uk/help/beta). The signature may 
 
 ## Prerequisites
 
-- Scala 3.4.3
+- Scala 2.13.12
 - Java 21
-- sbt > 1.10.1
+- sbt > 1.9.7
 - [Service Manager](https://github.com/hmrc/service-manager)
 
 ## Development Setup

@@ -41,7 +41,7 @@ import scala.concurrent.Future
 import scala.util.Try
 
 trait StreamingParsers {
-  self: BaseControllerHelpers & Logging =>
+  self: BaseControllerHelpers with Logging =>
 
   implicit val materializer: Materializer
 
@@ -52,14 +52,14 @@ trait StreamingParsers {
   implicit val materializerExecutionContext: ExecutionContext =
     ExecutionContext.fromExecutorService(Executors.newCachedThreadPool())
 
-  lazy val streamFromMemory: BodyParser[Source[ByteString, ?]] = BodyParser {
+  lazy val streamFromMemory: BodyParser[Source[ByteString, _]] = BodyParser {
     _ =>
       Accumulator.source[ByteString].map(Right.apply)
   }
 
   val config: AppConfig
 
-  implicit class ActionBuilderStreamHelpers(actionBuilder: ActionBuilder[Request, ?]) {
+  implicit class ActionBuilderStreamHelpers(actionBuilder: ActionBuilder[Request, _]) {
 
     /** Updates the [[Source]] in the [[Request]] with a version that can be used
       * multiple times via the use of a temporary file.
@@ -68,9 +68,9 @@ trait StreamingParsers {
       * @return An [[Action]]
       */
 
-    def streamWithSize(transformer: Flow[ByteString, ByteString, ?])(
-      block: Request[Source[ByteString, ?]] => Long => Future[Result]
-    )(implicit temporaryFileCreator: TemporaryFileCreator): Action[Source[ByteString, ?]] =
+    def streamWithSize(transformer: Flow[ByteString, ByteString, _])(
+      block: Request[Source[ByteString, _]] => Long => Future[Result]
+    )(implicit temporaryFileCreator: TemporaryFileCreator): Action[Source[ByteString, _]] =
       actionBuilder.async(streamFromMemory) {
         request =>
           // This is outside the for comprehension because we need access to the file
@@ -125,8 +125,8 @@ trait StreamingParsers {
       }
 
     def streamWithSize(
-      block: Request[Source[ByteString, ?]] => Long => Future[Result]
-    )(implicit temporaryFileCreator: TemporaryFileCreator): Action[Source[ByteString, ?]] =
+      block: Request[Source[ByteString, _]] => Long => Future[Result]
+    )(implicit temporaryFileCreator: TemporaryFileCreator): Action[Source[ByteString, _]] =
       streamWithSize(Flow.apply[ByteString])(block)(temporaryFileCreator)
   }
 }

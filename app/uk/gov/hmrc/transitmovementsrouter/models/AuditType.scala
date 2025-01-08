@@ -20,45 +20,26 @@ sealed abstract class AuditType(val name: String)
 
 object AuditType {
 
-  case object AmendmentAcceptance extends AuditType("AmendmentAcceptance")
-
-  case object InvalidationDecision extends AuditType("InvalidationDecision")
-
-  case object Discrepancies extends AuditType("Discrepancies")
-
-  case object NotificationToAmendDeclaration extends AuditType("NotificationToAmendDeclaration")
-
-  case object GoodsReleaseNotification extends AuditType("GoodsReleaseNotification")
-
-  case object MRNAllocated extends AuditType("MRNAllocated")
-
-  case object ReleaseForTransit extends AuditType("ReleaseForTransit")
-
-  case object RecoveryNotification extends AuditType("RecoveryNotification")
-
-  case object UnloadingPermission extends AuditType("UnloadingPermission")
-
-  case object WriteOffNotification extends AuditType("WriteOffNotification")
-
-  case object NoReleaseForTransit extends AuditType("NoReleaseForTransit")
-
-  case object GuaranteeNotValid extends AuditType("GuaranteeNotValid")
-
-  case object RejectionFromOfficeOfDeparture extends AuditType("RejectionFromOfficeOfDeparture")
-
-  case object RejectionFromOfficeOfDestination extends AuditType("RejectionFromOfficeOfDestination")
-
-  case object ControlDecisionNotification extends AuditType("ControlDecisionNotification")
-
-  case object PositiveAcknowledge extends AuditType("PositiveAcknowledge")
-
-  case object NCTSRequestedMissingMovement extends AuditType("NCTSRequestedMissingMovement")
-
-  case object NCTSToTraderSubmissionSuccessful extends AuditType("NCTSToTraderSubmissionSuccessful")
-
-  case object ForwardedIncidentNotificationToED extends AuditType("ForwardedIncidentNotificationToED")
-
-  private case object RequestOnNonArrivedMovement extends AuditType("RequestOnNonArrivedMovement")
+  final case object AmendmentAcceptance                 extends AuditType("AmendmentAcceptance")
+  final case object InvalidationDecision                extends AuditType("InvalidationDecision")
+  final case object Discrepancies                       extends AuditType("Discrepancies")
+  final case object NotificationToAmendDeclaration      extends AuditType("NotificationToAmendDeclaration")
+  final case object GoodsReleaseNotification            extends AuditType("GoodsReleaseNotification")
+  final case object MRNAllocated                        extends AuditType("MRNAllocated")
+  final case object ReleaseForTransit                   extends AuditType("ReleaseForTransit")
+  final case object RecoveryNotification                extends AuditType("RecoveryNotification")
+  final case object UnloadingPermission                 extends AuditType("UnloadingPermission")
+  final case object WriteOffNotification                extends AuditType("WriteOffNotification")
+  final case object NoReleaseForTransit                 extends AuditType("NoReleaseForTransit")
+  final case object GuaranteeNotValid                   extends AuditType("GuaranteeNotValid")
+  final case object RejectionFromOfficeOfDeparture      extends AuditType("RejectionFromOfficeOfDeparture")
+  final case object RejectionFromOfficeOfDestination    extends AuditType("RejectionFromOfficeOfDestination")
+  final case object ControlDecisionNotification         extends AuditType("ControlDecisionNotification")
+  final case object PositiveAcknowledge                 extends AuditType("PositiveAcknowledge")
+  final case object NCTSRequestedMissingMovement        extends AuditType("NCTSRequestedMissingMovement")
+  final case object NCTSToTraderSubmissionSuccessful    extends AuditType("NCTSToTraderSubmissionSuccessful")
+  final case object ForwardedIncidentNotificationToED   extends AuditType("ForwardedIncidentNotificationToED")
+  final private case object RequestOnNonArrivedMovement extends AuditType("RequestOnNonArrivedMovement")
 
   val values: Seq[AuditType] = Seq(
     AmendmentAcceptance,

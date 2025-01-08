@@ -36,9 +36,9 @@ import uk.gov.hmrc.transitmovementsrouter.services.state.WrappingState
 @ImplementedBy(classOf[EISMessageTransformersImpl])
 trait EISMessageTransformers {
 
-  def wrap: Flow[ByteString, ByteString, ?]
+  def wrap: Flow[ByteString, ByteString, _]
 
-  def unwrap: Flow[ByteString, ByteString, ?]
+  def unwrap: Flow[ByteString, ByteString, _]
 
 }
 
@@ -105,7 +105,7 @@ class EISMessageTransformersImpl extends EISMessageTransformers {
     case element                => (state, element)
   }
 
-  lazy val unwrap: Flow[ByteString, ByteString, ?] =
+  lazy val unwrap: Flow[ByteString, ByteString, _] =
     Flow[ByteString]
       .via(XmlParsing.parser)
       .statefulMap[UnwrappingState, ParseEvent](
@@ -145,7 +145,7 @@ class EISMessageTransformersImpl extends EISMessageTransformers {
     case x => (state, Seq(x))
   }
 
-  lazy val wrap: Flow[ByteString, ByteString, ?] =
+  lazy val wrap: Flow[ByteString, ByteString, _] =
     Flow[ByteString]
       .via(XmlParsing.parser)
       .statefulMap[WrappingState, Seq[ParseEvent]](

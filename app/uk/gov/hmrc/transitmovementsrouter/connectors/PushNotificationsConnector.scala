@@ -29,17 +29,15 @@ import play.api.http.MimeTypes
 import play.api.http.Status.ACCEPTED
 import play.api.http.Status.NOT_FOUND
 import play.api.libs.json.JsValue
-import play.api.libs.ws.DefaultBodyWritables
-import play.api.libs.ws.JsonBodyWritables
 import uk.gov.hmrc.http.HeaderCarrier
-import uk.gov.hmrc.http.HttpReads.Implicits.*
+import uk.gov.hmrc.http.HttpReads.Implicits._
 import uk.gov.hmrc.http.HttpResponse
 import uk.gov.hmrc.http.StringContextOps
 import uk.gov.hmrc.http.UpstreamErrorResponse
 import uk.gov.hmrc.http.client.HttpClientV2
 import uk.gov.hmrc.http.client.RequestBuilder
 import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
-import uk.gov.hmrc.transitmovementsrouter.models.*
+import uk.gov.hmrc.transitmovementsrouter.models._
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PushNotificationError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PushNotificationError.MovementNotFound
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PushNotificationError.Unexpected
@@ -51,7 +49,7 @@ import scala.util.control.NonFatal
 @ImplementedBy(classOf[PushNotificationsConnectorImpl])
 trait PushNotificationsConnector {
 
-  def postMessageReceived(movementId: MovementId, messageId: MessageId, messageType: MessageType, sourceXml: Source[ByteString, ?])(implicit
+  def postMessageReceived(movementId: MovementId, messageId: MessageId, messageType: MessageType, sourceXml: Source[ByteString, _])(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): EitherT[Future, PushNotificationError, Unit]
@@ -70,8 +68,6 @@ trait PushNotificationsConnector {
 @Singleton
 class PushNotificationsConnectorImpl @Inject() (httpClientV2: HttpClientV2)(implicit appConfig: AppConfig)
     extends PushNotificationsConnector
-    with DefaultBodyWritables
-    with JsonBodyWritables
     with BaseConnector {
 
   val baseUrl: Url      = appConfig.transitMovementsPushNotificationsUrl
@@ -82,7 +78,7 @@ class PushNotificationsConnectorImpl @Inject() (httpClientV2: HttpClientV2)(impl
   private def pushNotificationMessageUpdate(movementId: MovementId, messageId: MessageId, notificationType: String): UrlPath =
     UrlPath.parse(s"$baseRoute/traders/movements/${movementId.value}/messages/${messageId.value}/$notificationType")
 
-  override def postMessageReceived(movementId: MovementId, messageId: MessageId, messageType: MessageType, sourceXml: Source[ByteString, ?])(implicit
+  override def postMessageReceived(movementId: MovementId, messageId: MessageId, messageType: MessageType, sourceXml: Source[ByteString, _])(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): EitherT[Future, PushNotificationError, Unit] =

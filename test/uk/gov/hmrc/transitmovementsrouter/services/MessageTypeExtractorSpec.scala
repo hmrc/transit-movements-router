@@ -39,7 +39,7 @@ class MessageTypeExtractorSpec extends AnyFreeSpec with ScalaFutures with Matche
   val sut                                    = new MessageTypeExtractorImpl
   val messageTypeGenerator: Gen[MessageType] = Gen.oneOf(MessageType.values.toSeq)
 
-  def validBody(mt: MessageType): Source[ByteString, ?] =
+  def validBody(mt: MessageType): Source[ByteString, _] =
     Source.single(
       ByteString(s"""<ncts:${mt.rootNode.toUpperCase} PhaseID="NCTS5.0" xmlns:ncts="http://ncts.dgtaxud.ec"><blah></blah></ncts:${mt.rootNode.toUpperCase}>""")
     )
@@ -94,14 +94,14 @@ class MessageTypeExtractorSpec extends AnyFreeSpec with ScalaFutures with Matche
 
   "extract" - {
     "should choose the X-Message-Type first" in forAll(messageTypeGenerator) {
-      mt =>
+      mt: MessageType =>
         whenReady(sut.extract(Headers("X-Message-Type" -> mt.code), Source.single(ByteString("<CC001C></CC001C>"))).value) {
           _ mustBe Right(mt)
         }
     }
 
     "should try the body if the header does not contain a valid type" in forAll(messageTypeGenerator) {
-      mt =>
+      mt: MessageType =>
         whenReady(sut.extract(Headers("X-Message-Type" -> "nope"), validBody(mt)).value) {
           _ mustBe Right(mt)
         }

@@ -23,7 +23,7 @@ import uk.gov.hmrc.transitmovementsrouter.controllers.errors.PresentationError
 import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesNotification
 
 trait SdesResponseParser {
-  self: BaseController & Logging =>
+  self: BaseController with Logging =>
 
   def parseAndLogSdesResponse(responseBody: JsValue): Either[PresentationError, SdesNotification] =
     responseBody

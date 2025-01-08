@@ -62,7 +62,7 @@ class AuthenticateEISTokenImpl @Inject() (appConfig: AppConfig, parsers: BodyPar
 
   private def createUnauthorisedResponse(headers: Headers): Result =
     Status(UNAUTHORIZED)(Json.toJson(PresentationError.unauthorisedError("Supplied Bearer token is invalid")))
-      .withHeaders(headers.headers.filter(_._1.toLowerCase == "x-correlation-id") *)
+      .withHeaders(headers.headers.filter(_._1.toLowerCase == "x-correlation-id"): _*)
 
   override def parser: BodyParser[AnyContent] = parsers
 }

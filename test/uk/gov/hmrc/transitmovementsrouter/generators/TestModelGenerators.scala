@@ -101,7 +101,7 @@ trait TestModelGenerators extends BaseGenerators {
   implicit lazy val arbitraryOffsetDateTime: Arbitrary[OffsetDateTime] =
     Arbitrary {
       for {
-        millis <- Gen.chooseNum(0L, Long.MaxValue / 1000L)
+        millis <- Gen.chooseNum(0, Long.MaxValue / 1000L)
       } yield OffsetDateTime.ofInstant(Instant.ofEpochMilli(millis), ZoneOffset.UTC)
     }
 
@@ -140,7 +140,7 @@ trait TestModelGenerators extends BaseGenerators {
     Base64.getEncoder.encodeToString(MessageDigest.getInstance("MD5").digest(string.getBytes(StandardCharsets.UTF_8)))
 
   implicit val arbitraryMd5Hash: Arbitrary[Md5Hash] = Arbitrary {
-    Gen.alphaNumStr.map(md5hashbase64).map(Md5Hash.apply)
+    Gen.alphaNumStr.map(md5hashbase64).map(Md5Hash)
   }
 
   implicit val arbitraryObjectSummaryWithMd5: Arbitrary[ObjectSummaryWithMd5] = Arbitrary {

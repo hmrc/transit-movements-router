@@ -24,11 +24,8 @@ import play.api.libs.json.Writes
 
 sealed trait MessageType extends Product with Serializable {
   def code: String
-
   def rootNode: String
-
   def auditType: Option[AuditType] = None
-
   def movementType: MovementType
 }
 
@@ -80,16 +77,16 @@ object MessageType {
   // *******************
 
   /** E_DEC_AMD (IE013) */
-  case object DeclarationAmendment extends DepartureRequestMessageType("IE013", "CC013C")
+  final case object DeclarationAmendment extends DepartureRequestMessageType("IE013", "CC013C")
 
   /** E_DEC_DAT (IE015) */
-  case object DeclarationData extends DepartureRequestMessageType("IE015", "CC015C")
+  final case object DeclarationData extends DepartureRequestMessageType("IE015", "CC015C")
 
   /** E_DEC_INV (IE014) */
-  private case object DeclarationInvalidation extends DepartureRequestMessageType("IE014", "CC014C")
+  final private case object DeclarationInvalidation extends DepartureRequestMessageType("IE014", "CC014C")
 
   /** E_PRE_NOT (IE170) */
-  private case object PresentationNotification extends DepartureRequestMessageType("IE170", "CC170C")
+  final private case object PresentationNotification extends DepartureRequestMessageType("IE170", "CC170C")
 
   val departureRequestValues: Set[DepartureRequestMessageType] = Set(
     DeclarationAmendment,
