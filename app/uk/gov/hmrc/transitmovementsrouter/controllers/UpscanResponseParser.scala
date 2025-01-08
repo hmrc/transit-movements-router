@@ -28,7 +28,7 @@ import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanSuccessResponse
 import scala.concurrent.Future
 
 trait UpscanResponseParser {
-  self: BaseController & Logging =>
+  self: BaseController with Logging =>
 
   def parseAndLogUpscanResponse(responseBody: JsValue): EitherT[Future, PresentationError, UpscanResponse] =
     EitherT {

@@ -16,7 +16,7 @@
 
 package uk.gov.hmrc.transitmovementsrouter.controllers.actions
 
-import org.mockito.Mockito.when
+import org.mockito.MockitoSugar.when
 import org.scalacheck.Gen
 import org.scalatest.OptionValues
 import org.scalatest.concurrent.ScalaFutures

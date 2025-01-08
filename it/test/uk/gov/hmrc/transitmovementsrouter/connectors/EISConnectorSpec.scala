@@ -48,6 +48,9 @@ import uk.gov.hmrc.transitmovementsrouter.config.CircuitBreakerConfig
 import uk.gov.hmrc.transitmovementsrouter.config.EISInstanceConfig
 import uk.gov.hmrc.transitmovementsrouter.config.Headers
 import uk.gov.hmrc.transitmovementsrouter.config.RetryConfig
+import uk.gov.hmrc.transitmovementsrouter.connectors.EISConnector
+import uk.gov.hmrc.transitmovementsrouter.connectors.EISConnectorImpl
+import uk.gov.hmrc.transitmovementsrouter.connectors.Retries
 import uk.gov.hmrc.transitmovementsrouter.it.base.RegexPatterns
 import uk.gov.hmrc.transitmovementsrouter.it.base.TestActorSystem
 import uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuite
@@ -67,7 +70,6 @@ import java.util.UUID
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
-import cats.implicits.catsStdInstancesForFuture
 
 class EISConnectorSpec
     extends AnyWordSpec
@@ -87,7 +89,7 @@ class EISConnectorSpec
     override def createRetryPolicy(config: RetryConfig)(implicit
       ec: ExecutionContext
     ): RetryPolicy[Future] =
-      RetryPolicies.alwaysGiveUp[Future]
+      RetryPolicies.alwaysGiveUp[Future](cats.implicits.catsStdInstancesForFuture(ec))
   }
 
   private object OneRetry extends Retries {
@@ -95,7 +97,7 @@ class EISConnectorSpec
     override def createRetryPolicy(config: RetryConfig)(implicit
       ec: ExecutionContext
     ): RetryPolicy[Future] =
-      RetryPolicies.limitRetries[Future](1)
+      RetryPolicies.limitRetries[Future](1)(cats.implicits.catsStdInstancesForFuture(ec))
   }
 
   val uriStub = "/transit-movements-eis-stub/movements/messages"
@@ -133,7 +135,7 @@ class EISConnectorSpec
 
   lazy val connectorGen: Gen[() => EISConnector] = Gen.oneOf(() => noRetriesConnector, () => oneRetryConnector)
 
-  def source: Source[ByteString, ?] = Source.single(ByteString.fromString("<test></test>"))
+  def source: Source[ByteString, _] = Source.single(ByteString.fromString("<test></test>"))
 
   "post" should {
 
@@ -387,8 +389,8 @@ class EISConnectorSpec
       val mockRequestBuilder = mock[RequestBuilder]
 
       when(mockRequestBuilder.setHeader(any)).thenReturn(mockRequestBuilder)
-      when(mockRequestBuilder.execute[HttpResponse](using any (), any())).thenReturn(Future.failed(new RuntimeException))
-      when(mockRequestBuilder.withBody(any())(using any (), any(), any())).thenReturn(mockRequestBuilder)
+      when(mockRequestBuilder.execute[HttpResponse](any(), any())).thenReturn(Future.failed(new RuntimeException))
+      when(mockRequestBuilder.withBody(any())(any(), any(), any())).thenReturn(mockRequestBuilder)
       when(httpClientV2.post(any[URL])(any[HeaderCarrier])).thenReturn(mockRequestBuilder)
 
       whenReady(connector.post(movementId, messageId, source, hc)) {

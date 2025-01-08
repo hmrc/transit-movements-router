@@ -31,11 +31,11 @@ import uk.gov.hmrc.transitmovementsrouter.controllers.stream.StreamingParsers
 import scala.concurrent.Future
 
 trait ContentTypeRouting {
-  self: BaseController & StreamingParsers =>
+  self: BaseController with StreamingParsers =>
 
-  def contentTypeRoute(routes: PartialFunction[Option[String], Action[?]])(implicit materializer: Materializer): Action[Source[ByteString, ?]] =
+  def contentTypeRoute(routes: PartialFunction[Option[String], Action[_]])(implicit materializer: Materializer): Action[Source[ByteString, _]] =
     Action.async(streamFromMemory) {
-      (request: Request[Source[ByteString, ?]]) =>
+      (request: Request[Source[ByteString, _]]) =>
         routes
           .lift(request.headers.get(HeaderNames.CONTENT_TYPE))
           .map(

@@ -4,7 +4,7 @@ import uk.gov.hmrc.DefaultBuildSettings
 val appName = "transit-movements-router"
 
 ThisBuild / majorVersion := 0
-ThisBuild / scalaVersion := "3.4.3"
+ThisBuild / scalaVersion := "2.13.12"
 
 lazy val microservice = Project(appName, file("."))
   .enablePlugins(PlayScala, SbtDistributablesPlugin)

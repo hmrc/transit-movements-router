@@ -19,12 +19,15 @@ package uk.gov.hmrc.transitmovementsrouter.services
 import org.apache.pekko.stream.scaladsl.Source
 import org.apache.pekko.util.ByteString
 import org.mockito.ArgumentMatchers.any
-import org.mockito.ArgumentMatchers.{eq => eqTo}
+import org.mockito.ArgumentMatchersSugar.eqTo
 import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
-import org.mockito.Mockito.when
+import org.mockito.MockitoSugar.reset
+import org.mockito.MockitoSugar.spy
+import org.mockito.MockitoSugar.when
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
+import org.scalatest.BeforeAndAfterEach
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
@@ -44,6 +47,7 @@ import uk.gov.hmrc.objectstore.client.config.ObjectStoreClientConfig
 import uk.gov.hmrc.objectstore.client.play.PlayObjectStoreClientEither
 import uk.gov.hmrc.transitmovementsrouter.base.TestActorSystem
 import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
+import uk.gov.hmrc.transitmovementsrouter.fakes.objectstore.ObjectStoreStub
 import uk.gov.hmrc.transitmovementsrouter.generators.TestModelGenerators
 import uk.gov.hmrc.transitmovementsrouter.models.ConversationId
 import uk.gov.hmrc.transitmovementsrouter.models.errors.ObjectStoreError
@@ -55,7 +59,14 @@ import java.util.UUID.randomUUID
 import scala.concurrent.ExecutionContextExecutor
 import scala.concurrent.Future
 
-class ObjectStoreServiceSpec extends AnyFreeSpec with Matchers with MockitoSugar with ScalaFutures with TestModelGenerators with TestActorSystem {
+class ObjectStoreServiceSpec
+    extends AnyFreeSpec
+    with Matchers
+    with MockitoSugar
+    with ScalaFutures
+    with TestModelGenerators
+    with TestActorSystem
+    with BeforeAndAfterEach {
 
   val baseUrl                         = s"http://baseUrl-${randomUUID().toString}"
   val owner                           = "transit-movements-router"
@@ -65,10 +76,12 @@ class ObjectStoreServiceSpec extends AnyFreeSpec with Matchers with MockitoSugar
   implicit val hc: HeaderCarrier            = HeaderCarrier()
   implicit val ec: ExecutionContextExecutor = materializer.executionContext
 
-  val mockObjectStore: PlayObjectStoreClientEither = mock[PlayObjectStoreClientEither]
-
+  lazy val objectStoreStub: ObjectStoreStub      = spy(new ObjectStoreStub(config))
   val appConfig: AppConfig                       = mock[AppConfig]
-  val objectStoreService: ObjectStoreServiceImpl = new ObjectStoreServiceImpl(Clock.systemUTC(), mockObjectStore)
+  val objectStoreService: ObjectStoreServiceImpl = new ObjectStoreServiceImpl(Clock.systemUTC(), objectStoreStub)
+
+  override def beforeEach(): Unit =
+    reset(objectStoreStub)
 
   "storeOutgoing (via stream)" - {
     "given a successful response from the connector, should return a Right with Object Store Summary" in forAll(
@@ -84,7 +97,7 @@ class ObjectStoreServiceSpec extends AnyFreeSpec with Matchers with MockitoSugar
         val mockObjectStore      = mock[PlayObjectStoreClientEither]
         val dateFormat           = "20230424-114742"
         when(
-          mockObjectStore.putObject[Source[ByteString, ?]](
+          mockObjectStore.putObject[Source[ByteString, _]](
             path = eqTo(Path.File(s"sdes/${conversationId.value.toString}-$dateFormat.xml")),
             content = eqTo(source),
             retentionPeriod = eqTo(RetentionPeriod.OneWeek),
@@ -130,7 +143,7 @@ class ObjectStoreServiceSpec extends AnyFreeSpec with Matchers with MockitoSugar
         val mockObjectStore      = mock[PlayObjectStoreClientEither]
         val dateFormat           = "20230424-114742"
         when(
-          mockObjectStore.putObject[Source[ByteString, ?]](
+          mockObjectStore.putObject[Source[ByteString, _]](
             path = eqTo(Path.File(s"sdes/${conversationId.value.toString}-$dateFormat.xml")),
             content = eqTo(source),
             retentionPeriod = eqTo(RetentionPeriod.OneWeek),

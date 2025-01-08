@@ -20,5 +20,5 @@ sealed trait UpscanError
 
 object UpscanError {
   final case class Unexpected(cause: Option[Throwable]) extends UpscanError
-  case object NotFound                                  extends UpscanError
+  final case object NotFound                            extends UpscanError
 }

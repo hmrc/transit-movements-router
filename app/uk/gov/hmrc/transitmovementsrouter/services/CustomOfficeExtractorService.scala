@@ -39,14 +39,14 @@ import scala.concurrent.Future
 
 @ImplementedBy(classOf[CustomOfficeExtractorServiceImpl])
 trait CustomOfficeExtractorService {
-  def extractCustomOffice(source: Source[ByteString, ?], messageType: RequestMessageType): EitherT[Future, CustomOfficeExtractorError, CustomsOffice]
+  def extractCustomOffice(source: Source[ByteString, _], messageType: RequestMessageType): EitherT[Future, CustomOfficeExtractorError, CustomsOffice]
 
 }
 
 @Singleton
 class CustomOfficeExtractorServiceImpl @Inject() (implicit mat: Materializer) extends CustomOfficeExtractorService {
 
-  override def extractCustomOffice(source: Source[ByteString, ?], messageType: RequestMessageType): EitherT[Future, CustomOfficeExtractorError, CustomsOffice] =
+  override def extractCustomOffice(source: Source[ByteString, _], messageType: RequestMessageType): EitherT[Future, CustomOfficeExtractorError, CustomsOffice] =
     EitherT(source.runWith(customOfficeExtractor(messageType)))
 
   private val officeSinkShape = Sink.head[ParseResult[CustomsOffice]]

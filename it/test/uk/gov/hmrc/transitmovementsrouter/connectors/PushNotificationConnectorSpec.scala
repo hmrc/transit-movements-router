@@ -100,7 +100,7 @@ class PushNotificationConnectorSpec
     )
   )
 
-  val source: Source[ByteString, ?] = Source.single(ByteString.fromString("<CC029C></CC029C>"))
+  val source: Source[ByteString, _] = Source.single(ByteString.fromString("<CC029C></CC029C>"))
   val body: JsObject                = Json.obj("messageId" -> messageId.value)
 
   def xmlStub(codeToReturn: Int): StubMapping = server.stubFor(

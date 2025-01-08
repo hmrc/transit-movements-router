@@ -17,12 +17,12 @@
 package uk.gov.hmrc.transitmovementsrouter.services
 
 import org.mockito.ArgumentMatchers.any
-import org.mockito.ArgumentMatchers.{eq => eqTo}
+import org.mockito.ArgumentMatchersSugar.eqTo
 import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.when
-import org.scalatestplus.mockito.MockitoSugar.mock
+import org.mockito.MockitoSugar.mock
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.freespec.AnyFreeSpec
@@ -73,24 +73,14 @@ class ServiceMonitoringServiceSpec extends AnyFreeSpec with Matchers with TestMo
       ) {
         (movementId, messageId, messageType, customsOffice) =>
           val mockConnector = mock[ServiceMonitoringConnector]
-          when(
-            mockConnector.outgoing(
-              MovementId(eqTo(movementId.value)),
-              MessageId(eqTo(messageId.value)),
-              eqTo(messageType),
-              CustomsOffice(eqTo(customsOffice.value))
-            )(any(), any())
-          )
+          when(mockConnector.outgoing(eqTo(movementId), eqTo(messageId), eqTo(messageType), eqTo(customsOffice))(any(), any()))
             .thenReturn(Future.successful((): Unit))
 
           val sut = new ServiceMonitoringServiceImpl(mockAppConfig, mockConnector)
           whenReady(sut.outgoing(movementId, messageId, messageType, customsOffice).value) {
             case Right(()) =>
               verify(mockConnector, times(1))
-                .outgoing(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(messageType), CustomsOffice(eqTo(customsOffice.value)))(
-                  any(),
-                  any()
-                )
+                .outgoing(eqTo(movementId), eqTo(messageId), eqTo(messageType), eqTo(customsOffice))(any(), any())
             case Left(_) => fail("Expecting a Right of Unit")
           }
       }
@@ -104,24 +94,14 @@ class ServiceMonitoringServiceSpec extends AnyFreeSpec with Matchers with TestMo
         (movementId, messageId, messageType, customsOffice) =>
           val mockConnector = mock[ServiceMonitoringConnector]
           val expected      = new IllegalStateException("error")
-          when(
-            mockConnector.outgoing(
-              MovementId(eqTo(movementId.value)),
-              MessageId(eqTo(messageId.value)),
-              eqTo(messageType),
-              CustomsOffice(eqTo(customsOffice.value))
-            )(any(), any())
-          )
+          when(mockConnector.outgoing(eqTo(movementId), eqTo(messageId), eqTo(messageType), eqTo(customsOffice))(any(), any()))
             .thenReturn(Future.failed(expected))
 
           val sut = new ServiceMonitoringServiceImpl(mockAppConfig, mockConnector)
           whenReady(sut.outgoing(movementId, messageId, messageType, customsOffice).value) {
             case Left(ServiceMonitoringError.Unknown(Some(`expected`))) =>
               verify(mockConnector, times(1))
-                .outgoing(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(messageType), CustomsOffice(eqTo(customsOffice.value)))(
-                  any(),
-                  any()
-                )
+                .outgoing(eqTo(movementId), eqTo(messageId), eqTo(messageType), eqTo(customsOffice))(any(), any())
             case _ => fail("Expecting a Left of an Unexpected")
           }
       }
@@ -152,14 +132,14 @@ class ServiceMonitoringServiceSpec extends AnyFreeSpec with Matchers with TestMo
       "and the connector succeeds, return Right of unit" in forAll(arbitrary[MovementId], arbitrary[MessageId], arbitrary[MessageType]) {
         (movementId, messageId, messageType) =>
           val mockConnector = mock[ServiceMonitoringConnector]
-          when(mockConnector.incoming(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(messageType))(any(), any()))
+          when(mockConnector.incoming(eqTo(movementId), eqTo(messageId), eqTo(messageType))(any(), any()))
             .thenReturn(Future.successful((): Unit))
 
           val sut = new ServiceMonitoringServiceImpl(mockAppConfig, mockConnector)
           whenReady(sut.incoming(movementId, messageId, messageType).value) {
             case Right(()) =>
               verify(mockConnector, times(1))
-                .incoming(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(messageType))(any(), any())
+                .incoming(eqTo(movementId), eqTo(messageId), eqTo(messageType))(any(), any())
             case Left(_) => fail("Expecting a Right of Unit")
           }
       }
@@ -168,14 +148,14 @@ class ServiceMonitoringServiceSpec extends AnyFreeSpec with Matchers with TestMo
         (movementId, messageId, messageType) =>
           val mockConnector = mock[ServiceMonitoringConnector]
           val expected      = new IllegalStateException("error")
-          when(mockConnector.incoming(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(messageType))(any(), any()))
+          when(mockConnector.incoming(eqTo(movementId), eqTo(messageId), eqTo(messageType))(any(), any()))
             .thenReturn(Future.failed(expected))
 
           val sut = new ServiceMonitoringServiceImpl(mockAppConfig, mockConnector)
           whenReady(sut.incoming(movementId, messageId, messageType).value) {
             case Left(ServiceMonitoringError.Unknown(Some(`expected`))) =>
               verify(mockConnector, times(1))
-                .incoming(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(messageType))(any(), any())
+                .incoming(eqTo(movementId), eqTo(messageId), eqTo(messageType))(any(), any())
             case _ => fail("Expecting a Left of an Unexpected")
           }
       }

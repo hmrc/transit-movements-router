@@ -40,6 +40,7 @@ import play.mvc.Http.MimeTypes
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.test.HttpClientV2Support
 import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
+import uk.gov.hmrc.transitmovementsrouter.connectors.PersistenceConnectorImpl
 import uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuite
 import uk.gov.hmrc.transitmovementsrouter.it.generators.ModelGenerators
 import uk.gov.hmrc.transitmovementsrouter.models.MessageType.DeclarationAmendment
@@ -98,7 +99,7 @@ class PersistenceConnectorSpec
     )
   )
 
-  def source: Source[ByteString, ?] = Source.single(ByteString.fromString("<TraderChannelResponse><CC013C></CC013C></TraderChannelResponse>"))
+  def source: Source[ByteString, _] = Source.single(ByteString.fromString("<TraderChannelResponse><CC013C></CC013C></TraderChannelResponse>"))
 
   def stubForPostBody(codeToReturn: Int, body: Option[String] = None): StubMapping = server.stubFor(
     post(
@@ -157,9 +158,9 @@ class PersistenceConnectorSpec
             x.isLeft mustBe true
 
             statusCode match {
-              case BAD_REQUEST           => x mustBe a[Left[Unexpected, ?]]
-              case NOT_FOUND             => x mustBe a[Left[MovementNotFound, ?]]
-              case INTERNAL_SERVER_ERROR => x mustBe a[Left[Unexpected, ?]]
+              case BAD_REQUEST           => x mustBe a[Left[Unexpected, _]]
+              case NOT_FOUND             => x mustBe a[Left[MovementNotFound, _]]
+              case INTERNAL_SERVER_ERROR => x mustBe a[Left[Unexpected, _]]
               case _                     => fail()
             }
 
@@ -175,7 +176,7 @@ class PersistenceConnectorSpec
 
       whenReady(connector.postBody(movementId, messageId, DeclarationAmendment, failingSource).value) {
         res =>
-          res mustBe a[Left[Unexpected, ?]]
+          res mustBe a[Left[Unexpected, _]]
           res.left.toOption.get.asInstanceOf[Unexpected].thr.isDefined
       }
     }
