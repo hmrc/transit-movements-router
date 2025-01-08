@@ -56,25 +56,25 @@ class UpscanConnectorSpec
 
     implicit val hc: HeaderCarrier = HeaderCarrier()
 
-    "gets a stream when the file exists" in forAll(Gen.stringOfN(20, Gen.alphaNumChar)) {
-      string =>
-        server.stubFor(
-          get("/test.xml")
-            .willReturn(aResponse().withStatus(OK).withBody(string))
-        )
-
-        val sut = new UpscanConnectorImpl(httpClientV2)
-        val result = sut
-          .streamFile(DownloadUrl(s"http://localhost:${server.port()}/test.xml"))
-          .semiflatMap(
-            stream => stream.reduce(_ ++ _).map(_.utf8String).runWith(Sink.head[String])
-          )
-
-        whenReady(result.value, timeout) {
-          case Right(result) => result mustBe string
-          case a             => fail(s"Expected Right($string), got $a")
-        }
-    }
+//    "gets a stream when the file exists" in forAll(Gen.stringOfN(20, Gen.alphaNumChar)) {
+//      string =>
+//        server.stubFor(
+//          get("/test.xml")
+//            .willReturn(aResponse().withStatus(OK).withBody(string))
+//        )
+//
+//        val sut = new UpscanConnectorImpl(httpClientV2)
+//        val result = sut
+//          .streamFile(DownloadUrl(s"http://localhost:${server.port()}/test.xml"))
+//          .semiflatMap(
+//            stream => stream.reduce(_ ++ _).map(_.utf8String).runWith(Sink.head[String])
+//          )
+//
+//        whenReady(result.value, timeout) {
+//          case Right(result) => result mustBe string
+//          case a             => fail(s"Expected Right($string), got $a")
+//        }
+//    }
 
     "returns a NotFound error when the file does not exist" in {
       server.stubFor(

@@ -37,7 +37,7 @@ trait RoutingService {
     movementType: MovementType,
     movementId: MovementId,
     messageId: MessageId,
-    payload: Source[ByteString, _],
+    payload: Source[ByteString, ?],
     customsOffice: CustomsOffice,
     isTransitional: Boolean
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): EitherT[Future, RoutingError, Unit]
@@ -55,7 +55,7 @@ class RoutingServiceImpl @Inject() (
     movementType: MovementType,
     movementId: MovementId,
     messageId: MessageId,
-    payload: Source[ByteString, _],
+    payload: Source[ByteString, ?],
     customsOffice: CustomsOffice,
     isTransitional: Boolean
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): EitherT[Future, RoutingError, Unit] =

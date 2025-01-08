@@ -98,7 +98,7 @@ object PresentationError extends CommonFormats {
     (
       (__ \ MessageFieldName).read[String] and
         (__ \ CodeFieldName).read[ErrorCode]
-    )(StandardError.apply _)
+    )(StandardError.apply)
 
   implicit val duplicateLRNErrorFormat: OFormat[DuplicateLRNError] =
     (
@@ -111,12 +111,27 @@ object PresentationError extends CommonFormats {
 
 sealed abstract class PresentationError extends Product with Serializable {
   def message: String
+
   def code: ErrorCode
 }
 
-case class StandardError(message: String, code: ErrorCode)                                     extends PresentationError
+case class StandardError(message: String, code: ErrorCode) extends PresentationError
+
 case class InvalidOfficeError(message: String, office: String, field: String, code: ErrorCode) extends PresentationError
-case class DuplicateLRNError(message: String, code: ErrorCode, lrn: LocalReferenceNumber)      extends PresentationError
+
+object InvalidOfficeError {
+
+  def unapply(error: InvalidOfficeError): Option[(String, String, String, ErrorCode)] =
+    Some((error.message, error.office, error.field, error.code))
+}
+
+case class DuplicateLRNError(message: String, code: ErrorCode, lrn: LocalReferenceNumber) extends PresentationError
+
+object DuplicateLRNError {
+
+  def unapply(error: DuplicateLRNError): Option[(String, ErrorCode, LocalReferenceNumber)] =
+    Some((error.message, error.code, error.lrn))
+}
 
 case class UpstreamServiceError(
   message: String = "Internal server error",

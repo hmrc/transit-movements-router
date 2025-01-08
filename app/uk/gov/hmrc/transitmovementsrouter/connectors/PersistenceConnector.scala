@@ -32,7 +32,9 @@ import play.api.http.Status.INTERNAL_SERVER_ERROR
 import play.api.http.Status.NOT_FOUND
 import play.api.http.Status.OK
 import play.api.libs.json.Json
-import uk.gov.hmrc.http.HttpReads.Implicits._
+import play.api.libs.ws.DefaultBodyWritables
+import play.api.libs.ws.JsonBodyWritables
+import uk.gov.hmrc.http.HttpReads.Implicits.*
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.HttpResponse
 import uk.gov.hmrc.http.StringContextOps
@@ -44,7 +46,7 @@ import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.MessageNotFound
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.MovementNotFound
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.Unexpected
-import uk.gov.hmrc.transitmovementsrouter.models._
+import uk.gov.hmrc.transitmovementsrouter.models.*
 import uk.gov.hmrc.transitmovementsrouter.models.requests.MessageUpdate
 import uk.gov.hmrc.transitmovementsrouter.utils.RouterHeaderNames
 
@@ -59,7 +61,7 @@ trait PersistenceConnector {
     movementId: MovementId,
     messageId: MessageId,
     messageType: MessageType,
-    source: Source[ByteString, _]
+    source: Source[ByteString, ?]
   )(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
@@ -76,7 +78,11 @@ trait PersistenceConnector {
 }
 
 @Singleton
-class PersistenceConnectorImpl @Inject() (httpClientV2: HttpClientV2)(implicit appConfig: AppConfig) extends PersistenceConnector with BaseConnector {
+class PersistenceConnectorImpl @Inject() (httpClientV2: HttpClientV2)(implicit appConfig: AppConfig)
+    extends PersistenceConnector
+    with DefaultBodyWritables
+    with JsonBodyWritables
+    with BaseConnector {
 
   val baseUrl: Url      = appConfig.persistenceServiceBaseUrl
   val baseRoute: String = "/transit-movements"
@@ -87,7 +93,7 @@ class PersistenceConnectorImpl @Inject() (httpClientV2: HttpClientV2)(implicit a
   private def persistenceUpdateStatus(movementId: MovementId, messageId: MessageId): UrlPath =
     Url(path = s"$baseRoute/traders/movements/${movementId.value}/messages/${messageId.value}").path
 
-  override def postBody(movementId: MovementId, triggerId: MessageId, messageType: MessageType, source: Source[ByteString, _])(implicit
+  override def postBody(movementId: MovementId, triggerId: MessageId, messageType: MessageType, source: Source[ByteString, ?])(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): EitherT[Future, PersistenceError, PersistenceResponse] =
