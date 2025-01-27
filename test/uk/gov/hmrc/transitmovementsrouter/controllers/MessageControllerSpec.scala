@@ -20,18 +20,18 @@ import org.apache.pekko.stream.scaladsl.Source
 import org.apache.pekko.util.ByteString
 import cats.data.EitherT
 import org.mockito.ArgumentMatchers.any
-import org.mockito.ArgumentMatchersSugar.eqTo
+import org.mockito.ArgumentMatchers.{eq => eqTo}
+import org.mockito.Mockito.reset
 import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoInteractions
-import org.mockito.MockitoSugar.reset
-import org.mockito.MockitoSugar.when
+import org.mockito.Mockito.when
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.Gen
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.freespec.AnyFreeSpec
-import org.scalatest.matchers.must.Matchers.convertToAnyMustWrapper
+import org.scalatest.matchers.must.Matchers.mustBe
 import org.scalatest.matchers.should.Matchers
 import org.scalatestplus.mockito.MockitoSugar.mock
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
@@ -40,12 +40,12 @@ import play.api.http.DefaultHttpErrorHandler
 import play.api.http.HeaderNames
 import play.api.http.HttpErrorConfig
 import play.api.http.MimeTypes
-import play.api.http.Status._
+import play.api.http.Status.*
 import play.api.libs.Files
 import play.api.libs.Files.SingletonTemporaryFileCreator
 import play.api.libs.json.JsValue
 import play.api.libs.json.Json
-import play.api.mvc._
+import play.api.mvc.*
 import play.api.test.FakeHeaders
 import play.api.test.FakeRequest
 import play.api.test.Helpers.contentAsJson
@@ -78,16 +78,16 @@ import uk.gov.hmrc.transitmovementsrouter.models.AuditType.NCTSToTraderSubmissio
 import uk.gov.hmrc.transitmovementsrouter.models.MessageType.DeclarationAmendment
 import uk.gov.hmrc.transitmovementsrouter.models.MessageType.GoodsReleaseNotification
 import uk.gov.hmrc.transitmovementsrouter.models.MessageType.MrnAllocated
-import uk.gov.hmrc.transitmovementsrouter.models._
+import uk.gov.hmrc.transitmovementsrouter.models.*
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.MovementNotFound
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.Unexpected
-import uk.gov.hmrc.transitmovementsrouter.models.errors._
+import uk.gov.hmrc.transitmovementsrouter.models.errors.*
 import uk.gov.hmrc.transitmovementsrouter.models.requests.MessageUpdate
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.DownloadUrl
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanSuccessResponse
 import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesNotificationType
-import uk.gov.hmrc.transitmovementsrouter.services._
+import uk.gov.hmrc.transitmovementsrouter.services.*
 
 import java.util.UUID
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -178,7 +178,7 @@ class MessageControllerSpec
       override protected val logger: Logger = mock[Logger]
     }
 
-  def source: Source[ByteString, _] = createStream(cc015cOfficeOfDepartureGB)
+  def source: Source[ByteString, ?] = createStream(cc015cOfficeOfDepartureGB)
 
   val outgoing: String             = routes.MessagesController.outgoing(eori, movementType, movementId, messageId).url
   val incoming: String             = routes.MessagesController.incomingViaEIS(ConversationId(movementId, messageId)).url
@@ -189,7 +189,7 @@ class MessageControllerSpec
     body: NodeSeq,
     url: String,
     headers: FakeHeaders = FakeHeaders(Seq.empty)
-  ): Request[Source[ByteString, _]] =
+  ): Request[Source[ByteString, ?]] =
     FakeRequest(
       method = POST,
       uri = url,
@@ -231,14 +231,14 @@ class MessageControllerSpec
     reset(mockAuditingService)
     reset(config)
     when(config.logIncoming).thenReturn(true)
-    when(config.eisSizeLimit).thenReturn(5000000) // TODO: vary per test
+    when(config.eisSizeLimit).thenReturn(5000000L) // TODO: vary per test
     reset(mockAuditingService)
     resetAuthActionAndStatusMonitoring()
     super.afterEach()
   }
 
   lazy val submitDeclarationEither: EitherT[Future, RoutingError, Unit] =
-    EitherT.rightT(())
+    EitherT.liftF(Future.unit)
 
   def messageTypeHeader(messageType: MessageType): FakeHeaders = FakeHeaders(Seq(("X-Message-Type", messageType.code)))
   lazy val messageTypeHeaderDepartureDeclaration: FakeHeaders  = messageTypeHeader(MessageType.DeclarationData)
@@ -255,7 +255,7 @@ class MessageControllerSpec
             any[String].asInstanceOf[MovementType],
             any[String].asInstanceOf[MovementId],
             any[String].asInstanceOf[MessageId],
-            any[Source[ByteString, _]],
+            any[Source[ByteString, ?]],
             any[String].asInstanceOf[CustomsOffice],
             any[Boolean]
           )(any[HeaderCarrier], any[ExecutionContext])
@@ -279,7 +279,7 @@ class MessageControllerSpec
           MovementId(eqTo(movementId.value)),
           MessageId(eqTo(messageId.value)),
           eqTo(messageType),
-          eqTo(customsOffice)
+          CustomsOffice(eqTo(customsOffice.value))
         )(any(), any())
     }
 
@@ -295,7 +295,7 @@ class MessageControllerSpec
         resetAuthActionAndStatusMonitoring()
         val expectedConversationId = ConversationId(movementId, messageId)
 
-        when(config.eisSizeLimit).thenReturn(-1)
+        when(config.eisSizeLimit).thenReturn(-1L)
 
         when(mockMessageTypeExtractor.extractFromHeaders(any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](messageType))
 
@@ -304,12 +304,12 @@ class MessageControllerSpec
 
         when(
           mockObjectStoreService
-            .storeOutgoing(ConversationId(eqTo(expectedConversationId.value)), any[Source[ByteString, _]])(any[HeaderCarrier], any[ExecutionContext])
+            .storeOutgoing(ConversationId(eqTo(expectedConversationId.value)), any[Source[ByteString, ?]])(any[HeaderCarrier], any[ExecutionContext])
         )
-          .thenReturn(EitherT.rightT(summary))
+          .thenReturn(EitherT.rightT[Future, ObjectSummaryWithMd5](summary))
 
         when(mockSDESService.send(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(summary))(any(), any()))
-          .thenReturn(EitherT.rightT((): Unit))
+          .thenReturn(EitherT.liftF(Future.unit))
 
         val result = controller().outgoing(eori, movementType, movementId, messageId)(
           fakeRequest(cc015cOfficeOfDepartureGB, outgoing, messageTypeHeaderDepartureDeclaration)
@@ -321,7 +321,7 @@ class MessageControllerSpec
           any[String].asInstanceOf[MovementType],
           any[String].asInstanceOf[MovementId],
           any[String].asInstanceOf[MessageId],
-          any[Source[ByteString, _]],
+          any[Source[ByteString, ?]],
           any[String].asInstanceOf[CustomsOffice],
           any[Boolean]
         )(any[HeaderCarrier], any[ExecutionContext])
@@ -501,7 +501,7 @@ class MessageControllerSpec
           any[String].asInstanceOf[MovementType],
           any[String].asInstanceOf[MovementId],
           any[String].asInstanceOf[MessageId],
-          any[Source[ByteString, _]],
+          any[Source[ByteString, ?]],
           any[String].asInstanceOf[CustomsOffice],
           any[Boolean]
         )(any[HeaderCarrier], any[ExecutionContext])
@@ -546,15 +546,15 @@ class MessageControllerSpec
         when(mockMessageTypeExtractor.extract(any(), any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](messageType))
 
         when(mockPersistenceConnector.postBody(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(messageType), any())(any(), any()))
-          .thenReturn(EitherT.fromEither(Right(PersistenceResponse(messageId, eoriNumber, clientId, isTransitional))))
+          .thenReturn(EitherT.liftF(Future.successful(PersistenceResponse(messageId, eoriNumber, clientId, isTransitional))))
 
         when(
           mockPushNotificationsConnector
-            .postMessageReceived(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(messageType), any[Source[ByteString, _]])(
+            .postMessageReceived(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(messageType), any[Source[ByteString, ?]])(
               any[HeaderCarrier],
               any[ExecutionContext]
             )
-        ).thenReturn(EitherT.rightT(()))
+        ).thenReturn(EitherT.liftF(Future.unit))
 
         when(
           mockAuditingService.auditStatusEvent(
@@ -677,7 +677,7 @@ class MessageControllerSpec
     "must return NOT_FOUND when target movement is invalid or archived" in {
 
       when(mockPersistenceConnector.postBody(any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId], any(), any())(any(), any()))
-        .thenReturn(EitherT.fromEither(Left(MovementNotFound(MovementId("abcdef1234567890")))))
+        .thenReturn(EitherT.fromEither[Future](Left(MovementNotFound(MovementId("abcdef1234567890")))))
 
       when(
         mockAuditingService.auditStatusEvent(
@@ -753,7 +753,7 @@ class MessageControllerSpec
     "must return INTERNAL_SERVER_ERROR when persistence service fails unexpected" in {
 
       when(mockPersistenceConnector.postBody(any[String].asInstanceOf[MovementId], any[String].asInstanceOf[MessageId], any(), any())(any(), any()))
-        .thenReturn(EitherT.fromEither(Left(Unexpected(None))))
+        .thenReturn(EitherT.fromEither[Future](Left(Unexpected(None))))
 
       when(
         mockAuditingService.auditStatusEvent(
@@ -830,23 +830,23 @@ class MessageControllerSpec
       arbitrary[EoriNumber]
     ) {
       (successUpscanResponse, movementId, messageId, messageType, clientId, eoriNumber) =>
-        val source: Source[ByteString, _] = singleUseStringSource("abc")
+        val source: Source[ByteString, ?] = singleUseStringSource("abc")
 
         when(mockUpscanConnector.streamFile(DownloadUrl(eqTo(successUpscanResponse.downloadUrl.value)))(any(), any(), any()))
-          .thenReturn(EitherT.rightT(source))
+          .thenReturn(EitherT.rightT[Future, Source[ByteString, ?]](source))
 
         when(mockMessageTypeExtractor.extractFromBody(any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](messageType))
 
         when(mockPersistenceConnector.postBody(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(messageType), any())(any(), any()))
-          .thenReturn(EitherT.fromEither(Right(PersistenceResponse(messageId, eoriNumber, clientId, isTransitional))))
+          .thenReturn(EitherT.fromEither[Future](Right(PersistenceResponse(messageId, eoriNumber, clientId, isTransitional))))
 
         when(
           mockPushNotificationsConnector
-            .postMessageReceived(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(messageType), any[Source[ByteString, _]])(
+            .postMessageReceived(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(messageType), any[Source[ByteString, ?]])(
               any(),
               any()
             )
-        ).thenReturn(EitherT.rightT(()))
+        ).thenReturn(EitherT.liftF(Future.unit))
 
         val request = fakeRequestLargeMessage(Json.toJson[UpscanResponse](successUpscanResponse), incomingLargeMessage)
 
@@ -870,15 +870,15 @@ class MessageControllerSpec
       arbitrary[MessageType]
     ) {
       (successUpscanResponse, movementId, messageId, messageType) =>
-        val source: Source[ByteString, _] = singleUseStringSource("abc")
+        val source: Source[ByteString, ?] = singleUseStringSource("abc")
 
         when(mockUpscanConnector.streamFile(DownloadUrl(eqTo(successUpscanResponse.downloadUrl.value)))(any(), any(), any()))
-          .thenReturn(EitherT.rightT(source))
+          .thenReturn(EitherT.rightT[Future, Source[ByteString, ?]](source))
 
         when(mockMessageTypeExtractor.extractFromBody(any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](messageType))
 
         when(mockPersistenceConnector.postBody(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(messageType), any())(any(), any()))
-          .thenReturn(EitherT.fromEither(Left(MovementNotFound(movementId))))
+          .thenReturn(EitherT.fromEither[Future](Left(MovementNotFound(movementId))))
 
         val request = fakeRequestLargeMessage(Json.toJson[UpscanResponse](successUpscanResponse), incomingLargeMessage)
         val result  = controller().incomingViaUpscan(movementId, messageId)(request)
@@ -899,7 +899,7 @@ class MessageControllerSpec
           mockUpscanResponseParser.parseAndLogUpscanResponse(
             any[String].asInstanceOf[JsValue]
           )
-        ).thenReturn(EitherT.fromEither(Left(PresentationError.badRequestError("Unexpected Upscan callback response"))))
+        ).thenReturn(EitherT.fromEither[Future](Left(PresentationError.badRequestError("Unexpected Upscan callback response"))))
 
         val request = fakeRequestLargeMessage(Json.obj("reference" -> "abc"), incomingLargeMessage)
         val result  = controller().incomingViaUpscan(movementId, messageId)(request)
@@ -918,10 +918,10 @@ class MessageControllerSpec
       arbitraryMessageId.arbitrary
     ) {
       (successUpscanResponse, movementId, messageId) =>
-        val source: Source[ByteString, _] = singleUseStringSource("abc")
+        val source: Source[ByteString, ?] = singleUseStringSource("abc")
 
         when(mockUpscanConnector.streamFile(DownloadUrl(eqTo(successUpscanResponse.downloadUrl.value)))(any(), any(), any()))
-          .thenReturn(EitherT.rightT(source))
+          .thenReturn(EitherT.rightT[Future, Source[ByteString, ?]](source))
 
         when(mockMessageTypeExtractor.extractFromBody(any())).thenReturn(EitherT.leftT[Future, MessageType](MessageTypeExtractionError.UnableToExtractFromBody))
 
@@ -941,10 +941,10 @@ class MessageControllerSpec
       arbitraryMessageId.arbitrary
     ) {
       (successUpscanResponse, movementId, messageId) =>
-        val source: Source[ByteString, _] = singleUseStringSource("abc")
+        val source: Source[ByteString, ?] = singleUseStringSource("abc")
 
         when(mockUpscanConnector.streamFile(DownloadUrl(eqTo(successUpscanResponse.downloadUrl.value)))(any(), any(), any()))
-          .thenReturn(EitherT.rightT(source))
+          .thenReturn(EitherT.rightT[Future, Source[ByteString, ?]](source))
 
         when(mockMessageTypeExtractor.extractFromBody(any()))
           .thenReturn(EitherT.leftT[Future, MessageType](MessageTypeExtractionError.InvalidMessageType("abcde")))
@@ -967,15 +967,15 @@ class MessageControllerSpec
       arbitrary[MessageType]
     ) {
       (successUpscanResponse, movementId, messageId, messageType) =>
-        val source: Source[ByteString, _] = singleUseStringSource("abc")
+        val source: Source[ByteString, ?] = singleUseStringSource("abc")
 
         when(mockUpscanConnector.streamFile(DownloadUrl(eqTo(successUpscanResponse.downloadUrl.value)))(any(), any(), any()))
-          .thenReturn(EitherT.rightT(source))
+          .thenReturn(EitherT.rightT[Future, Source[ByteString, ?]](source))
 
         when(mockMessageTypeExtractor.extractFromBody(any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](messageType))
 
         when(mockPersistenceConnector.postBody(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(messageType), any())(any(), any()))
-          .thenReturn(EitherT.fromEither(Left(Unexpected(None))))
+          .thenReturn(EitherT.fromEither[Future](Left(Unexpected(None))))
 
         val request = fakeRequestLargeMessage(Json.toJson[UpscanResponse](successUpscanResponse), incomingLargeMessage)
         val result  = controller().incomingViaUpscan(movementId, messageId)(request)
@@ -1016,7 +1016,7 @@ class MessageControllerSpec
           eqTo(MessageUpdate(MessageStatus.Success))
         )(any[HeaderCarrier], any[ExecutionContext])
       )
-        .thenReturn(EitherT.rightT(()))
+        .thenReturn(EitherT.liftF(Future.unit))
 
       when(
         mockPushNotificationsConnector.postSubmissionNotification(
@@ -1025,7 +1025,7 @@ class MessageControllerSpec
           eqTo(ppnsMessage)
         )(any[HeaderCarrier], any[ExecutionContext])
       )
-        .thenReturn(EitherT.rightT(()))
+        .thenReturn(EitherT.liftF(Future.unit))
 
       val request = fakeRequestLargeMessage(Json.toJson(sdesResponse), sdesCallback)
 
@@ -1072,7 +1072,7 @@ class MessageControllerSpec
           eqTo(MessageUpdate(MessageStatus.Failed))
         )(any[HeaderCarrier], any[ExecutionContext])
       )
-        .thenReturn(EitherT.rightT(()))
+        .thenReturn(EitherT.liftF(Future.unit))
       when(
         mockPushNotificationsConnector
           .postSubmissionNotification(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(ppnsMessage))(
@@ -1080,7 +1080,7 @@ class MessageControllerSpec
             any[ExecutionContext]
           )
       )
-        .thenReturn(EitherT.fromEither(Left(PushNotificationError.Unexpected(None))))
+        .thenReturn(EitherT.fromEither[Future](Left(PushNotificationError.Unexpected(None))))
       val request = fakeRequestLargeMessage(Json.toJson(sdesResponse), sdesCallback)
 
       val result = controller().handleSdesResponse()(request)
@@ -1129,7 +1129,7 @@ class MessageControllerSpec
           eqTo(MessageUpdate(messageStatus))
         )(any(), any())
       )
-        .thenReturn(EitherT.fromEither(Left(Unexpected())))
+        .thenReturn(EitherT.fromEither[Future](Left(Unexpected())))
 
       when(
         mockPushNotificationsConnector
@@ -1137,7 +1137,7 @@ class MessageControllerSpec
             any[HeaderCarrier],
             any[ExecutionContext]
           )
-      ).thenReturn(EitherT.rightT(()))
+      ).thenReturn(EitherT.liftF(Future.unit))
 
       val request = fakeRequestLargeMessage(Json.toJson(sdesResponse), sdesCallback)
 

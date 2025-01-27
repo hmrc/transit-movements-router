@@ -26,15 +26,15 @@ import play.api.libs.json.Writes
 sealed trait MessageStatus
 
 object MessageStatus {
-  final case object Received extends MessageStatus
+  case object Received extends MessageStatus
 
-  final case object Processing extends MessageStatus
+  case object Processing extends MessageStatus
 
-  final case object Success extends MessageStatus
+  case object Success extends MessageStatus
 
-  final case object Failed extends MessageStatus
+  case object Failed extends MessageStatus
 
-  final private case object Pending extends MessageStatus
+  private case object Pending extends MessageStatus
 
   implicit val messageStatusWrites: Writes[MessageStatus] = (status: MessageStatus) => Json.toJson(status.toString)
 

@@ -45,11 +45,11 @@ import scala.util.control.NonFatal
 @ImplementedBy(classOf[MessageTypeExtractorImpl])
 trait MessageTypeExtractor {
 
-  def extract(headers: Headers, source: Source[ByteString, _]): EitherT[Future, MessageTypeExtractionError, MessageType]
+  def extract(headers: Headers, source: Source[ByteString, ?]): EitherT[Future, MessageTypeExtractionError, MessageType]
 
   def extractFromHeaders(headers: Headers): EitherT[Future, MessageTypeExtractionError, MessageType]
 
-  def extractFromBody(source: Source[ByteString, _]): EitherT[Future, MessageTypeExtractionError, MessageType]
+  def extractFromBody(source: Source[ByteString, ?]): EitherT[Future, MessageTypeExtractionError, MessageType]
 
 }
 
@@ -89,7 +89,7 @@ class MessageTypeExtractorImpl @Inject() (implicit ec: ExecutionContext, mat: Ma
     )
     .toMat(Sink.head)(Keep.right)
 
-  override def extract(headers: Headers, source: Source[ByteString, _]): EitherT[Future, MessageTypeExtractionError, MessageType] =
+  override def extract(headers: Headers, source: Source[ByteString, ?]): EitherT[Future, MessageTypeExtractionError, MessageType] =
     extractFromHeaders(headers).leftFlatMap(
       _ => extractFromBody(source)
     )
@@ -106,6 +106,6 @@ class MessageTypeExtractorImpl @Inject() (implicit ec: ExecutionContext, mat: Ma
       }
     }
 
-  override def extractFromBody(source: Source[ByteString, _]): EitherT[Future, MessageTypeExtractionError, MessageType] =
+  override def extractFromBody(source: Source[ByteString, ?]): EitherT[Future, MessageTypeExtractionError, MessageType] =
     EitherT(source.runWith(messageTypeExtractor))
 }

@@ -25,7 +25,7 @@ import uk.gov.hmrc.transitmovementsrouter.services.EISMessageTransformers
 import scala.xml.NodeSeq
 
 class FakeXmlTransformer(xml: NodeSeq) extends EISMessageTransformers {
-  override def unwrap: Flow[ByteString, ByteString, _] = Flow.fromSinkAndSource[ByteString, ByteString](Sink.ignore, StreamTestHelpers.createStream(xml))
+  override def unwrap: Flow[ByteString, ByteString, ?] = Flow.fromSinkAndSource[ByteString, ByteString](Sink.ignore, StreamTestHelpers.createStream(xml))
 
-  override def wrap: Flow[ByteString, ByteString, _] = Flow.fromSinkAndSource[ByteString, ByteString](Sink.ignore, StreamTestHelpers.createStream(xml))
+  override def wrap: Flow[ByteString, ByteString, ?] = Flow.fromSinkAndSource[ByteString, ByteString](Sink.ignore, StreamTestHelpers.createStream(xml))
 }

@@ -22,9 +22,9 @@ import com.github.tomakehurst.wiremock.matching.UrlPathPattern
 import org.apache.pekko.stream.scaladsl.Source
 import org.apache.pekko.util.ByteString
 import org.mockito.ArgumentMatchers.any
-import org.mockito.ArgumentMatchersSugar.eqTo
+import org.mockito.ArgumentMatchers.{eq => eqTo}
 import org.mockito.Mockito.when
-import org.mockito.MockitoSugar.mock
+import org.scalatestplus.mockito.MockitoSugar.mock
 import org.scalacheck.Gen
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
@@ -208,7 +208,7 @@ class MessagesControllerIntegrationSpec
   when(
     objectStoreService.putObject(
       any[Path.File],
-      any[Source[ByteString, _]],
+      any[Source[ByteString, ?]],
       eqTo(RetentionPeriod.OneWeek),
       eqTo(Some(MimeTypes.XML)),
       eqTo(None),
