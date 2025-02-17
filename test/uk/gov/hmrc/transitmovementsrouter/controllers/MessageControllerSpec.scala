@@ -543,14 +543,16 @@ class MessageControllerSpec
       arbitrary[Boolean]
     ) {
       (movementId, messageId, messageType, clientId, eoriNumber, isTransitional) =>
+        val persistenceResponse = PersistenceResponse(messageId, eoriNumber, clientId, isTransitional, None)
+
         when(mockMessageTypeExtractor.extract(any(), any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](messageType))
 
         when(mockPersistenceConnector.postBody(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(messageType), any())(any(), any()))
-          .thenReturn(EitherT.liftF(Future.successful(PersistenceResponse(messageId, eoriNumber, clientId, isTransitional))))
+          .thenReturn(EitherT.liftF(Future.successful(PersistenceResponse(messageId, eoriNumber, clientId, isTransitional, None))))
 
         when(
           mockPushNotificationsConnector
-            .postMessageReceived(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(messageType), any[Source[ByteString, ?]])(
+            .postMessageReceived(MovementId(eqTo(movementId.value)), eqTo(persistenceResponse), eqTo(messageType), any[Source[ByteString, ?]])(
               any[HeaderCarrier],
               any[ExecutionContext]
             )
@@ -832,17 +834,19 @@ class MessageControllerSpec
       (successUpscanResponse, movementId, messageId, messageType, clientId, eoriNumber) =>
         val source: Source[ByteString, ?] = singleUseStringSource("abc")
 
+        val persistenceResponse = PersistenceResponse(messageId, eoriNumber, clientId, isTransitional, None)
+
         when(mockUpscanConnector.streamFile(DownloadUrl(eqTo(successUpscanResponse.downloadUrl.value)))(any(), any(), any()))
           .thenReturn(EitherT.rightT[Future, Source[ByteString, ?]](source))
 
         when(mockMessageTypeExtractor.extractFromBody(any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](messageType))
 
         when(mockPersistenceConnector.postBody(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(messageType), any())(any(), any()))
-          .thenReturn(EitherT.fromEither[Future](Right(PersistenceResponse(messageId, eoriNumber, clientId, isTransitional))))
+          .thenReturn(EitherT.fromEither[Future](Right(PersistenceResponse(messageId, eoriNumber, clientId, isTransitional, None))))
 
         when(
           mockPushNotificationsConnector
-            .postMessageReceived(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(messageType), any[Source[ByteString, ?]])(
+            .postMessageReceived(MovementId(eqTo(movementId.value)), eqTo(persistenceResponse), eqTo(messageType), any[Source[ByteString, ?]])(
               any(),
               any()
             )
