@@ -142,7 +142,7 @@ class PersistenceConnectorSpec
       whenReady(connector.postBody(movementId, messageId, DeclarationAmendment, source).value) {
         x =>
           x.isRight mustBe true
-          x mustBe Right(PersistenceResponse(messageId, eoriNumber, Option(clientId), isTransitional = true, sendNotification = Some(true)))
+          x mustBe Right(PersistenceResponse(messageId, eoriNumber, Option(clientId), isTransitional = true, sendNotification = None))
       }
     }
 

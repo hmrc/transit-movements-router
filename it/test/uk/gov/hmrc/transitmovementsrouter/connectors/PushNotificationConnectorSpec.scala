@@ -18,7 +18,13 @@ package uk.gov.hmrc.transitmovementsrouter.connectors
 
 import org.apache.pekko.stream.scaladsl.Source
 import org.apache.pekko.util.ByteString
-import com.github.tomakehurst.wiremock.client.WireMock.{aResponse, equalTo, equalToJson, equalToXml, getRequestedFor, post, urlEqualTo}
+import com.github.tomakehurst.wiremock.client.WireMock.aResponse
+import com.github.tomakehurst.wiremock.client.WireMock.equalTo
+import com.github.tomakehurst.wiremock.client.WireMock.equalToJson
+import com.github.tomakehurst.wiremock.client.WireMock.equalToXml
+import com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor
+import com.github.tomakehurst.wiremock.client.WireMock.post
+import com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo
 import com.github.tomakehurst.wiremock.stubbing.StubMapping
 import io.lemonlabs.uri.Url
 import io.lemonlabs.uri.UrlPath
@@ -44,7 +50,11 @@ import uk.gov.hmrc.transitmovementsrouter.connectors.PushNotificationsConnectorI
 import uk.gov.hmrc.transitmovementsrouter.it.base.TestActorSystem
 import uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuite
 import uk.gov.hmrc.transitmovementsrouter.it.generators.ModelGenerators
-import uk.gov.hmrc.transitmovementsrouter.models.{EoriNumber, MessageId, MessageType, MovementId, PersistenceResponse}
+import uk.gov.hmrc.transitmovementsrouter.models.EoriNumber
+import uk.gov.hmrc.transitmovementsrouter.models.MessageId
+import uk.gov.hmrc.transitmovementsrouter.models.MessageType
+import uk.gov.hmrc.transitmovementsrouter.models.MovementId
+import uk.gov.hmrc.transitmovementsrouter.models.PersistenceResponse
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PushNotificationError.MovementNotFound
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PushNotificationError.Unexpected
 import uk.gov.hmrc.transitmovementsrouter.services.EISMessageTransformersImpl
@@ -66,7 +76,7 @@ class PushNotificationConnectorSpec
   val movementId: MovementId   = arbitraryMovementId.arbitrary.sample.get
   val messageId: MessageId     = arbitraryMessageId.arbitrary.sample.get
   val messageType: MessageType = arbitraryMessageType.arbitrary.sample.get
-  val eoriNumber: EoriNumber = arbitraryEoriNumber.arbitrary.sample.get
+  val eoriNumber: EoriNumber   = arbitraryEoriNumber.arbitrary.sample.get
 
   val persistenceResponse: PersistenceResponse = PersistenceResponse(messageId, eoriNumber, None, false, None)
 
@@ -179,8 +189,6 @@ class PushNotificationConnectorSpec
         server.resetAll()
 
         when(mockAppConfig.pushNotificationsEnabled).thenReturn(true)
-
-
 
         xmlStub(statusCode)
 

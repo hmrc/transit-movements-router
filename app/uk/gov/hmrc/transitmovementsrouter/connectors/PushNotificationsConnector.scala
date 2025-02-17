@@ -92,7 +92,7 @@ class PushNotificationsConnectorImpl @Inject() (httpClientV2: HttpClientV2)(impl
     ec: ExecutionContext
   ): EitherT[Future, PushNotificationError, Unit] =
     EitherT {
-      if (!appConfig.pushNotificationsEnabled || !persistenceResponse.sendNotification.getOrElse(true)) {
+      if (!appConfig.pushNotificationsEnabled || !persistenceResponse.shouldSendNotification) {
         Future.successful(Right(()))
       } else {
         val request = createRequest(movementId, persistenceResponse.messageId, messageReceivedPath)
