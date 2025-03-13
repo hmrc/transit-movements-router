@@ -230,6 +230,7 @@ class EISConnectorImpl(
 
                 } else Future.successful(createError(error))
               }
+
           }
           .recover {
             case NonFatal(e) =>

@@ -21,6 +21,9 @@
         </encoder>
     </appender>
 
+    <logger name="uk.gov.hmrc.transitmovementsrouter.connectors.EISConnectorImpl" level="INFO"/>
+    <logger name="uk.gov.hmrc.transitmovementsrouter.controllers.MessagesController" level="INFO"/>
+
     <logger name="com.google.inject" level="INFO"/>
 
     <logger name="uk.gov" level="INFO"/>
