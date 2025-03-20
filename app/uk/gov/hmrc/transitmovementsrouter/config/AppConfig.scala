@@ -28,11 +28,6 @@ class AppConfig @Inject() (config: Configuration, servicesConfig: CTCServicesCon
 
   lazy val appName: String = config.get[String]("appName")
 
-  lazy val transitionalToSit2: Boolean = config.get[Boolean]("microservice.services.eis.transitional-to-sit2")
-  lazy val finalToSit1: Boolean        = config.get[Boolean]("microservice.services.eis.final-to-sit1")
-
-  lazy val eisXi: EISInstanceConfig     = config.get[EISInstanceConfig]("microservice.services.eis.xi")
-  lazy val eisGb: EISInstanceConfig     = config.get[EISInstanceConfig]("microservice.services.eis.gb")
   lazy val eisGbV2_1: EISInstanceConfig = config.get[EISInstanceConfig]("microservice.services.eis.gb_v2_1")
   lazy val eisXiV2_1: EISInstanceConfig = config.get[EISInstanceConfig]("microservice.services.eis.xi_v2_1")
 

@@ -38,7 +38,6 @@ import uk.gov.hmrc.http.StringContextOps
 import uk.gov.hmrc.http.UpstreamErrorResponse
 import uk.gov.hmrc.http.client.HttpClientV2
 import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
-import uk.gov.hmrc.transitmovementsrouter.config.Constants
 import uk.gov.hmrc.transitmovementsrouter.metrics.HasMetrics
 import uk.gov.hmrc.transitmovementsrouter.metrics.MetricsKeys
 import uk.gov.hmrc.transitmovementsrouter.models.AuditType
@@ -121,10 +120,6 @@ class AuditingConnectorImpl @Inject() (httpClient: HttpClientV2, val metrics: Me
     _ =>
       val (url: Url, path: String) = getUrlAndPath(auditType, hc)
 
-      val finalHeader: Option[(String, String)] = if (!isTransitional) {
-        Some(Constants.APIVersionHeaderKey -> Constants.APIVersionFinalHeaderValue)
-      } else None
-
       val originalHeaders: Seq[(String, String)] = Seq(
         HeaderNames.CONTENT_TYPE -> contentType,
         "X-ContentLength"        -> contentLength.toString,
@@ -132,7 +127,7 @@ class AuditingConnectorImpl @Inject() (httpClient: HttpClientV2, val metrics: Me
         "X-Audit-Source"         -> "transit-movements-router"
       )
 
-      val allHeaders: Seq[(String, String)] = originalHeaders ++ finalHeader
+      val allHeaders: Seq[(String, String)] = originalHeaders
 
       httpClient
         .post(url"$url")
