@@ -67,8 +67,6 @@ class RoutingServiceSpec
   "Submitting a payload" - {
 
     "given a valid response from connector" - {
-      when(mockMessageConnectorProvider.gb).thenReturn(mockMessageConnector)
-      when(mockMessageConnectorProvider.xi).thenReturn(mockMessageConnector)
       when(mockMessageConnectorProvider.gbV2_1).thenReturn(mockMessageConnector)
       when(mockMessageConnectorProvider.xiV2_1).thenReturn(mockMessageConnector)
 
@@ -102,8 +100,7 @@ class RoutingServiceSpec
                 movementId,
                 messageId,
                 payload,
-                CustomsOffice(officeOfDepartureXML._2),
-                isTransitional = true
+                CustomsOffice(officeOfDepartureXML._2)
               )
 
               whenReady(response.value, Timeout(2.seconds)) {
@@ -131,8 +128,7 @@ class RoutingServiceSpec
                 movementId,
                 messageId,
                 payload,
-                CustomsOffice(officeOfDepartureXML._2),
-                isTransitional = true
+                CustomsOffice(officeOfDepartureXML._2)
               )
 
               whenReady(response.value, Timeout(2.seconds)) {
@@ -146,9 +142,6 @@ class RoutingServiceSpec
     }
 
     "given an error from connector" - {
-
-      when(mockMessageConnectorProvider.gb).thenReturn(mockMessageConnector)
-      when(mockMessageConnectorProvider.xi).thenReturn(mockMessageConnector)
 
       s"should return error response for a GB transitional payload" in forAll(
         arbitrary[MessageId],
@@ -178,8 +171,7 @@ class RoutingServiceSpec
             movementId,
             messageId,
             payload,
-            CustomsOffice(officeOfDepartureXML._2),
-            isTransitional = true
+            CustomsOffice(officeOfDepartureXML._2)
           )
 
           whenReady(response.value.failed, Timeout(2.seconds)) {
@@ -216,8 +208,7 @@ class RoutingServiceSpec
             movementId,
             messageId,
             payload,
-            CustomsOffice(officeOfDepartureXML._2),
-            isTransitional = false
+            CustomsOffice(officeOfDepartureXML._2)
           )
 
           whenReady(response.value.failed, Timeout(2.seconds)) {
@@ -255,8 +246,7 @@ class RoutingServiceSpec
           movementId,
           messageId,
           payload,
-          CustomsOffice(officeOfDepartureXML._2),
-          isTransitional = true
+          CustomsOffice(officeOfDepartureXML._2)
         )
 
         whenReady(response.value.failed, Timeout(2.seconds)) {
@@ -293,8 +283,7 @@ class RoutingServiceSpec
           movementId,
           messageId,
           payload,
-          CustomsOffice(officeOfDepartureXML._2),
-          isTransitional = false
+          CustomsOffice(officeOfDepartureXML._2)
         )
 
         whenReady(response.value.failed, Timeout(2.seconds)) {
