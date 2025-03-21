@@ -19,6 +19,7 @@ package uk.gov.hmrc.transitmovementsrouter.controllers.actions
 import com.google.inject.ImplementedBy
 import com.google.inject.Inject
 import com.google.inject.Singleton
+import play.api.Logging
 import play.api.http.Status.UNAUTHORIZED
 import play.api.libs.json.Json
 import play.api.mvc.ActionBuilder
@@ -41,7 +42,8 @@ trait AuthenticateEISToken extends ActionFilter[Request] with ActionBuilder[Requ
 
 @Singleton
 class AuthenticateEISTokenImpl @Inject() (appConfig: AppConfig, parsers: BodyParsers.Default)(implicit val executionContext: ExecutionContext)
-    extends AuthenticateEISToken {
+    extends AuthenticateEISToken
+    with Logging {
 
   private val incomingAuthConfig = appConfig.incomingAuth
   private val tokenPattern       = "^Bearer (.+)$".r
@@ -55,10 +57,28 @@ class AuthenticateEISTokenImpl @Inject() (appConfig: AppConfig, parsers: BodyPar
         if incomingAuthConfig.acceptedTokens.contains(token)
       } yield token) match {
         case Some(_) => Future.successful(None)
-        case None    => Future.successful(Some(createUnauthorisedResponse(request.headers)))
+        case None =>
+          if (appConfig.logObfuscatedInboundBearer) { obfuscatedLogging(request.headers.get("Authorization")) }
+          Future.successful(Some(createUnauthorisedResponse(request.headers)))
       }
 
     } else Future.successful(None)
+
+  private def obfuscatedLogging(authVal: Option[String]): Unit = {
+    def obfuscatedToken(token: String): String = {
+      val alteredString = token.replace("Bearer ", "")
+      s"${alteredString.take(2)}*****${alteredString.takeRight(2)}"
+    }
+
+    val obfuscatedMdtpTokens = incomingAuthConfig.acceptedTokens.map(obfuscatedToken)
+    val obfuscatedInboundEisToken = authVal
+      .map(
+        v => obfuscatedToken(v)
+      )
+      .getOrElse("empty")
+
+    logger.error(s"Bearer token mismatch: MDTP tokens: ${obfuscatedMdtpTokens.mkString(",")} EIS inbound token: $obfuscatedInboundEisToken")
+  }
 
   private def createUnauthorisedResponse(headers: Headers): Result =
     Status(UNAUTHORIZED)(Json.toJson(PresentationError.unauthorisedError("Supplied Bearer token is invalid")))

@@ -124,6 +124,21 @@ class AuthenticateEISTokenSpec extends AnyFreeSpec with Matchers with OptionValu
         }
     }
 
+    "ensure we always return unauthorized with a bad authorisation header and log obfuscated bearers" in forAll(Gen.alphaNumStr.map(_.toLowerCase)) {
+      token =>
+        val mockAppConfig = mock[AppConfig]
+        when(mockAppConfig.incomingAuth).thenReturn(enabledConfig)
+        when(mockAppConfig.logObfuscatedInboundBearer).thenReturn(true)
+        val sut = new AuthenticateEISTokenImpl(mockAppConfig, mockParsers)
+
+        val request = FakeRequest("POST", "/", FakeHeaders(Seq("Authorization" -> s"Bearer $token")), "")
+
+        whenReady(sut.filter(request)) {
+          case Some(value) => value.header.status mustBe UNAUTHORIZED
+          case None => fail("Should have returned a result")
+        }
+    }
+
     "ensure we always return no result with a good authorisation header, allowing the action to proceed" in {
       val mockAppConfig = mock[AppConfig]
       when(mockAppConfig.incomingAuth).thenReturn(enabledConfig)
