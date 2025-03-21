@@ -135,7 +135,7 @@ class AuthenticateEISTokenSpec extends AnyFreeSpec with Matchers with OptionValu
 
         whenReady(sut.filter(request)) {
           case Some(value) => value.header.status mustBe UNAUTHORIZED
-          case None => fail("Should have returned a result")
+          case None        => fail("Should have returned a result")
         }
     }
 
