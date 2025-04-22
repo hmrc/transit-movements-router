@@ -52,7 +52,6 @@ import uk.gov.hmrc.objectstore.client.Path
 import uk.gov.hmrc.objectstore.client.RetentionPeriod
 import uk.gov.hmrc.objectstore.client.play.PlayObjectStoreClientEither
 import uk.gov.hmrc.play.bootstrap.metrics.Metrics
-import uk.gov.hmrc.transitmovementsrouter.config.Constants
 import uk.gov.hmrc.transitmovementsrouter.controllers.MessagesController
 import uk.gov.hmrc.transitmovementsrouter.models.ConversationId
 import uk.gov.hmrc.transitmovementsrouter.models.EoriNumber
@@ -243,8 +242,7 @@ class MessagesControllerIntegrationSpec
 
   "outgoing" - {
     "small messages" - {
-
-      "with a small valid body routing to GB, return 201" in {
+      "with a small valid body routing to GB_V2_1, return 201" in {
         // We do this instead of using the standard "app" because we otherwise get the error
         // "Trying to materialize stream after materializer has been shutdown".
         // We suspect it's due to nested tests.
@@ -254,7 +252,7 @@ class MessagesControllerIntegrationSpec
 
         server.stubFor(
           post(
-            urlEqualTo("/gb")
+            urlEqualTo("/gb_v2_1")
           )
             .withHeader(HeaderNames.AUTHORIZATION, equalTo(s"Bearer bearertoken"))
             .withHeader("Date", equalTo("Thu, 13 Apr 2023 10:34:41 UTC"))
@@ -287,50 +285,6 @@ class MessagesControllerIntegrationSpec
         }
       }
 
-      "with a small valid body routing to GB_V2_1, return 201" in {
-        // We do this instead of using the standard "app" because we otherwise get the error
-        // "Trying to materialize stream after materializer has been shutdown".
-        // We suspect it's due to nested tests.
-        val newApp                  = appBuilder.build()
-        val conversationId          = ConversationId(UUID.randomUUID())
-        val (movementId, messageId) = conversationId.toMovementAndMessageId
-
-        server.stubFor(
-          post(
-            urlEqualTo("/gb_v2_1")
-          )
-            .withHeader(HeaderNames.AUTHORIZATION, equalTo(s"Bearer bearertoken"))
-            .withHeader("Date", equalTo("Thu, 13 Apr 2023 10:34:41 UTC"))
-            .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
-            .withHeader("X-Conversation-Id", equalTo(conversationId.value.toString))
-            .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
-            .withHeader(HeaderNames.CONTENT_TYPE, equalTo("application/xml"))
-            .withRequestBody(equalToXml(sampleOutgoingXmlWrapped))
-            .willReturn(aResponse().withStatus(OK))
-        )
-
-        val apiRequest = FakeRequest(
-          "POST",
-          s"/traders/GB0123456789/movements/departures/${movementId.value}/messages/${messageId.value}",
-          FakeHeaders(
-            Seq(
-              "x-message-type"              -> "IE015",
-              "x-request-id"                -> UUID.randomUUID().toString,
-              HeaderNames.CONTENT_TYPE      -> MimeTypes.XML,
-              Constants.APIVersionHeaderKey -> Constants.APIVersionFinalHeaderValue
-            )
-          ),
-          Source.single(ByteString(sampleOutgoingXml))
-        )
-
-        running(newApp) {
-          val sut    = newApp.injector.instanceOf[MessagesController]
-          val result = sut.outgoing(EoriNumber("GB0123456789"), MovementType("departures"), movementId, messageId)(apiRequest)
-
-          Helpers.status(result) mustBe CREATED
-        }
-      }
-
       "with a small valid body routing to XI_V2_1, return 202" in {
         val newApp                  = appBuilder.build()
         val conversationId          = ConversationId(UUID.randomUUID())
@@ -342,54 +296,6 @@ class MessagesControllerIntegrationSpec
         server.stubFor(
           post(
             urlEqualTo("/xi_v2_1")
-          )
-            .withHeader(HeaderNames.AUTHORIZATION, equalTo(s"Bearer bearertoken"))
-            .withHeader("Date", equalTo("Thu, 13 Apr 2023 10:34:41 UTC"))
-            .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
-            .withHeader("X-Conversation-Id", equalTo(conversationId.value.toString))
-            .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
-            .withHeader(HeaderNames.CONTENT_TYPE, equalTo("application/xml"))
-            .withRequestBody(equalToXml(sampleOutgoingXIXmlWrapped))
-            .willReturn(aResponse().withStatus(OK))
-        )
-
-        val apiRequest = FakeRequest(
-          "POST",
-          s"/traders/GB0123456789/movements/departures/${movementId.value}/messages/${messageId.value}",
-          FakeHeaders(
-            Seq(
-              "Date"                        -> formatted,
-              "x-message-type"              -> "IE015",
-              "x-request-id"                -> UUID.randomUUID().toString,
-              HeaderNames.CONTENT_TYPE      -> MimeTypes.XML,
-              Constants.APIVersionHeaderKey -> Constants.APIVersionFinalHeaderValue
-            )
-          ),
-          Source.single(ByteString(sampleOutgoingXIXml))
-        )
-
-        running(newApp) {
-          val sut    = newApp.injector.instanceOf[MessagesController]
-          val result = sut.outgoing(EoriNumber("GB0123456789"), MovementType("departures"), movementId, messageId)(apiRequest)
-
-          Helpers.status(result) mustBe CREATED
-        }
-      }
-
-      "with a small valid body routing to XI, return 202" in {
-        // We do this instead of using the standard "app" because we otherwise get the error
-        // "Trying to materialize stream after materializer has been shutdown".
-        // We suspect it's due to nested tests.
-        val newApp                  = appBuilder.build()
-        val conversationId          = ConversationId(UUID.randomUUID())
-        val (movementId, messageId) = conversationId.toMovementAndMessageId
-
-        val time      = OffsetDateTime.of(2023, 2, 14, 15, 55, 28, 0, ZoneOffset.UTC)
-        val formatted = DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss z", Locale.ENGLISH).withZone(ZoneOffset.UTC).format(time)
-
-        server.stubFor(
-          post(
-            urlEqualTo("/xi")
           )
             .withHeader(HeaderNames.AUTHORIZATION, equalTo(s"Bearer bearertoken"))
             .withHeader("Date", equalTo("Thu, 13 Apr 2023 10:34:41 UTC"))
