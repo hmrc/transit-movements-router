@@ -339,7 +339,7 @@ class MessagesController @Inject() (
       // our system might delete the file before we use it in the stream.
       //
       // suppress drops any errors (as far as this flatmap chain is concerned) and then returns unit, always.
-      _ <- pushNotificationsConnector.postMessageReceived(movementId, persistenceResponse.messageId, messageType, source).suppress
+      _ <- pushNotificationsConnector.postMessageReceived(movementId, persistenceResponse, messageType, source).suppress
     } yield persistenceResponse
 
   private def handleUpscanSuccessResponse(upscanResponse: UpscanResponse): EitherT[Future, PresentationError, DownloadUrl] =

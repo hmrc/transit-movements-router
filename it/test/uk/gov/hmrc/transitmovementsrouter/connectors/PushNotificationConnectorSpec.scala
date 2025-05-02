@@ -22,6 +22,7 @@ import com.github.tomakehurst.wiremock.client.WireMock.aResponse
 import com.github.tomakehurst.wiremock.client.WireMock.equalTo
 import com.github.tomakehurst.wiremock.client.WireMock.equalToJson
 import com.github.tomakehurst.wiremock.client.WireMock.equalToXml
+import com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor
 import com.github.tomakehurst.wiremock.client.WireMock.post
 import com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo
 import com.github.tomakehurst.wiremock.stubbing.StubMapping
@@ -49,9 +50,11 @@ import uk.gov.hmrc.transitmovementsrouter.connectors.PushNotificationsConnectorI
 import uk.gov.hmrc.transitmovementsrouter.it.base.TestActorSystem
 import uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuite
 import uk.gov.hmrc.transitmovementsrouter.it.generators.ModelGenerators
+import uk.gov.hmrc.transitmovementsrouter.models.EoriNumber
 import uk.gov.hmrc.transitmovementsrouter.models.MessageId
 import uk.gov.hmrc.transitmovementsrouter.models.MessageType
 import uk.gov.hmrc.transitmovementsrouter.models.MovementId
+import uk.gov.hmrc.transitmovementsrouter.models.PersistenceResponse
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PushNotificationError.MovementNotFound
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PushNotificationError.Unexpected
 import uk.gov.hmrc.transitmovementsrouter.services.EISMessageTransformersImpl
@@ -73,6 +76,9 @@ class PushNotificationConnectorSpec
   val movementId: MovementId   = arbitraryMovementId.arbitrary.sample.get
   val messageId: MessageId     = arbitraryMessageId.arbitrary.sample.get
   val messageType: MessageType = arbitraryMessageType.arbitrary.sample.get
+  val eoriNumber: EoriNumber   = arbitraryEoriNumber.arbitrary.sample.get
+
+  val persistenceResponse: PersistenceResponse = PersistenceResponse(messageId, eoriNumber, None, false, None)
 
   val messageReceivedUri: String =
     UrlPath.parse(s"/transit-movements-push-notifications/traders/movements/${movementId.value}/messages/${messageId.value}/messageReceived").toString()
@@ -113,6 +119,8 @@ class PushNotificationConnectorSpec
       .willReturn(aResponse().withStatus(codeToReturn))
   )
 
+  def verifyZeroInteraction = server.verify(0, getRequestedFor(urlEqualTo(messageReceivedUri)))
+
   def jsonStub(codeToReturn: Int): StubMapping = server.stubFor(
     post(
       urlEqualTo(submissionNotificationUri)
@@ -137,10 +145,43 @@ class PushNotificationConnectorSpec
 
       xmlStub(ACCEPTED)
 
-      whenReady(connector.postMessageReceived(movementId, messageId, messageType, source).value) {
+      whenReady(connector.postMessageReceived(movementId, persistenceResponse, messageType, source).value) {
         x =>
           x mustBe Right(())
       }
+    }
+
+    "return unit when post is successful with body when 'sendNotification is true" in {
+      when(mockAppConfig.pushNotificationsEnabled).thenReturn(true)
+
+      xmlStub(ACCEPTED)
+
+      whenReady(connector.postMessageReceived(movementId, persistenceResponse.copy(sendNotification = Some(true)), messageType, source).value) {
+        x =>
+          x mustBe Right(())
+      }
+    }
+
+    "return unit when post is successful with body when 'sendNotification is None" in {
+      when(mockAppConfig.pushNotificationsEnabled).thenReturn(true)
+
+      xmlStub(ACCEPTED)
+
+      whenReady(connector.postMessageReceived(movementId, persistenceResponse.copy(sendNotification = None), messageType, source).value) {
+        x =>
+          x mustBe Right(())
+      }
+    }
+
+    "return unit and do not make a request to PPNS when 'sendNotifiation' is false" in {
+      when(mockAppConfig.pushNotificationsEnabled).thenReturn(true)
+
+      whenReady(connector.postMessageReceived(movementId, persistenceResponse.copy(sendNotification = Some(false)), messageType, source).value) {
+        x =>
+          x mustBe Right(())
+      }
+
+      verifyZeroInteraction
     }
 
     "return a PushNotificationError when unsuccessful with body" in forAll(errorCodes) {
@@ -151,7 +192,7 @@ class PushNotificationConnectorSpec
 
         xmlStub(statusCode)
 
-        whenReady(connector.postMessageReceived(movementId, messageId, messageType, source).value) {
+        whenReady(connector.postMessageReceived(movementId, persistenceResponse, messageType, source).value) {
           x =>
             x.isLeft mustBe true
 
@@ -173,7 +214,7 @@ class PushNotificationConnectorSpec
 
       val failingSource = Source.single(ByteString.fromString("{}")).via(new EISMessageTransformersImpl().unwrap)
 
-      whenReady(connector.postMessageReceived(movementId, messageId, messageType, failingSource).value) {
+      whenReady(connector.postMessageReceived(movementId, persistenceResponse, messageType, failingSource).value) {
         res =>
           res mustBe a[Left[Unexpected, _]]
           res.left.toOption.get.asInstanceOf[Unexpected].exception.isDefined
@@ -185,7 +226,7 @@ class PushNotificationConnectorSpec
 
       xmlStub(INTERNAL_SERVER_ERROR)
 
-      whenReady(connector.postMessageReceived(movementId, messageId, messageType, source).value) {
+      whenReady(connector.postMessageReceived(movementId, persistenceResponse, messageType, source).value) {
         case Left(_)  => fail("The stub should never have been hit and therefore should always return a right")
         case Right(_) =>
       }

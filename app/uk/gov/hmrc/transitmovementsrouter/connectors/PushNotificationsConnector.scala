@@ -51,7 +51,7 @@ import scala.util.control.NonFatal
 @ImplementedBy(classOf[PushNotificationsConnectorImpl])
 trait PushNotificationsConnector {
 
-  def postMessageReceived(movementId: MovementId, messageId: MessageId, messageType: MessageType, sourceXml: Source[ByteString, ?])(implicit
+  def postMessageReceived(movementId: MovementId, response: PersistenceResponse, messageType: MessageType, sourceXml: Source[ByteString, ?])(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): EitherT[Future, PushNotificationError, Unit]
@@ -82,15 +82,20 @@ class PushNotificationsConnectorImpl @Inject() (httpClientV2: HttpClientV2)(impl
   private def pushNotificationMessageUpdate(movementId: MovementId, messageId: MessageId, notificationType: String): UrlPath =
     UrlPath.parse(s"$baseRoute/traders/movements/${movementId.value}/messages/${messageId.value}/$notificationType")
 
-  override def postMessageReceived(movementId: MovementId, messageId: MessageId, messageType: MessageType, sourceXml: Source[ByteString, ?])(implicit
+  override def postMessageReceived(
+    movementId: MovementId,
+    persistenceResponse: PersistenceResponse,
+    messageType: MessageType,
+    sourceXml: Source[ByteString, ?]
+  )(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): EitherT[Future, PushNotificationError, Unit] =
     EitherT {
-      if (!appConfig.pushNotificationsEnabled) {
+      if (!appConfig.pushNotificationsEnabled || !persistenceResponse.shouldSendNotification) {
         Future.successful(Right(()))
       } else {
-        val request = createRequest(movementId, messageId, messageReceivedPath)
+        val request = createRequest(movementId, persistenceResponse.messageId, messageReceivedPath)
           .setHeader(HeaderNames.CONTENT_TYPE -> MimeTypes.XML)
           .withBody(sourceXml)
         executeAndExpect(movementId, Option(messageType), request, ACCEPTED)
