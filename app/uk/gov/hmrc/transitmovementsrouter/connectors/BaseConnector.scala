@@ -35,9 +35,7 @@ trait BaseConnector {
 
     def withMessageType(messageType: Option[MessageType]): RequestBuilder =
       messageType
-        .map(
-          t => requestBuilder.setHeader("X-Message-Type" -> t.code)
-        )
+        .map(t => requestBuilder.setHeader("X-Message-Type" -> t.code))
         .getOrElse(requestBuilder)
 
     def withMovementId(movementId: Option[MovementId]): RequestBuilder =

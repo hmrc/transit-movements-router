@@ -32,7 +32,7 @@ import play.api.mvc.Request
 import play.api.mvc.Result
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.HeaderNames
-import uk.gov.hmrc.internalauth.client._
+import uk.gov.hmrc.internalauth.client.*
 import uk.gov.hmrc.play.bootstrap.backend.controller.BackendController
 import uk.gov.hmrc.play.http.HeaderCarrierConverter
 import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
@@ -41,12 +41,14 @@ import uk.gov.hmrc.transitmovementsrouter.connectors.PushNotificationsConnector
 import uk.gov.hmrc.transitmovementsrouter.connectors.UpscanConnector
 import uk.gov.hmrc.transitmovementsrouter.controllers.actions.AuthenticateEISToken
 import uk.gov.hmrc.transitmovementsrouter.controllers.actions.InternalAuthActionProvider
+import uk.gov.hmrc.transitmovementsrouter.controllers.actions.ValidateVersionRefiner
+import uk.gov.hmrc.transitmovementsrouter.controllers.actions.ValidatedVersionedRequest
 import uk.gov.hmrc.transitmovementsrouter.controllers.errors.ConvertError
 import uk.gov.hmrc.transitmovementsrouter.controllers.errors.PresentationError
 import uk.gov.hmrc.transitmovementsrouter.controllers.stream.StreamingParsers
 import uk.gov.hmrc.transitmovementsrouter.models.AuditType.NCTSRequestedMissingMovement
 import uk.gov.hmrc.transitmovementsrouter.models.AuditType.NCTSToTraderSubmissionSuccessful
-import uk.gov.hmrc.transitmovementsrouter.models._
+import uk.gov.hmrc.transitmovementsrouter.models.*
 import uk.gov.hmrc.transitmovementsrouter.models.requests.MessageUpdate
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.DownloadUrl
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanFailedResponse
@@ -54,7 +56,7 @@ import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanSuccessResponse
 import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesNotification
 import uk.gov.hmrc.transitmovementsrouter.models.sdes.SdesNotificationType
-import uk.gov.hmrc.transitmovementsrouter.services._
+import uk.gov.hmrc.transitmovementsrouter.services.*
 import uk.gov.hmrc.transitmovementsrouter.utils.RouterHeaderNames
 import uk.gov.hmrc.transitmovementsrouter.utils.StreamWithFile
 
@@ -71,9 +73,7 @@ object MessagesController extends ConvertError {
     def asPresentationWithMessageType(messageTypeMaybe: Option[MessageType])(implicit
       ec: ExecutionContext
     ): EitherT[Future, (PresentationError, Option[MessageType]), A] =
-      value.asPresentation.leftMap(
-        x => (x, messageTypeMaybe)
-      )
+      value.asPresentation.leftMap(x => (x, messageTypeMaybe))
   }
 }
 
@@ -92,7 +92,8 @@ class MessagesController @Inject() (
   internalAuth: InternalAuthActionProvider,
   statusMonitoringService: ServiceMonitoringService,
   auditService: AuditingService,
-  val config: AppConfig
+  val config: AppConfig,
+  validateVersionRefiner: ValidateVersionRefiner
 )(implicit
   val materializer: Materializer,
   val temporaryFileCreator: TemporaryFileCreator
@@ -110,10 +111,11 @@ class MessagesController @Inject() (
 
   def outgoing(@unused eori: EoriNumber, movementType: MovementType, movementId: MovementId, messageId: MessageId): Action[Source[ByteString, ?]] = {
     def viaEIS(messageType: MessageType, customsOffice: CustomsOffice, source: Source[ByteString, ?])(implicit
-      hc: HeaderCarrier
+      hc: HeaderCarrier,
+      request: ValidatedVersionedRequest[Source[ByteString, ?]]
     ): EitherT[Future, PresentationError, Status] =
       for {
-        _ <- routingService.submitMessage(movementType, movementId, messageId, source, customsOffice).asPresentation
+        _ <- routingService.submitMessage(movementType, movementId, messageId, source, customsOffice, request.versionHeader).asPresentation
         _ = statusMonitoringService.outgoing(movementId, messageId, messageType, customsOffice)
       } yield Created
 
@@ -123,22 +125,18 @@ class MessagesController @Inject() (
         _               <- sdesService.send(movementId, messageId, objectStoreFile).asPresentation
       } yield Accepted
 
-    internalAuth(predicate).async(streamFromMemory) {
-
-      implicit request =>
-        (for {
-          source             <- reUsableOutgoingSource(request)
-          messageType        <- messageTypeExtractor.extractFromHeaders(request.headers).asPresentation
-          requestMessageType <- filterRequestMessageType(messageType)
-          customsOffice      <- customOfficeExtractorService.extractCustomOffice(source.headOption.get, requestMessageType).asPresentation
-          size               <- calculateSize(source.lift(1).get)
-          submitted <-
-            if (config.eisSizeLimit >= size) viaEIS(messageType, customsOffice, source.lift(2).get)
-            else viaSDES(source.lift(3).get)
-        } yield submitted)
-          .valueOr(
-            error => Status(error.code.statusCode)(Json.toJson(error))
-          )
+    (internalAuth(predicate) andThen validateVersionRefiner).async(streamFromMemory) { implicit request =>
+      (for {
+        source             <- reUsableOutgoingSource(request)
+        messageType        <- messageTypeExtractor.extractFromHeaders(request.headers).asPresentation
+        requestMessageType <- filterRequestMessageType(messageType)
+        customsOffice      <- customOfficeExtractorService.extractCustomOffice(source.headOption.get, requestMessageType).asPresentation
+        size               <- calculateSize(source.lift(1).get)
+        submitted          <-
+          if (config.eisSizeLimit >= size) viaEIS(messageType, customsOffice, source.lift(2).get)
+          else viaSDES(source.lift(3).get)
+      } yield submitted)
+        .valueOr(error => Status(error.code.statusCode)(Json.toJson(error)))
     }
   }
 
@@ -147,9 +145,8 @@ class MessagesController @Inject() (
       source
         .runWith(Sink.seq)
         .map(Right(_): Either[PresentationError, Seq[ByteString]])
-        .recover {
-          error =>
-            Left(PresentationError.internalServiceError(cause = Some(error)))
+        .recover { error =>
+          Left(PresentationError.internalServiceError(cause = Some(error)))
         }
     )
 
@@ -205,11 +202,9 @@ class MessagesController @Inject() (
     val sizeFuture: Future[Either[PresentationError, Long]] = source
       .map(_.size.toLong)
       .runWith(Sink.fold(0L)(_ + _))
-      .map(
-        size => Right(size): Either[PresentationError, Long]
-      )
-      .recover {
-        case _: Exception => Left(PresentationError.internalServiceError())
+      .map(size => Right(size): Either[PresentationError, Long])
+      .recover { case _: Exception =>
+        Left(PresentationError.internalServiceError())
       }
 
     EitherT(sizeFuture)
@@ -219,113 +214,101 @@ class MessagesController @Inject() (
     EitherT.fromOption[Future](messageType.auditType, PresentationError.badRequestError(s"$messageType is not a ResponseMessageType"))
 
   def incomingViaEIS(ids: ConversationId): Action[Source[ByteString, ?]] =
-    authenticateEISToken.async(streamFromMemory) {
+    authenticateEISToken.async(streamFromMemory) { implicit request =>
+      import MessagesController.PresentationEitherTHelper
 
-      implicit request =>
-        import MessagesController.PresentationEitherTHelper
+      val (movementId, triggerId) = ids.toMovementAndMessageId
+      (for {
+        source <- reUsableIncomingSource(request).leftMap(err => (err, None))
 
-        val (movementId, triggerId) = ids.toMovementAndMessageId
-        (for {
-          source <- reUsableIncomingSource(request).leftMap(
-            err => (err, None)
-          )
+        messageType <- messageTypeExtractor.extract(request.headers, source.headOption.get).asPresentationWithMessageType(None)
 
-          messageType <- messageTypeExtractor.extract(request.headers, source.headOption.get).asPresentationWithMessageType(None)
+        auditMsg <- extractAuditMessageType(messageType).leftMap(err => (err, Option(messageType)))
+        _ = statusMonitoringService.incoming(movementId, triggerId, messageType)
 
-          auditMsg <- extractAuditMessageType(messageType).leftMap(
-            err => (err, Option(messageType))
-          )
-          _ = statusMonitoringService.incoming(movementId, triggerId, messageType)
-
-          size <- calculateSize(source.lift(1).get).leftMap(
-            err => (err, Option(messageType))
-          )
-          persistenceResponse <- persistStream(movementId, triggerId, messageType, source.lift(2).get).leftMap {
-            err =>
-              if (err.code.statusCode == NOT_FOUND)
-                auditService.auditStatusEvent(
-                  NCTSRequestedMissingMovement,
-                  Some(Json.toJson(err)),
-                  Some(movementId),
-                  None,
-                  None,
-                  Some(messageType.movementType),
-                  Some(messageType),
-                  None
-                )
-              (err, Option(messageType))
-          }
-          _ = auditService.auditMessageEvent(
-            auditType = auditMsg,
-            contentType = MimeTypes.XML,
-            contentLength = size,
-            payload = source.lift(3).get,
-            movementId = Some(movementId),
-            messageId = Some(persistenceResponse.messageId),
-            enrolmentEORI = Some(persistenceResponse.eori),
-            movementType = Some(messageType.movementType),
-            messageType = Some(messageType),
-            clientId = persistenceResponse.clientId,
-            isTransitional = persistenceResponse.isTransitional
-          )
-          _ = auditService.auditStatusEvent(
-            NCTSToTraderSubmissionSuccessful,
-            None,
-            Some(movementId),
-            Some(persistenceResponse.messageId),
-            enrolmentEORI = Some(persistenceResponse.eori),
-            Some(messageType.movementType),
-            Some(messageType),
-            clientId = persistenceResponse.clientId
-          )
-          _ = logIncomingSuccess(movementId, triggerId, persistenceResponse.messageId, messageType)
-        } yield persistenceResponse)
-          .fold[Result](
-            {
-              error =>
-                if (config.logIncoming) {
-                  logger.error(s"""Unable to process message from EIS :
+        size                <- calculateSize(source.lift(1).get).leftMap(err => (err, Option(messageType)))
+        persistenceResponse <- persistStream(movementId, triggerId, messageType, source.lift(2).get).leftMap { err =>
+          if (err.code.statusCode == NOT_FOUND)
+            auditService.auditStatusEvent(
+              NCTSRequestedMissingMovement,
+              Some(Json.toJson(err)),
+              Some(movementId),
+              None,
+              None,
+              Some(messageType.movementType),
+              Some(messageType),
+              None
+            )
+          (err, Option(messageType))
+        }
+        _ = auditService.auditMessageEvent(
+          auditType = auditMsg,
+          contentType = MimeTypes.XML,
+          contentLength = size,
+          payload = source.lift(3).get,
+          movementId = Some(movementId),
+          messageId = Some(persistenceResponse.messageId),
+          enrolmentEORI = Some(persistenceResponse.eori),
+          movementType = Some(messageType.movementType),
+          messageType = Some(messageType),
+          clientId = persistenceResponse.clientId,
+          isTransitional = persistenceResponse.isTransitional
+        )
+        _ = auditService.auditStatusEvent(
+          NCTSToTraderSubmissionSuccessful,
+          None,
+          Some(movementId),
+          Some(persistenceResponse.messageId),
+          enrolmentEORI = Some(persistenceResponse.eori),
+          Some(messageType.movementType),
+          Some(messageType),
+          clientId = persistenceResponse.clientId
+        )
+        _ = logIncomingSuccess(movementId, triggerId, persistenceResponse.messageId, messageType)
+      } yield persistenceResponse)
+        .fold[Result](
+          { error =>
+            if (config.logIncoming) {
+              logger.error(s"""Unable to process message from EIS :
                          |
                          |${generateRequestLog(movementId, triggerId, error._2)}
 
                          |error is ${Json.toJson(error._1)}""".stripMargin)
-                }
-                Status(error._1.code.statusCode)(Json.toJson(error._1))
-            },
-            response => Created.withHeaders("X-Message-Id" -> response.messageId.value)
-          )
+            }
+            Status(error._1.code.statusCode)(Json.toJson(error._1))
+          },
+          response => Created.withHeaders("X-Message-Id" -> response.messageId.value)
+        )
 
     }
 
-  def incomingViaUpscan(movementId: MovementId, triggerId: MessageId): Action[JsValue] = Action.async(cc.parsers.json) {
-    implicit request =>
-      implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
-      (for {
-        upscanResponse      <- parseAndLogUpscanResponse(request.body)
-        downloadUrl         <- handleUpscanSuccessResponse(upscanResponse)
-        source              <- upscanConnector.streamFile(downloadUrl).map(_.via(eisMessageTransformers.unwrap)).asPresentation
-        persistenceResponse <- withUpscanSource(movementId, triggerId, source)
-      } yield persistenceResponse)
-        .fold[Result](
-          presentationError =>
-            // TODO: Inform SDES of failure
-            Status(presentationError.code.statusCode)(Json.toJson(presentationError)),
-          response =>
-            // TODO: Inform SDES of success
-            Created.withHeaders("X-Message-Id" -> response.messageId.value)
-        )
+  def incomingViaUpscan(movementId: MovementId, triggerId: MessageId): Action[JsValue] = Action.async(cc.parsers.json) { implicit request =>
+    implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
+    (for {
+      upscanResponse      <- parseAndLogUpscanResponse(request.body)
+      downloadUrl         <- handleUpscanSuccessResponse(upscanResponse)
+      source              <- upscanConnector.streamFile(downloadUrl).map(_.via(eisMessageTransformers.unwrap)).asPresentation
+      persistenceResponse <- withUpscanSource(movementId, triggerId, source)
+    } yield persistenceResponse)
+      .fold[Result](
+        presentationError =>
+          // TODO: Inform SDES of failure
+          Status(presentationError.code.statusCode)(Json.toJson(presentationError)),
+        response =>
+          // TODO: Inform SDES of success
+          Created.withHeaders("X-Message-Id" -> response.messageId.value)
+      )
   }
 
   private def withUpscanSource(movementId: MovementId, triggerId: MessageId, source: Source[ByteString, ?])(implicit
     hc: HeaderCarrier
   ): EitherT[Future, PresentationError, PersistenceResponse] =
-    withReusableSource(source) {
-      fileSource =>
-        for {
-          messageType <- messageTypeExtractor.extractFromBody(fileSource).asPresentation
-          _ = statusMonitoringService.incoming(movementId, triggerId, messageType)
-          persistenceResponse <- persistStream(movementId, triggerId, messageType, fileSource)
-        } yield persistenceResponse
+    withReusableSource(source) { fileSource =>
+      for {
+        messageType <- messageTypeExtractor.extractFromBody(fileSource).asPresentation
+        _ = statusMonitoringService.incoming(movementId, triggerId, messageType)
+        persistenceResponse <- persistStream(movementId, triggerId, messageType, fileSource)
+      } yield persistenceResponse
     }
 
   private def persistStream(movementId: MovementId, triggerId: MessageId, messageType: MessageType, source: Source[ByteString, ?])(implicit
@@ -380,49 +363,48 @@ class MessagesController @Inject() (
     } yield persistenceResponse
 
   def handleSdesResponse(): Action[JsValue] =
-    Action.async(parse.json) {
-      implicit request =>
-        implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
-        // This is used to handle sdes response. Like if we receive bad json response from sdes then we need to report to sdes and log the response.
-        parseAndLogSdesResponse(request.body) match {
-          case Left(presentationError) =>
-            Future.successful(Status(presentationError.code.statusCode)(Json.toJson(presentationError)))
-          case Right(sdesResponse) =>
-            val (movementId, messageId) = extractMovementMessageId(sdesResponse)
-            (for {
-              persistenceResponse <- sdesResponse.notification match {
-                case SdesNotificationType.FileProcessed =>
-                  updateAndSendNotification(
-                    movementId,
-                    messageId,
-                    MessageStatus.Success,
-                    Json.toJson(
-                      Json.obj(
-                        "code" -> "SUCCESS",
-                        "message" ->
-                          s"The message ${messageId.value} for movement ${movementId.value} was successfully processed"
-                      )
+    Action.async(parse.json) { implicit request =>
+      implicit val hc: HeaderCarrier = HeaderCarrierConverter.fromRequest(request)
+      // This is used to handle sdes response. Like if we receive bad json response from sdes then we need to report to sdes and log the response.
+      parseAndLogSdesResponse(request.body) match {
+        case Left(presentationError) =>
+          Future.successful(Status(presentationError.code.statusCode)(Json.toJson(presentationError)))
+        case Right(sdesResponse) =>
+          val (movementId, messageId) = extractMovementMessageId(sdesResponse)
+          (for {
+            persistenceResponse <- sdesResponse.notification match {
+              case SdesNotificationType.FileProcessed =>
+                updateAndSendNotification(
+                  movementId,
+                  messageId,
+                  MessageStatus.Success,
+                  Json.toJson(
+                    Json.obj(
+                      "code"    -> "SUCCESS",
+                      "message" ->
+                        s"The message ${messageId.value} for movement ${movementId.value} was successfully processed"
                     )
                   )
-                case SdesNotificationType.FileProcessingFailure =>
-                  updateAndSendNotification(
-                    movementId,
-                    messageId,
-                    MessageStatus.Failed,
-                    Json.toJson(
-                      PresentationError.internalServiceError()
-                    )
+                )
+              case SdesNotificationType.FileProcessingFailure =>
+                updateAndSendNotification(
+                  movementId,
+                  messageId,
+                  MessageStatus.Failed,
+                  Json.toJson(
+                    PresentationError.internalServiceError()
                   )
-                case _ => EitherT.rightT[Future, PresentationError]((): Unit)
-              }
-            } yield persistenceResponse).fold[Result](
-              presentationError => {
-                pushNotificationsConnector.postSubmissionNotification(movementId, messageId, Json.toJson(PresentationError.internalServiceError()))
-                Status(presentationError.code.statusCode)(Json.toJson(presentationError))
-              },
-              _ => Ok
-            )
-        }
+                )
+              case _ => EitherT.rightT[Future, PresentationError]((): Unit)
+            }
+          } yield persistenceResponse).fold[Result](
+            presentationError => {
+              pushNotificationsConnector.postSubmissionNotification(movementId, messageId, Json.toJson(PresentationError.internalServiceError()))
+              Status(presentationError.code.statusCode)(Json.toJson(presentationError))
+            },
+            _ => Ok
+          )
+      }
     }
 
   // Logging methods

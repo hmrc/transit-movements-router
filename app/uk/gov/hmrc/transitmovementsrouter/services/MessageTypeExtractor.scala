@@ -84,20 +84,16 @@ class MessageTypeExtractorImpl @Inject() (implicit ec: ExecutionContext, mat: Ma
       case _: WFCException => Left(UnableToExtractFromBody)
       case NonFatal(e)     => Left(MessageTypeExtractionError.Unexpected(Some(e)))
     }
-    .fold[MaybeMessageType](Left(UnableToExtractFromBody))(
-      (_, incoming) => incoming
-    )
+    .fold[MaybeMessageType](Left(UnableToExtractFromBody))((_, incoming) => incoming)
     .toMat(Sink.head)(Keep.right)
 
   override def extract(headers: Headers, source: Source[ByteString, ?]): EitherT[Future, MessageTypeExtractionError, MessageType] =
-    extractFromHeaders(headers).leftFlatMap(
-      _ => extractFromBody(source)
-    )
+    extractFromHeaders(headers).leftFlatMap(_ => extractFromBody(source))
 
   override def extractFromHeaders(headers: Headers): EitherT[Future, MessageTypeExtractionError, MessageType] =
     EitherT {
       headers.get(RouterHeaderNames.MESSAGE_TYPE) match {
-        case None => Future.successful(Left(UnableToExtractFromHeader))
+        case None              => Future.successful(Left(UnableToExtractFromHeader))
         case Some(headerValue) =>
           MessageType.withCode(headerValue) match {
             case None              => Future.successful(Left(InvalidMessageType(headerValue)))

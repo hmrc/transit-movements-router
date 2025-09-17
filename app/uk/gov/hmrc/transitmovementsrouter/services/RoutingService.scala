@@ -26,6 +26,8 @@ import uk.gov.hmrc.transitmovementsrouter.connectors.EISConnector
 import uk.gov.hmrc.transitmovementsrouter.connectors.EISConnectorProvider
 import uk.gov.hmrc.transitmovementsrouter.models._
 import uk.gov.hmrc.transitmovementsrouter.models.errors.RoutingError
+import cats.data.EitherT
+import cats.implicits._
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
@@ -38,7 +40,8 @@ trait RoutingService {
     movementId: MovementId,
     messageId: MessageId,
     payload: Source[ByteString, ?],
-    customsOffice: CustomsOffice
+    customsOffice: CustomsOffice,
+    versionHeader: APIVersionHeader
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): EitherT[Future, RoutingError, Unit]
 
 }
@@ -55,17 +58,19 @@ class RoutingServiceImpl @Inject() (
     movementId: MovementId,
     messageId: MessageId,
     payload: Source[ByteString, ?],
-    customsOffice: CustomsOffice
+    customsOffice: CustomsOffice,
+    versionHeader: APIVersionHeader
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): EitherT[Future, RoutingError, Unit] =
-    for {
-      connector <- eisConnectorSelector(customsOffice)
-      _         <- EitherT(connector.post(movementId, messageId, payload.via(eisMessageTransformers.wrap), hc))
-    } yield ()
+    EitherT(
+      eisConnectorSelector(customsOffice, versionHeader)
+        .post(movementId, messageId, payload.via(eisMessageTransformers.wrap), hc)
+    )
 
-  private def eisConnectorSelector(customsOffice: CustomsOffice): EitherT[Future, RoutingError, EISConnector] = EitherT {
-    if (customsOffice.isGB) Future.successful(Right(messageConnectorProvider.gbV2_1))
-    else
-      Future.successful(Right(messageConnectorProvider.xiV2_1))
-
-  }
+  private def eisConnectorSelector(customsOffice: CustomsOffice, versionHeader: APIVersionHeader): EISConnector =
+    (customsOffice.isGB, versionHeader) match {
+      case (true, APIVersionHeader.v2_1)  => messageConnectorProvider.gbV2_1
+      case (true, APIVersionHeader.v3_0)  => messageConnectorProvider.gbV3_0
+      case (false, APIVersionHeader.v2_1) => messageConnectorProvider.xiV2_1
+      case (false, APIVersionHeader.v3_0) => messageConnectorProvider.xiV3_0
+    }
 }

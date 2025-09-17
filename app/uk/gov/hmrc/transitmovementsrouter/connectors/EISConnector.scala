@@ -90,8 +90,8 @@ class EISConnectorImpl(
   private val lrnErrorMaybeExtractor: Flow[ParseEvent, LocalReferenceNumber, NotUsed] =
     XmlParsing
       .subtree("lrnDuplicationErrorDetail" :: "sourceFaultDetail" :: "lrn" :: Nil)
-      .collect {
-        case element => LocalReferenceNumber(element.getTextContent.trim)
+      .collect { case element =>
+        LocalReferenceNumber(element.getTextContent.trim)
       }
 
   private lazy val authorization = s"Bearer ${eisInstanceConfig.headers.bearerToken}"
@@ -115,7 +115,7 @@ class EISConnectorImpl(
     response.left.toOption.get match {
       case RoutingError.Upstream(upstreamErrorResponse) => attemptRetry(s"with status code ${upstreamErrorResponse.statusCode}", retryDetails)
       case RoutingError.Unexpected(message, _)          => attemptRetry(s"with error $message", retryDetails)
-      case x: RoutingError =>
+      case x: RoutingError                              =>
         logger.error(s"An unexpected error occurred - got a ${x.getClass}")
         Future.failed(new IllegalStateException(s"An unexpected error occurred - got a ${x.getClass}"))
     }
@@ -125,7 +125,7 @@ class EISConnectorImpl(
       retries.createRetryPolicy(eisInstanceConfig.retryConfig),
       (t: Either[RoutingError, Unit]) =>
         t match {
-          case Left(RoutingError.DuplicateLRNError(_, _, _)) => Future.successful(true) // Don't retry for duplicate LRN errors
+          case Left(RoutingError.DuplicateLRNError(_, _, _))                          => Future.successful(true) // Don't retry for duplicate LRN errors
           case Left(RoutingError.Upstream(UpstreamErrorResponse(_, FORBIDDEN, _, _))) =>
             Future.successful(true) // Don't retry if we get forbidden, as that error won't change
           case _ => Future.successful(t.isRight)
@@ -146,7 +146,7 @@ class EISConnectorImpl(
 
       // The router required this to be supplied so will be in the carrier in "otherHeaders". headersForUrl only seems to care about
       // "explicitHeaders", so we need to use "headers" here and filter on what's returned.
-      val messageType = hc.headers(Seq(RouterHeaderNames.MESSAGE_TYPE)).headOption.map(_._2).getOrElse("undefined")
+      val messageType     = hc.headers(Seq(RouterHeaderNames.MESSAGE_TYPE)).headOption.map(_._2).getOrElse("undefined")
       lazy val logMessage =
         s"""|transit-movements-router-eis
             |
@@ -181,62 +181,60 @@ class EISConnectorImpl(
             HeaderNames.DATE                  -> nowFormatted()
           )
           .execute[HttpResponse]
-          .flatMap[Either[RoutingError, Unit]] {
-            result =>
-              if (isSuccessful(result.status)) {
-                logger.info(logMessage + s"Response status: ${result.status}")
-                Future.successful(Right(()))
-              } else {
-                // We do this manually as we otherwise lose the raw string from the response -- the standard
-                // HttpReads will wrap the response in its own metadata which we don't want if we actually have
-                // an XML document to read.
-                val error = UpstreamErrorResponse(
-                  HttpErrorFunctions.upstreamResponseMessage("POST", eisInstanceConfig.url, result.status, result.body),
-                  result.status,
-                  result.status,
-                  result.headers
-                )
-                val status =
-                  if (logBodyOn500 && error.statusCode == INTERNAL_SERVER_ERROR) {
-                    s"""Response status: ${error.statusCode}"
+          .flatMap[Either[RoutingError, Unit]] { result =>
+            if (isSuccessful(result.status)) {
+              logger.info(logMessage + s"Response status: ${result.status}")
+              Future.successful(Right(()))
+            } else {
+              // We do this manually as we otherwise lose the raw string from the response -- the standard
+              // HttpReads will wrap the response in its own metadata which we don't want if we actually have
+              // an XML document to read.
+              val error = UpstreamErrorResponse(
+                HttpErrorFunctions.upstreamResponseMessage("POST", eisInstanceConfig.url, result.status, result.body),
+                result.status,
+                result.status,
+                result.headers
+              )
+              val status =
+                if (logBodyOn500 && error.statusCode == INTERNAL_SERVER_ERROR) {
+                  s"""Response status: ${error.statusCode}"
                          |Message:
                          |
                          |${error.message}""".stripMargin
-                  } else s"Response status: ${error.statusCode}"
+                } else s"Response status: ${error.statusCode}"
 
-                logger.warn(logMessage + status)
+              logger.warn(logMessage + status)
 
-                if (result.status == FORBIDDEN && result.body.nonEmpty) {
-                  // We might have an XML fragment, in which case we try to parse it using Akka streams.
-                  Source
-                    .single(ByteString(result.body))
-                    .via(XmlParsing.parser)
-                    .via(lrnErrorMaybeExtractor)
-                    .withAttributes(
-                      Attributes.logLevels(
-                        onFailure = LogLevels.Off
-                      )
+              if (result.status == FORBIDDEN && result.body.nonEmpty) {
+                // We might have an XML fragment, in which case we try to parse it using Akka streams.
+                Source
+                  .single(ByteString(result.body))
+                  .via(XmlParsing.parser)
+                  .via(lrnErrorMaybeExtractor)
+                  .withAttributes(
+                    Attributes.logLevels(
+                      onFailure = LogLevels.Off
                     )
-                    .runWith(Sink.headOption)
-                    .recover {
-                      case NonFatal(_) => None // If we get an error, it's probably a parsing error, so treat it as if we got nothing.
-                    }
-                    .map {
-                      case Some(lrn) =>
-                        Left(RoutingError.DuplicateLRNError(s"LRN $lrn has previously been used and cannot be reused", ErrorCode.Conflict, lrn))
-                      case None =>
-                        createError(error)
-                    }
+                  )
+                  .runWith(Sink.headOption)
+                  .recover { case NonFatal(_) =>
+                    None // If we get an error, it's probably a parsing error, so treat it as if we got nothing.
+                  }
+                  .map {
+                    case Some(lrn) =>
+                      Left(RoutingError.DuplicateLRNError(s"LRN $lrn has previously been used and cannot be reused", ErrorCode.Conflict, lrn))
+                    case None =>
+                      createError(error)
+                  }
 
-                } else Future.successful(createError(error))
-              }
+              } else Future.successful(createError(error))
+            }
 
           }
-          .recover {
-            case NonFatal(e) =>
-              val message = logMessage + s"Request Error: Routing to $code failed to retrieve data with message ${e.getMessage}"
-              logger.error(message)
-              Left(RoutingError.Unexpected(message, Some(e)))
+          .recover { case NonFatal(e) =>
+            val message = logMessage + s"Request Error: Routing to $code failed to retrieve data with message ${e.getMessage}"
+            logger.error(message)
+            Left(RoutingError.Unexpected(message, Some(e)))
           }
       }
     }
@@ -254,9 +252,7 @@ class EISConnectorImpl(
     } else {
       val nextAttempt =
         retryDetails.upcomingDelay
-          .map(
-            d => s"in ${d.toSeconds} seconds"
-          )
+          .map(d => s"in ${d.toSeconds} seconds")
           .getOrElse("immediately")
       logger.warn(
         s"Message when routing to $code failed with $message\n" +

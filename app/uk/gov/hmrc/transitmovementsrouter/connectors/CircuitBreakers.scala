@@ -51,19 +51,16 @@ trait CircuitBreakers { self: Logging =>
         s"$code Circuit breaker for $clazz closing after trial connection success"
       )
     }
-    .onCallFailure(
-      _ => logger.error(s"$code Circuit breaker for $clazz recorded failed call")
-    )
+    .onCallFailure(_ => logger.error(s"$code Circuit breaker for $clazz recorded failed call"))
     .onCallBreakerOpen {
       logger.error(
         s"$code Circuit breaker for $clazz rejected call due to previous failures"
       )
     }
-    .onCallTimeout {
-      elapsed =>
-        val duration = Duration.fromNanos(elapsed)
-        logger.error(
-          s"$code Circuit breaker for $clazz recorded failed call due to timeout after ${duration.toMillis}ms"
-        )
+    .onCallTimeout { elapsed =>
+      val duration = Duration.fromNanos(elapsed)
+      logger.error(
+        s"$code Circuit breaker for $clazz recorded failed call due to timeout after ${duration.toMillis}ms"
+      )
     }
 }

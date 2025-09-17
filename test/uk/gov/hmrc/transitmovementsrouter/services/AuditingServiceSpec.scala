@@ -71,135 +71,130 @@ class AuditingServiceSpec
     reset(mockConnector)
 
   "For auditing message type event" - {
-    "Posting any audit type event" - Seq(MimeTypes.XML, MimeTypes.JSON).foreach {
-      contentType =>
-        s"when contentType equals $contentType" - {
-          "on success audit, return the successful future" in forAll(
-            Gen.option(arbitrary[EoriNumber]),
-            Gen.option(arbitrary[MovementType]),
-            Gen.option(arbitrary[MovementId]),
-            Gen.option(arbitrary[MessageId]),
-            Gen.option(arbitrary[MessageType]),
-            Gen.option(arbitrary[ClientId])
-          ) {
-            (eoriNumber, movementType, movementId, messageId, messageType, clientId) =>
-              when(
-                mockConnector.postMessageType(
-                  eqTo(AmendmentAcceptance),
-                  eqTo(contentType),
-                  eqTo[Long](smallMessageSize),
-                  any(),
-                  eqTo(movementId),
-                  eqTo(messageId),
-                  eqTo(eoriNumber),
-                  eqTo(movementType),
-                  eqTo(messageType),
-                  eqTo(clientId),
-                  eqTo(isTransitional)
-                )(any(), any())
-              )
-                .thenReturn(Future.successful(()))
+    "Posting any audit type event" - Seq(MimeTypes.XML, MimeTypes.JSON).foreach { contentType =>
+      s"when contentType equals $contentType" - {
+        "on success audit, return the successful future" in forAll(
+          Gen.option(arbitrary[EoriNumber]),
+          Gen.option(arbitrary[MovementType]),
+          Gen.option(arbitrary[MovementId]),
+          Gen.option(arbitrary[MessageId]),
+          Gen.option(arbitrary[MessageType]),
+          Gen.option(arbitrary[ClientId])
+        ) { (eoriNumber, movementType, movementId, messageId, messageType, clientId) =>
+          when(
+            mockConnector.postMessageType(
+              eqTo(AmendmentAcceptance),
+              eqTo(contentType),
+              eqTo[Long](smallMessageSize),
+              any(),
+              eqTo(movementId),
+              eqTo(messageId),
+              eqTo(eoriNumber),
+              eqTo(movementType),
+              eqTo(messageType),
+              eqTo(clientId),
+              eqTo(isTransitional)
+            )(any(), any())
+          )
+            .thenReturn(Future.successful(()))
 
-              whenReady(
-                sut.auditMessageEvent(
-                  AuditType.AmendmentAcceptance,
-                  contentType,
-                  smallMessageSize,
-                  Source.empty,
-                  movementId,
-                  messageId,
-                  eoriNumber,
-                  movementType,
-                  messageType,
-                  clientId,
-                  isTransitional
-                )
-              ) {
-                _ =>
-                  verify(mockConnector, times(1)).postMessageType(
-                    eqTo(AmendmentAcceptance),
-                    eqTo(contentType),
-                    eqTo[Long](smallMessageSize),
-                    any(),
-                    eqTo(movementId),
-                    eqTo(messageId),
-                    eqTo(eoriNumber),
-                    eqTo(movementType),
-                    eqTo(messageType),
-                    eqTo(clientId),
-                    eqTo(isTransitional)
-                  )(any(), any())
-              }
+          whenReady(
+            sut.auditMessageEvent(
+              AuditType.AmendmentAcceptance,
+              contentType,
+              smallMessageSize,
+              Source.empty,
+              movementId,
+              messageId,
+              eoriNumber,
+              movementType,
+              messageType,
+              clientId,
+              isTransitional
+            )
+          ) { _ =>
+            verify(mockConnector, times(1)).postMessageType(
+              eqTo(AmendmentAcceptance),
+              eqTo(contentType),
+              eqTo[Long](smallMessageSize),
+              any(),
+              eqTo(movementId),
+              eqTo(messageId),
+              eqTo(eoriNumber),
+              eqTo(movementType),
+              eqTo(messageType),
+              eqTo(clientId),
+              eqTo(isTransitional)
+            )(any(), any())
+          }
+        }
+
+        "on failure audit, will log a message" in forAll(
+          Gen.option(arbitrary[EoriNumber]),
+          Gen.option(arbitrary[MovementType]),
+          Gen.option(arbitrary[MovementId]),
+          Gen.option(arbitrary[MessageId]),
+          Gen.option(arbitrary[MessageType]),
+          Gen.option(arbitrary[ClientId])
+        ) { (eoriNumber, movementType, movementId, messageId, messageType, clientId) =>
+          val exception = new IllegalStateException("failed")
+
+          when(
+            mockConnector.postMessageType(
+              eqTo(AmendmentAcceptance),
+              eqTo(contentType),
+              any(),
+              any(),
+              eqTo(movementId),
+              eqTo(messageId),
+              eqTo(eoriNumber),
+              eqTo(movementType),
+              eqTo(messageType),
+              eqTo(clientId),
+              eqTo(isTransitional)
+            )(any(), any())
+          ).thenReturn(Future.failed(exception))
+
+          object Harness extends AuditingServiceImpl(mockConnector) {
+            val logger0: slf4j.Logger = mock[org.slf4j.Logger]
+            when(logger0.isWarnEnabled()).thenReturn(true)
+            override val logger: Logger = new Logger(logger0)
           }
 
-          "on failure audit, will log a message" in forAll(
-            Gen.option(arbitrary[EoriNumber]),
-            Gen.option(arbitrary[MovementType]),
-            Gen.option(arbitrary[MovementId]),
-            Gen.option(arbitrary[MessageId]),
-            Gen.option(arbitrary[MessageType]),
-            Gen.option(arbitrary[ClientId])
-          ) {
-            (eoriNumber, movementType, movementId, messageId, messageType, clientId) =>
-              val exception = new IllegalStateException("failed")
-
-              when(
-                mockConnector.postMessageType(
-                  eqTo(AmendmentAcceptance),
-                  eqTo(contentType),
-                  any(),
-                  any(),
-                  eqTo(movementId),
-                  eqTo(messageId),
-                  eqTo(eoriNumber),
-                  eqTo(movementType),
-                  eqTo(messageType),
-                  eqTo(clientId),
-                  eqTo(isTransitional)
-                )(any(), any())
-              ).thenReturn(Future.failed(exception))
-
-              object Harness extends AuditingServiceImpl(mockConnector) {
-                val logger0: slf4j.Logger = mock[org.slf4j.Logger]
-                when(logger0.isWarnEnabled()).thenReturn(true)
-                override val logger: Logger = new Logger(logger0)
-              }
-
-              whenReady(
-                Harness.auditMessageEvent(
-                  AuditType.AmendmentAcceptance,
-                  contentType,
-                  0L,
-                  Source.empty,
-                  movementId,
-                  messageId,
-                  eoriNumber,
-                  movementType,
-                  messageType,
-                  clientId,
-                  isTransitional
-                )
-              ) {
-                _ =>
-                  verify(mockConnector, times(1)).postMessageType(
-                    eqTo(AmendmentAcceptance),
-                    eqTo(contentType),
-                    any(),
-                    any(),
-                    eqTo(movementId),
-                    eqTo(messageId),
-                    eqTo(eoriNumber),
-                    eqTo(movementType),
-                    eqTo(messageType),
-                    eqTo(clientId),
-                    eqTo(isTransitional)
-                  )(any(), any())
-                  verify(Harness.logger0, times(1)).warn(eqTo("Unable to audit payload due to an exception"), eqTo(exception))
-              }
-
+          whenReady(
+            Harness.auditMessageEvent(
+              AuditType.AmendmentAcceptance,
+              contentType,
+              0L,
+              Source.empty,
+              movementId,
+              messageId,
+              eoriNumber,
+              movementType,
+              messageType,
+              clientId,
+              isTransitional
+            )
+          ) { _ =>
+            verify(mockConnector, times(1)).postMessageType(
+              eqTo(AmendmentAcceptance),
+              eqTo(contentType),
+              any(),
+              any(),
+              eqTo(movementId),
+              eqTo(messageId),
+              eqTo(eoriNumber),
+              eqTo(movementType),
+              eqTo(messageType),
+              eqTo(clientId),
+              eqTo(isTransitional)
+            )(any(), any())
+            verify(Harness.logger0, times(1)).warn(eqTo("Unable to audit payload due to an exception"), eqTo(exception))
           }
 
         }
+
+      }
 
     }
   }
@@ -213,46 +208,44 @@ class AuditingServiceSpec
       Gen.option(arbitrary[MessageId]),
       Gen.option(arbitrary[MessageType]),
       Gen.option(arbitrary[JsValue])
-    ) {
-      (eoriNumber, movementType, movementId, messageId, messageType, payload) =>
-        when(
-          mockConnector.postStatus(
-            eqTo(AmendmentAcceptance),
-            eqTo(payload),
-            eqTo(movementId),
-            eqTo(messageId),
-            eqTo(eoriNumber),
-            eqTo(movementType),
-            eqTo(messageType),
-            eqTo(Some(ClientId("2345")))
-          )(any(), any())
-        )
-          .thenReturn(Future.successful(()))
+    ) { (eoriNumber, movementType, movementId, messageId, messageType, payload) =>
+      when(
+        mockConnector.postStatus(
+          eqTo(AmendmentAcceptance),
+          eqTo(payload),
+          eqTo(movementId),
+          eqTo(messageId),
+          eqTo(eoriNumber),
+          eqTo(movementType),
+          eqTo(messageType),
+          eqTo(Some(ClientId("2345")))
+        )(any(), any())
+      )
+        .thenReturn(Future.successful(()))
 
-        whenReady(
-          sut.auditStatusEvent(
-            AuditType.AmendmentAcceptance,
-            payload,
-            movementId,
-            messageId,
-            eoriNumber,
-            movementType,
-            messageType,
-            Some(ClientId("2345"))
-          )
-        ) {
-          _ =>
-            verify(mockConnector, times(1)).postStatus(
-              eqTo(AmendmentAcceptance),
-              eqTo(payload),
-              eqTo(movementId),
-              eqTo(messageId),
-              eqTo(eoriNumber),
-              eqTo(movementType),
-              eqTo(messageType),
-              eqTo(Some(ClientId("2345")))
-            )(any(), any())
-        }
+      whenReady(
+        sut.auditStatusEvent(
+          AuditType.AmendmentAcceptance,
+          payload,
+          movementId,
+          messageId,
+          eoriNumber,
+          movementType,
+          messageType,
+          Some(ClientId("2345"))
+        )
+      ) { _ =>
+        verify(mockConnector, times(1)).postStatus(
+          eqTo(AmendmentAcceptance),
+          eqTo(payload),
+          eqTo(movementId),
+          eqTo(messageId),
+          eqTo(eoriNumber),
+          eqTo(movementType),
+          eqTo(messageType),
+          eqTo(Some(ClientId("2345")))
+        )(any(), any())
+      }
     }
 
     "on failure audit, will log a message" in forAll(
@@ -262,53 +255,51 @@ class AuditingServiceSpec
       Gen.option(arbitrary[MessageId]),
       Gen.option(arbitrary[MessageType]),
       Gen.option(arbitrary[JsValue])
-    ) {
-      (eoriNumber, movementType, movementId, messageId, messageType, payload) =>
-        val exception = new IllegalStateException("failed")
-        when(
-          mockConnector.postStatus(
-            eqTo(AmendmentAcceptance),
-            eqTo(payload),
-            eqTo(movementId),
-            eqTo(messageId),
-            eqTo(eoriNumber),
-            eqTo(movementType),
-            eqTo(messageType),
-            eqTo(Some(ClientId("2345")))
-          )(any(), any())
-        ).thenReturn(Future.failed(exception))
+    ) { (eoriNumber, movementType, movementId, messageId, messageType, payload) =>
+      val exception = new IllegalStateException("failed")
+      when(
+        mockConnector.postStatus(
+          eqTo(AmendmentAcceptance),
+          eqTo(payload),
+          eqTo(movementId),
+          eqTo(messageId),
+          eqTo(eoriNumber),
+          eqTo(movementType),
+          eqTo(messageType),
+          eqTo(Some(ClientId("2345")))
+        )(any(), any())
+      ).thenReturn(Future.failed(exception))
 
-        object Harness extends AuditingServiceImpl(mockConnector) {
-          val logger0: slf4j.Logger = mock[org.slf4j.Logger]
-          when(logger0.isWarnEnabled()).thenReturn(true)
-          override val logger: Logger = new Logger(logger0)
-        }
+      object Harness extends AuditingServiceImpl(mockConnector) {
+        val logger0: slf4j.Logger = mock[org.slf4j.Logger]
+        when(logger0.isWarnEnabled()).thenReturn(true)
+        override val logger: Logger = new Logger(logger0)
+      }
 
-        whenReady(
-          Harness.auditStatusEvent(
-            AuditType.AmendmentAcceptance,
-            payload,
-            movementId,
-            messageId,
-            eoriNumber,
-            movementType,
-            messageType,
-            Some(ClientId("2345"))
-          )
-        ) {
-          _ =>
-            verify(mockConnector, times(1)).postStatus(
-              eqTo(AmendmentAcceptance),
-              eqTo(payload),
-              eqTo(movementId),
-              eqTo(messageId),
-              eqTo(eoriNumber),
-              eqTo(movementType),
-              eqTo(messageType),
-              eqTo(Some(ClientId("2345")))
-            )(any(), any())
-            verify(Harness.logger0, times(1)).warn(eqTo("Unable to audit payload due to an exception"), eqTo(exception))
-        }
+      whenReady(
+        Harness.auditStatusEvent(
+          AuditType.AmendmentAcceptance,
+          payload,
+          movementId,
+          messageId,
+          eoriNumber,
+          movementType,
+          messageType,
+          Some(ClientId("2345"))
+        )
+      ) { _ =>
+        verify(mockConnector, times(1)).postStatus(
+          eqTo(AmendmentAcceptance),
+          eqTo(payload),
+          eqTo(movementId),
+          eqTo(messageId),
+          eqTo(eoriNumber),
+          eqTo(movementType),
+          eqTo(messageType),
+          eqTo(Some(ClientId("2345")))
+        )(any(), any())
+        verify(Harness.logger0, times(1)).warn(eqTo("Unable to audit payload due to an exception"), eqTo(exception))
+      }
 
     }
 

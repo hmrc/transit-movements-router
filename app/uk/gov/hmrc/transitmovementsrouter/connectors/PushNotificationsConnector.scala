@@ -137,16 +137,15 @@ class PushNotificationsConnectorImpl @Inject() (httpClientV2: HttpClientV2)(impl
     requestBuilder.withInternalAuthToken
       .withMessageType(messageType)
       .execute[HttpResponse]
-      .map {
-        response =>
-          response.status match {
-            case `expected` => Right((): Unit)
-            case NOT_FOUND  => Left(MovementNotFound(movementId))
-            case _          => Left(Unexpected(Some(UpstreamErrorResponse(response.body, response.status))))
-          }
+      .map { response =>
+        response.status match {
+          case `expected` => Right((): Unit)
+          case NOT_FOUND  => Left(MovementNotFound(movementId))
+          case _          => Left(Unexpected(Some(UpstreamErrorResponse(response.body, response.status))))
+        }
       }
-      .recover {
-        case NonFatal(ex) => Left(Unexpected(Some(ex)))
+      .recover { case NonFatal(ex) =>
+        Left(Unexpected(Some(ex)))
       }
 
   private def createRequest(movementId: MovementId, messageId: MessageId, notificationType: String)(implicit hc: HeaderCarrier) = {

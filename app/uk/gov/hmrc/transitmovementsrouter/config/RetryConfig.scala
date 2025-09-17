@@ -23,14 +23,13 @@ import scala.concurrent.duration.FiniteDuration
 
 object RetryConfig {
 
-  implicit lazy val configLoader: ConfigLoader[RetryConfig] = ConfigLoader {
-    rootConfig => path =>
-      val config = Configuration(rootConfig.getConfig(path))
-      RetryConfig(
-        config.get[Int]("max-retries"),
-        config.get[FiniteDuration]("delay-between-retries"),
-        config.get[FiniteDuration]("timeout")
-      )
+  implicit lazy val configLoader: ConfigLoader[RetryConfig] = ConfigLoader { rootConfig => path =>
+    val config = Configuration(rootConfig.getConfig(path))
+    RetryConfig(
+      config.get[Int]("max-retries"),
+      config.get[FiniteDuration]("delay-between-retries"),
+      config.get[FiniteDuration]("timeout")
+    )
   }
 
 }

@@ -139,20 +139,18 @@ class PersistenceConnectorImpl @Inject() (httpClientV2: HttpClientV2)(implicit a
             case _                     => Left(Unexpected())
           }
       }
-      .recover {
-        case NonFatal(ex) =>
-          Left(Unexpected(Some(ex)))
+      .recover { case NonFatal(ex) =>
+        Left(Unexpected(Some(ex)))
       }
 
   private def executeAndExpect(requestBuilder: RequestBuilder, expected: Int)(implicit ec: ExecutionContext) =
     requestBuilder.withInternalAuthToken
       .execute[HttpResponse]
-      .flatMap {
-        response =>
-          response.status match {
-            case `expected` => Future.successful(())
-            case _          => Future.failed(UpstreamErrorResponse(response.body, response.status))
-          }
+      .flatMap { response =>
+        response.status match {
+          case `expected` => Future.successful(())
+          case _          => Future.failed(UpstreamErrorResponse(response.body, response.status))
+        }
       }
 
   private def createRequest(movementId: MovementId, triggerId: MessageId)(implicit hc: HeaderCarrier) = {

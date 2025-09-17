@@ -67,12 +67,27 @@ class EISConnectorProviderSpec extends AnyFreeSpec with HttpClientV2Support with
       verify(appConfig, times(1)).eisXiV2_1
     }
 
+    "getting the GB v3.0 connector will get the GB v3.0 connector" in {
+      val sut = new EISConnectorProviderImpl(appConfig, retries, httpClientV2, Clock.systemUTC())
+      sut.gbV3_0
+
+      verify(appConfig, times(1)).eisGbV3_0
+    }
+
+    "getting the XI v3.0 connector will get the XI v3.0 connector" in {
+      val sut = new EISConnectorProviderImpl(appConfig, retries, httpClientV2, Clock.systemUTC())
+      sut.xiV3_0
+
+      verify(appConfig, times(1)).eisXiV3_0
+    }
+
     "both connectors are not the same" in {
 
       // Given this message connector
       val sut = new EISConnectorProviderImpl(appConfig, retries, httpClientV2, Clock.systemUTC())
 
       sut.gbV2_1 must not be sut.xiV2_1
+      sut.gbV3_0 must not be sut.xiV3_0
     }
 
   }

@@ -61,8 +61,8 @@ class UpscanConnectorImpl @Inject() (httpClientV2: HttpClientV2) extends UpscanC
             case thr                                       => UpscanError.Unexpected(Some(thr))
           }
         }
-        .recover {
-          case NonFatal(thr) => Left(UpscanError.Unexpected(Some(thr)))
+        .recover { case NonFatal(thr) =>
+          Left(UpscanError.Unexpected(Some(thr)))
         }
     }
 

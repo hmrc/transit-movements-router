@@ -45,10 +45,9 @@ trait StreamWithFile {
       _      <- writeToFile(file, src)
       result <- block(FileIO.fromPath(file))
     } yield result)
-      .flatTap {
-        _ =>
-          file.delete()
-          EitherT.rightT(())
+      .flatTap { _ =>
+        file.delete()
+        EitherT.rightT(())
       }
 
   }
@@ -61,10 +60,9 @@ trait StreamWithFile {
       src
         .runWith(FileIO.toPath(file))
         .map(Right.apply)
-        .recover {
-          case NonFatal(thr) =>
-            logger.error(s"Failed to create file stream: $thr", thr)
-            Left(PresentationError.internalServiceError(cause = Some(thr)))
+        .recover { case NonFatal(thr) =>
+          logger.error(s"Failed to create file stream: $thr", thr)
+          Left(PresentationError.internalServiceError(cause = Some(thr)))
         }
     )
 

@@ -66,12 +66,12 @@ class ContentTypeRoutingSpec
       case None    => contentActionTwo
     }
 
-    def contentActionOne: Action[NodeSeq] = Action.async(parse.xml) {
-      _ => Future.successful(Ok("One"))
+    def contentActionOne: Action[NodeSeq] = Action.async(parse.xml) { _ =>
+      Future.successful(Ok("One"))
     }
 
-    def contentActionTwo: Action[AnyContent] = Action.async {
-      _ => Future.successful(Ok("Two"))
+    def contentActionTwo: Action[AnyContent] = Action.async { _ =>
+      Future.successful(Ok("Two"))
     }
 
     override val config: AppConfig = mock[AppConfig]
@@ -79,9 +79,7 @@ class ContentTypeRoutingSpec
   }
 
   private def generateSource: Source[ByteString, NotUsed] =
-    Source.fromIterator(
-      () => ByteString.fromString("<test>test</test>", StandardCharsets.UTF_8).grouped(1024)
-    )
+    Source.fromIterator(() => ByteString.fromString("<test>test</test>", StandardCharsets.UTF_8).grouped(1024))
 
   "ContentTypeRouting" - {
 

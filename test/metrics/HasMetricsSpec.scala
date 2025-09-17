@@ -97,241 +97,180 @@ class HasMetricsSpec extends AsyncWordSpecLike with Matchers with OptionValues w
 
   "HasMetrics" when {
     "withMetricsTimerAsync" should {
-      "increment success counter for a successful future" in withTestMetrics {
-        metrics =>
-          metrics
-            .withMetricsTimerAsync(TestMetric)(
-              _ => Future.successful(())
-            )
-            .map {
-              _ =>
-                verifyCompletedWithSuccess(metrics)
-            }
-      }
-
-      "increment success counter for a successful future where completeWithSuccess is called explicitly" in withTestMetrics {
-        metrics =>
-          metrics
-            .withMetricsTimerAsync(TestMetric) {
-              timer =>
-                timer.completeWithSuccess()
-                Future.successful(())
-            }
-            .map(
-              _ => verifyCompletedWithSuccess(metrics)
-            )
-      }
-
-      "increment failure counter for a failed future" in withTestMetrics {
-        metrics =>
-          metrics
-            .withMetricsTimerAsync(TestMetric)(
-              _ => Future.failed(new Exception)
-            )
-            .recover {
-              case _ =>
-                verifyCompletedWithFailure(metrics)
-            }
-      }
-
-      "increment failure counter for a successful future where completeWithFailure is called explicitly" in withTestMetrics {
-        metrics =>
-          metrics
-            .withMetricsTimerAsync(TestMetric) {
-              timer =>
-                timer.completeWithFailure()
-                Future.successful(())
-            }
-            .map(
-              _ => verifyCompletedWithFailure(metrics)
-            )
-      }
-
-      "only increment counters once regardless of how many times the user calls complete with success" in withTestMetrics {
-        metrics =>
-          metrics
-            .withMetricsTimerAsync(TestMetric) {
-              timer =>
-                Future(timer.completeWithSuccess())
-                Future(timer.completeWithSuccess())
-                Future(timer.completeWithSuccess())
-                Future(timer.completeWithSuccess())
-                Future.successful(())
-            }
-            .map(
-              _ => verifyCompletedWithSuccess(metrics)
-            )
-      }
-
-      "only increment counters once regardless of how many times the user calls complete with failure" in withTestMetrics {
-        metrics =>
-          metrics
-            .withMetricsTimerAsync(TestMetric) {
-              timer =>
-                Future(timer.completeWithFailure())
-                Future(timer.completeWithFailure())
-                Future(timer.completeWithFailure())
-                Future(timer.completeWithFailure())
-                timer.completeWithFailure()
-                Future.successful(())
-            }
-            .map(
-              _ => verifyCompletedWithFailure(metrics)
-            )
-      }
-
-      "increment failure counter when the user throws an exception constructing their code block" in withTestMetrics {
-        metrics =>
-          assertThrows[RuntimeException] {
-            metrics.withMetricsTimerAsync(TestMetric)(
-              _ => Future.successful(throw new RuntimeException)
-            )
+      "increment success counter for a successful future" in withTestMetrics { metrics =>
+        metrics
+          .withMetricsTimerAsync(TestMetric)(_ => Future.successful(()))
+          .map { _ =>
+            verifyCompletedWithSuccess(metrics)
           }
+      }
 
-          Future.successful(verifyCompletedWithFailure(metrics))
+      "increment success counter for a successful future where completeWithSuccess is called explicitly" in withTestMetrics { metrics =>
+        metrics
+          .withMetricsTimerAsync(TestMetric) { timer =>
+            timer.completeWithSuccess()
+            Future.successful(())
+          }
+          .map(_ => verifyCompletedWithSuccess(metrics))
+      }
+
+      "increment failure counter for a failed future" in withTestMetrics { metrics =>
+        metrics
+          .withMetricsTimerAsync(TestMetric)(_ => Future.failed(new Exception))
+          .recover { case _ =>
+            verifyCompletedWithFailure(metrics)
+          }
+      }
+
+      "increment failure counter for a successful future where completeWithFailure is called explicitly" in withTestMetrics { metrics =>
+        metrics
+          .withMetricsTimerAsync(TestMetric) { timer =>
+            timer.completeWithFailure()
+            Future.successful(())
+          }
+          .map(_ => verifyCompletedWithFailure(metrics))
+      }
+
+      "only increment counters once regardless of how many times the user calls complete with success" in withTestMetrics { metrics =>
+        metrics
+          .withMetricsTimerAsync(TestMetric) { timer =>
+            Future(timer.completeWithSuccess())
+            Future(timer.completeWithSuccess())
+            Future(timer.completeWithSuccess())
+            Future(timer.completeWithSuccess())
+            Future.successful(())
+          }
+          .map(_ => verifyCompletedWithSuccess(metrics))
+      }
+
+      "only increment counters once regardless of how many times the user calls complete with failure" in withTestMetrics { metrics =>
+        metrics
+          .withMetricsTimerAsync(TestMetric) { timer =>
+            Future(timer.completeWithFailure())
+            Future(timer.completeWithFailure())
+            Future(timer.completeWithFailure())
+            Future(timer.completeWithFailure())
+            timer.completeWithFailure()
+            Future.successful(())
+          }
+          .map(_ => verifyCompletedWithFailure(metrics))
+      }
+
+      "increment failure counter when the user throws an exception constructing their code block" in withTestMetrics { metrics =>
+        assertThrows[RuntimeException] {
+          metrics.withMetricsTimerAsync(TestMetric)(_ => Future.successful(throw new RuntimeException))
+        }
+
+        Future.successful(verifyCompletedWithFailure(metrics))
       }
     }
 
     "withMetricsTimerResult" should {
-      "increment success counter for a successful future of an informational Result" in withTestMetrics {
-        metrics =>
-          metrics
-            .withMetricsTimerResult(TestMetric) {
-              Future.successful(Results.Continue)
-            }
-            .map(
-              _ => verifyCompletedWithSuccess(metrics)
-            )
-      }
-
-      "increment success counter for a successful future of a successful Result" in withTestMetrics {
-        metrics =>
-          metrics
-            .withMetricsTimerResult(TestMetric) {
-              Future.successful(Results.Ok)
-            }
-            .map(
-              _ => verifyCompletedWithSuccess(metrics)
-            )
-      }
-
-      "increment success counter for a successful future of a redirect Result" in withTestMetrics {
-        metrics =>
-          metrics
-            .withMetricsTimerResult(TestMetric) {
-              Future.successful(Results.NotModified)
-            }
-            .map(
-              _ => verifyCompletedWithSuccess(metrics)
-            )
-      }
-
-      "increment failure counter for a successful future of a client error Result" in withTestMetrics {
-        metrics =>
-          metrics
-            .withMetricsTimerResult(TestMetric) {
-              Future.successful(Results.EntityTooLarge)
-            }
-            .map(
-              _ => verifyCompletedWithFailure(metrics)
-            )
-      }
-
-      "increment failure counter for a successful future of a server error Result" in withTestMetrics {
-        metrics =>
-          metrics
-            .withMetricsTimerResult(TestMetric) {
-              Future.successful(Results.BadGateway)
-            }
-            .map(
-              _ => verifyCompletedWithFailure(metrics)
-            )
-      }
-
-      "increment failure counter for a failed future" in withTestMetrics {
-        metrics =>
-          metrics
-            .withMetricsTimerResult(TestMetric) {
-              Future.failed(new Exception)
-            }
-            .transformWith(
-              _ => verifyCompletedWithFailure(metrics)
-            )
-      }
-
-      "increment failure counter when the user throws an exception constructing their code block" in withTestMetrics {
-        metrics =>
-          assertThrows[RuntimeException] {
-            metrics.withMetricsTimerResult(TestMetric) {
-              Future.successful(throw new RuntimeException)
-            }
+      "increment success counter for a successful future of an informational Result" in withTestMetrics { metrics =>
+        metrics
+          .withMetricsTimerResult(TestMetric) {
+            Future.successful(Results.Continue)
           }
+          .map(_ => verifyCompletedWithSuccess(metrics))
+      }
 
-          Future.successful(verifyCompletedWithFailure(metrics))
+      "increment success counter for a successful future of a successful Result" in withTestMetrics { metrics =>
+        metrics
+          .withMetricsTimerResult(TestMetric) {
+            Future.successful(Results.Ok)
+          }
+          .map(_ => verifyCompletedWithSuccess(metrics))
+      }
+
+      "increment success counter for a successful future of a redirect Result" in withTestMetrics { metrics =>
+        metrics
+          .withMetricsTimerResult(TestMetric) {
+            Future.successful(Results.NotModified)
+          }
+          .map(_ => verifyCompletedWithSuccess(metrics))
+      }
+
+      "increment failure counter for a successful future of a client error Result" in withTestMetrics { metrics =>
+        metrics
+          .withMetricsTimerResult(TestMetric) {
+            Future.successful(Results.EntityTooLarge)
+          }
+          .map(_ => verifyCompletedWithFailure(metrics))
+      }
+
+      "increment failure counter for a successful future of a server error Result" in withTestMetrics { metrics =>
+        metrics
+          .withMetricsTimerResult(TestMetric) {
+            Future.successful(Results.BadGateway)
+          }
+          .map(_ => verifyCompletedWithFailure(metrics))
+      }
+
+      "increment failure counter for a failed future" in withTestMetrics { metrics =>
+        metrics
+          .withMetricsTimerResult(TestMetric) {
+            Future.failed(new Exception)
+          }
+          .transformWith(_ => verifyCompletedWithFailure(metrics))
+      }
+
+      "increment failure counter when the user throws an exception constructing their code block" in withTestMetrics { metrics =>
+        assertThrows[RuntimeException] {
+          metrics.withMetricsTimerResult(TestMetric) {
+            Future.successful(throw new RuntimeException)
+          }
+        }
+
+        Future.successful(verifyCompletedWithFailure(metrics))
       }
     }
 
     "withMetricsTimerAction" should {
       def fakeRequest: FakeRequest[AnyContentAsEmpty.type] = FakeRequest()
 
-      "increment success counter for an informational Result" in withTestActionMetrics {
-        metrics =>
-          metrics
-            .withMetricsTimerAction(TestMetric) {
-              metrics.Action(Results.SwitchingProtocols)
-            }
-            .apply(fakeRequest)
-            .map(
-              _ => verifyCompletedWithSuccess(metrics)
-            )
+      "increment success counter for an informational Result" in withTestActionMetrics { metrics =>
+        metrics
+          .withMetricsTimerAction(TestMetric) {
+            metrics.Action(Results.SwitchingProtocols)
+          }
+          .apply(fakeRequest)
+          .map(_ => verifyCompletedWithSuccess(metrics))
       }
 
-      "increment success counter for a successful Result" in withTestActionMetrics {
-        metrics =>
-          metrics
-            .withMetricsTimerAction(TestMetric) {
-              metrics.Action(Results.Ok)
-            }
-            .apply(fakeRequest)
-            .map(
-              _ => verifyCompletedWithSuccess(metrics)
-            )
+      "increment success counter for a successful Result" in withTestActionMetrics { metrics =>
+        metrics
+          .withMetricsTimerAction(TestMetric) {
+            metrics.Action(Results.Ok)
+          }
+          .apply(fakeRequest)
+          .map(_ => verifyCompletedWithSuccess(metrics))
       }
 
-      "increment success counter for a redirect Result" in withTestActionMetrics {
-        metrics =>
-          metrics
-            .withMetricsTimerAction(TestMetric) {
-              metrics.Action(Results.Found("https://wikipedia.org"))
-            }
-            .apply(fakeRequest)
-            .map(
-              _ => verifyCompletedWithSuccess(metrics)
-            )
+      "increment success counter for a redirect Result" in withTestActionMetrics { metrics =>
+        metrics
+          .withMetricsTimerAction(TestMetric) {
+            metrics.Action(Results.Found("https://wikipedia.org"))
+          }
+          .apply(fakeRequest)
+          .map(_ => verifyCompletedWithSuccess(metrics))
       }
 
-      "increment failure counter for a client error Result" in withTestActionMetrics {
-        metrics =>
-          metrics
-            .withMetricsTimerAction(TestMetric) {
-              metrics.Action(Results.Conflict)
-            }
-            .apply(fakeRequest)
-            .map(
-              _ => verifyCompletedWithFailure(metrics)
-            )
+      "increment failure counter for a client error Result" in withTestActionMetrics { metrics =>
+        metrics
+          .withMetricsTimerAction(TestMetric) {
+            metrics.Action(Results.Conflict)
+          }
+          .apply(fakeRequest)
+          .map(_ => verifyCompletedWithFailure(metrics))
       }
 
-      "increment failure counter for a server error Result" in withTestActionMetrics {
-        metrics =>
-          metrics
-            .withMetricsTimerAction(TestMetric) {
-              metrics.Action(Results.ServiceUnavailable)
-            }
-            .apply(fakeRequest)
-            .map(
-              _ => verifyCompletedWithFailure(metrics)
-            )
+      "increment failure counter for a server error Result" in withTestActionMetrics { metrics =>
+        metrics
+          .withMetricsTimerAction(TestMetric) {
+            metrics.Action(Results.ServiceUnavailable)
+          }
+          .apply(fakeRequest)
+          .map(_ => verifyCompletedWithFailure(metrics))
       }
     }
   }

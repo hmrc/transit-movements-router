@@ -34,10 +34,9 @@ trait UpscanResponseParser {
     EitherT {
       responseBody
         .validate[UpscanResponse]
-        .map {
-          upscanResponse =>
-            logResponse(Some(upscanResponse))
-            Future.successful(Right(upscanResponse))
+        .map { upscanResponse =>
+          logResponse(Some(upscanResponse))
+          Future.successful(Right(upscanResponse))
         }
         .getOrElse {
           logResponse(None)

@@ -27,9 +27,8 @@ class FileURLSpec extends AnyFreeSpec with Matchers with ScalaCheckDrivenPropert
 
   "apply(FileURI, String)" - {
 
-    "for a file, store the location" in forAll(arbitrary[ObjectSummaryWithMd5]) {
-      summary =>
-        FileURL(summary.location, "http://test").value mustBe s"http://test/${summary.location.asUri}"
+    "for a file, store the location" in forAll(arbitrary[ObjectSummaryWithMd5]) { summary =>
+      FileURL(summary.location, "http://test").value mustBe s"http://test/${summary.location.asUri}"
     }
 
   }

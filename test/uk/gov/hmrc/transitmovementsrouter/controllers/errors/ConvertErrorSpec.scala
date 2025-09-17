@@ -122,13 +122,12 @@ class ConvertErrorSpec extends AnyFreeSpec with Matchers with OptionValues with 
       }
     }
 
-    "for a validation error return UnrecognisedOffice" in forAll(Gen.alphaNumStr, Gen.alphaStr) {
-      (office, field) =>
-        val input =
-          Left[CustomOfficeExtractorError, Unit](UnrecognisedOffice(s"Did not recognise office:$office", CustomsOffice(office), field)).toEitherT[Future]
-        whenReady(input.asPresentation.value) {
-          _ mustBe Left(InvalidOfficeError(s"Did not recognise office:$office", office, field, InvalidOffice))
-        }
+    "for a validation error return UnrecognisedOffice" in forAll(Gen.alphaNumStr, Gen.alphaStr) { (office, field) =>
+      val input =
+        Left[CustomOfficeExtractorError, Unit](UnrecognisedOffice(s"Did not recognise office:$office", CustomsOffice(office), field)).toEitherT[Future]
+      whenReady(input.asPresentation.value) {
+        _ mustBe Left(InvalidOfficeError(s"Did not recognise office:$office", office, field, InvalidOffice))
+      }
     }
 
     "for a failure - handle TooManyElementsFound error" in {

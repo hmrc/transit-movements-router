@@ -27,9 +27,7 @@ import play.api.libs.json.JsValue
 class CommonFormatsSpec extends AnyFreeSpec with Matchers {
 
   val nonEmptyListJson: JsValue = JsArray(
-    Seq(1, 2, 3, 4).map(
-      n => JsNumber(n)
-    )
+    Seq(1, 2, 3, 4).map(n => JsNumber(n))
   )
 
   "Reads converts a json array into a nonEmptyList" in {

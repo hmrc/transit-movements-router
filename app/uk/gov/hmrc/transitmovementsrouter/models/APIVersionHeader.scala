@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 HM Revenue & Customs
+ * Copyright 2025 HM Revenue & Customs
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,15 +14,14 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.transitmovementsrouter.config
+package uk.gov.hmrc.transitmovementsrouter.models
 
-import play.api.ConfigLoader
-
-object Headers {
-
-  implicit lazy val configLoader: ConfigLoader[Headers] = ConfigLoader { rootConfig => path =>
-    Headers(rootConfig.getConfig(path).getString("bearerToken"))
-  }
-
+enum APIVersionHeader(val value: String) {
+  case v2_1 extends APIVersionHeader("2.1")
+  case v3_0 extends APIVersionHeader("3.0")
 }
-case class Headers(bearerToken: String)
+
+object APIVersionHeader {
+  def fromString(value: String): Option[APIVersionHeader] =
+    values.find(_.value == value)
+}

@@ -36,9 +36,9 @@ class UpscanResponseSpec extends AnyFreeSpec with Matchers with ScalaCheckDriven
   "Successful submission response" - {
     "deserializes correctly" in {
       val jsonSuccessResponse = Json.obj(
-        "reference"   -> "11370e18-6e24-453e-b45a-76d3e32ea33d",
-        "downloadUrl" -> "https://bucketName.s3.eu-west-2.amazonaws.com?1235676",
-        "fileStatus"  -> "READY",
+        "reference"     -> "11370e18-6e24-453e-b45a-76d3e32ea33d",
+        "downloadUrl"   -> "https://bucketName.s3.eu-west-2.amazonaws.com?1235676",
+        "fileStatus"    -> "READY",
         "uploadDetails" -> Json.obj(
           "fileName"        -> "test.pdf",
           "fileMimeType"    -> "application/pdf",
@@ -68,9 +68,9 @@ class UpscanResponseSpec extends AnyFreeSpec with Matchers with ScalaCheckDriven
       )
 
       Json.toJson[UpscanResponse](response) mustBe Json.obj(
-        "reference"   -> "11370e18-6e24-453e-b45a-76d3e32ea33d",
-        "downloadUrl" -> "https://bucketName.s3.eu-west-2.amazonaws.com?1235676",
-        "fileStatus"  -> "READY",
+        "reference"     -> "11370e18-6e24-453e-b45a-76d3e32ea33d",
+        "downloadUrl"   -> "https://bucketName.s3.eu-west-2.amazonaws.com?1235676",
+        "fileStatus"    -> "READY",
         "uploadDetails" -> Json.obj(
           "fileName"        -> "test.pdf",
           "fileMimeType"    -> "application/pdf",
@@ -84,8 +84,8 @@ class UpscanResponseSpec extends AnyFreeSpec with Matchers with ScalaCheckDriven
 
   "Failed submission response" - {
     val jsonFailureResponse = Json.obj(
-      "reference"  -> "11370e18-6e24-453e-b45a-76d3e32ea33d",
-      "fileStatus" -> "FAILED",
+      "reference"      -> "11370e18-6e24-453e-b45a-76d3e32ea33d",
+      "fileStatus"     -> "FAILED",
       "failureDetails" -> Json.obj(
         "failureReason" -> "QUARANTINE",
         "message"       -> "This file has a virus"

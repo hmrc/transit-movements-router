@@ -30,15 +30,14 @@ import scala.annotation.unused
 object ServiceMonitoringRequests {
 
   @unused // this is used in the macro below, but otherwise not used so the IDE flags it as such
-  implicit private val messageTypeWrites: Writes[MessageType] = Writes {
-    messageType => JsString(messageType.code)
+  implicit private val messageTypeWrites: Writes[MessageType] = Writes { messageType =>
+    JsString(messageType.code)
   }
 
   @unused // this is used in the macro below, but otherwise not used so the IDE flags it as such
-  implicit private val officeWrites: Writes[CustomsOffice] = Writes {
-    office =>
-      if (office.value.length > 2) JsString(office.value.substring(0, 2))
-      else JsString(office.value)
+  implicit private val officeWrites: Writes[CustomsOffice] = Writes { office =>
+    if (office.value.length > 2) JsString(office.value.substring(0, 2))
+    else JsString(office.value)
   }
 
   implicit val outgoingWrites: OWrites[OutgoingServiceMonitoringRequest] = Json.writes[OutgoingServiceMonitoringRequest]

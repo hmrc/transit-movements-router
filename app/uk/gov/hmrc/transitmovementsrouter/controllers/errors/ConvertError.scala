@@ -36,12 +36,8 @@ trait ConvertError {
     // Allows for fire and forget, but still calls asPresentation in case we need to log anything
     def suppress(implicit c: Converter[E], ec: ExecutionContext): EitherT[Future, PresentationError, Unit] =
       value.asPresentation
-        .map(
-          _ => (): Unit
-        )
-        .leftFlatMap(
-          _ => EitherT.rightT((): Unit)
-        )
+        .map(_ => (): Unit)
+        .leftFlatMap(_ => EitherT.rightT((): Unit))
   }
 
   sealed trait Converter[E] {
@@ -73,7 +69,7 @@ trait ConvertError {
     import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError._
 
     def convert(error: PersistenceError): PresentationError = error match {
-      case MovementNotFound(movementId) => PresentationError.notFoundError(s"Movement ${movementId.value} not found")
+      case MovementNotFound(movementId)           => PresentationError.notFoundError(s"Movement ${movementId.value} not found")
       case MessageNotFound(movementId, messageId) =>
         PresentationError.notFoundError(s"Message with ID ${messageId.value} for movement ${movementId.value} was not found")
       case Unexpected(error) => PresentationError.internalServiceError(cause = error)

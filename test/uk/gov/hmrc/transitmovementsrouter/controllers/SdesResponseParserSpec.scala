@@ -50,12 +50,11 @@ class SdesResponseParserSpec extends AnyFreeSpec with ScalaFutures with Matchers
 
     "given a successful response in the callback, returns right" in forAll(
       arbitrarySdesResponse(conversationId).arbitrary
-    ) {
-      sdesResponse =>
-        val json   = Json.toJson(sdesResponse)
-        val either = testController.parseAndLogSdesResponse(json)
-        either mustBe Right(sdesResponse)
-        either.toOption.get mustBe sdesResponse
+    ) { sdesResponse =>
+      val json   = Json.toJson(sdesResponse)
+      val either = testController.parseAndLogSdesResponse(json)
+      either mustBe Right(sdesResponse)
+      either.toOption.get mustBe sdesResponse
     }
   }
 

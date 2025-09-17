@@ -90,9 +90,8 @@ class PushNotificationConnectorSpec
 
   implicit val mockAppConfig: AppConfig = mock[AppConfig]
   when(mockAppConfig.internalAuthToken).thenReturn(token)
-  when(mockAppConfig.transitMovementsPushNotificationsUrl).thenAnswer {
-    _ =>
-      Url.parse(server.baseUrl())
+  when(mockAppConfig.transitMovementsPushNotificationsUrl).thenAnswer { _ =>
+    Url.parse(server.baseUrl())
   }
 
   implicit val hc: HeaderCarrier = HeaderCarrier()
@@ -145,9 +144,8 @@ class PushNotificationConnectorSpec
 
       xmlStub(ACCEPTED)
 
-      whenReady(connector.postMessageReceived(movementId, persistenceResponse, messageType, source).value) {
-        x =>
-          x mustBe Right(())
+      whenReady(connector.postMessageReceived(movementId, persistenceResponse, messageType, source).value) { x =>
+        x mustBe Right(())
       }
     }
 
@@ -156,9 +154,8 @@ class PushNotificationConnectorSpec
 
       xmlStub(ACCEPTED)
 
-      whenReady(connector.postMessageReceived(movementId, persistenceResponse.copy(sendNotification = Some(true)), messageType, source).value) {
-        x =>
-          x mustBe Right(())
+      whenReady(connector.postMessageReceived(movementId, persistenceResponse.copy(sendNotification = Some(true)), messageType, source).value) { x =>
+        x mustBe Right(())
       }
     }
 
@@ -167,42 +164,38 @@ class PushNotificationConnectorSpec
 
       xmlStub(ACCEPTED)
 
-      whenReady(connector.postMessageReceived(movementId, persistenceResponse.copy(sendNotification = None), messageType, source).value) {
-        x =>
-          x mustBe Right(())
+      whenReady(connector.postMessageReceived(movementId, persistenceResponse.copy(sendNotification = None), messageType, source).value) { x =>
+        x mustBe Right(())
       }
     }
 
     "return unit and do not make a request to PPNS when 'sendNotifiation' is false" in {
       when(mockAppConfig.pushNotificationsEnabled).thenReturn(true)
 
-      whenReady(connector.postMessageReceived(movementId, persistenceResponse.copy(sendNotification = Some(false)), messageType, source).value) {
-        x =>
-          x mustBe Right(())
+      whenReady(connector.postMessageReceived(movementId, persistenceResponse.copy(sendNotification = Some(false)), messageType, source).value) { x =>
+        x mustBe Right(())
       }
 
       verifyZeroInteraction
     }
 
-    "return a PushNotificationError when unsuccessful with body" in forAll(errorCodes) {
-      statusCode =>
-        server.resetAll()
+    "return a PushNotificationError when unsuccessful with body" in forAll(errorCodes) { statusCode =>
+      server.resetAll()
 
-        when(mockAppConfig.pushNotificationsEnabled).thenReturn(true)
+      when(mockAppConfig.pushNotificationsEnabled).thenReturn(true)
 
-        xmlStub(statusCode)
+      xmlStub(statusCode)
 
-        whenReady(connector.postMessageReceived(movementId, persistenceResponse, messageType, source).value) {
-          x =>
-            x.isLeft mustBe true
+      whenReady(connector.postMessageReceived(movementId, persistenceResponse, messageType, source).value) { x =>
+        x.isLeft mustBe true
 
-            statusCode match {
-              case NOT_FOUND             => x mustBe a[Left[MovementNotFound, _]]
-              case INTERNAL_SERVER_ERROR => x mustBe a[Left[Unexpected, _]]
-              case _                     => fail()
-            }
-
+        statusCode match {
+          case NOT_FOUND             => x mustBe a[Left[MovementNotFound, _]]
+          case INTERNAL_SERVER_ERROR => x mustBe a[Left[Unexpected, _]]
+          case _                     => fail()
         }
+
+      }
     }
 
     "return Unexpected(throwable) when NonFatal exception is thrown with body" in {
@@ -214,10 +207,9 @@ class PushNotificationConnectorSpec
 
       val failingSource = Source.single(ByteString.fromString("{}")).via(new EISMessageTransformersImpl().unwrap)
 
-      whenReady(connector.postMessageReceived(movementId, persistenceResponse, messageType, failingSource).value) {
-        res =>
-          res mustBe a[Left[Unexpected, _]]
-          res.left.toOption.get.asInstanceOf[Unexpected].exception.isDefined
+      whenReady(connector.postMessageReceived(movementId, persistenceResponse, messageType, failingSource).value) { res =>
+        res mustBe a[Left[Unexpected, _]]
+        res.left.toOption.get.asInstanceOf[Unexpected].exception.isDefined
       }
     }
 
@@ -240,31 +232,28 @@ class PushNotificationConnectorSpec
 
       jsonStub(ACCEPTED)
 
-      whenReady(connector.postSubmissionNotification(movementId, messageId, body).value) {
-        x =>
-          x mustBe Right(())
+      whenReady(connector.postSubmissionNotification(movementId, messageId, body).value) { x =>
+        x mustBe Right(())
       }
     }
 
-    "return a PushNotificationError when unsuccessful with body" in forAll(errorCodes) {
-      statusCode =>
-        server.resetAll()
+    "return a PushNotificationError when unsuccessful with body" in forAll(errorCodes) { statusCode =>
+      server.resetAll()
 
-        when(mockAppConfig.pushNotificationsEnabled).thenReturn(true)
+      when(mockAppConfig.pushNotificationsEnabled).thenReturn(true)
 
-        jsonStub(statusCode)
+      jsonStub(statusCode)
 
-        whenReady(connector.postSubmissionNotification(movementId, messageId, body).value) {
-          x =>
-            x.isLeft mustBe true
+      whenReady(connector.postSubmissionNotification(movementId, messageId, body).value) { x =>
+        x.isLeft mustBe true
 
-            statusCode match {
-              case NOT_FOUND             => x mustBe a[Left[MovementNotFound, _]]
-              case INTERNAL_SERVER_ERROR => x mustBe a[Left[Unexpected, _]]
-              case _                     => fail()
-            }
-
+        statusCode match {
+          case NOT_FOUND             => x mustBe a[Left[MovementNotFound, _]]
+          case INTERNAL_SERVER_ERROR => x mustBe a[Left[Unexpected, _]]
+          case _                     => fail()
         }
+
+      }
     }
 
   }
@@ -276,32 +265,29 @@ class PushNotificationConnectorSpec
       noBodyStub(ACCEPTED)
 
       implicit val hc: HeaderCarrier = HeaderCarrier()
-      whenReady(connector.postMessageReceived(movementId, messageId, messageType).value) {
-        x =>
-          x mustBe Right(())
+      whenReady(connector.postMessageReceived(movementId, messageId, messageType).value) { x =>
+        x mustBe Right(())
       }
     }
 
-    "return a PushNotificationError when unsuccessful without a body" in forAll(errorCodes) {
-      statusCode =>
-        server.resetAll()
+    "return a PushNotificationError when unsuccessful without a body" in forAll(errorCodes) { statusCode =>
+      server.resetAll()
 
-        when(mockAppConfig.pushNotificationsEnabled).thenReturn(true)
+      when(mockAppConfig.pushNotificationsEnabled).thenReturn(true)
 
-        noBodyStub(statusCode)
+      noBodyStub(statusCode)
 
-        implicit val hc: HeaderCarrier = HeaderCarrier()
+      implicit val hc: HeaderCarrier = HeaderCarrier()
 
-        whenReady(connector.postMessageReceived(movementId, messageId, messageType).value) {
-          x =>
-            x.isLeft mustBe true
+      whenReady(connector.postMessageReceived(movementId, messageId, messageType).value) { x =>
+        x.isLeft mustBe true
 
-            statusCode match {
-              case NOT_FOUND             => x mustBe a[Left[MovementNotFound, _]]
-              case INTERNAL_SERVER_ERROR => x mustBe a[Left[Unexpected, _]]
-              case _                     => fail()
-            }
+        statusCode match {
+          case NOT_FOUND             => x mustBe a[Left[MovementNotFound, _]]
+          case INTERNAL_SERVER_ERROR => x mustBe a[Left[Unexpected, _]]
+          case _                     => fail()
         }
+      }
     }
 
   }

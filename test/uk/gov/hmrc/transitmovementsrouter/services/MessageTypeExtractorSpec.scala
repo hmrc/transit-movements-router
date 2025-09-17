@@ -45,73 +45,63 @@ class MessageTypeExtractorSpec extends AnyFreeSpec with ScalaFutures with Matche
     )
 
   "extractFromHeader" - {
-    "returns Left(UnableToExtract) when no X-Message-Type header" in {
+    "returns Left(UnableToExtract) when no X-Message-Type header" in
       whenReady(sut.extractFromHeaders(Headers()).value) {
         _ mustBe Left(UnableToExtractFromHeader)
       }
-    }
 
-    "returns Left(InvalidMessageType) when X-Message-Type header value is nonsense" in {
+    "returns Left(InvalidMessageType) when X-Message-Type header value is nonsense" in
       whenReady(sut.extractFromHeaders(Headers("X-Message-Type" -> "abcde")).value) {
         _ mustBe Left(InvalidMessageType("abcde"))
       }
-    }
 
-    "returns Right(MessageType)" in forAll(messageTypeGenerator) {
-      mt =>
-        whenReady(sut.extractFromHeaders(Headers("X-Message-Type" -> mt.code)).value) {
-          _ mustBe Right(mt)
-        }
+    "returns Right(MessageType)" in forAll(messageTypeGenerator) { mt =>
+      whenReady(sut.extractFromHeaders(Headers("X-Message-Type" -> mt.code)).value) {
+        _ mustBe Right(mt)
+      }
     }
   }
 
   "extractFromBody" - {
-    "return Left(UnableToExtract) when the body is not as expected" in {
+    "return Left(UnableToExtract) when the body is not as expected" in
       whenReady(sut.extractFromBody(Source.single(ByteString("nope"))).value) {
         _ mustBe Left(UnableToExtractFromBody)
       }
-    }
 
-    "return Left(InvalidMessageType) when the root name is not as expected" in {
+    "return Left(InvalidMessageType) when the root name is not as expected" in
       whenReady(sut.extractFromBody(Source.single(ByteString("<CC001C></CC001C>"))).value) {
         _ mustBe Left(InvalidMessageType("CC001C"))
       }
+
+    "returns Right(MessageType)" in forAll(messageTypeGenerator) { mt =>
+      whenReady(sut.extractFromBody(validBody(mt)).value) {
+        _ mustBe Right(mt)
+      }
     }
 
-    "returns Right(MessageType)" in forAll(messageTypeGenerator) {
-      mt =>
-        whenReady(sut.extractFromBody(validBody(mt)).value) {
-          _ mustBe Right(mt)
-        }
-    }
-
-    "return Left(UnableToExtract) when no body is returned (i.e., if the wrapping is incorrect)" in {
+    "return Left(UnableToExtract) when no body is returned (i.e., if the wrapping is incorrect)" in
       whenReady(sut.extractFromBody(Source.empty[ByteString]).value) {
         _ mustBe Left(UnableToExtractFromBody)
       }
-    }
   }
 
   "extract" - {
-    "should choose the X-Message-Type first" in forAll(messageTypeGenerator) {
-      mt =>
-        whenReady(sut.extract(Headers("X-Message-Type" -> mt.code), Source.single(ByteString("<CC001C></CC001C>"))).value) {
-          _ mustBe Right(mt)
-        }
+    "should choose the X-Message-Type first" in forAll(messageTypeGenerator) { mt =>
+      whenReady(sut.extract(Headers("X-Message-Type" -> mt.code), Source.single(ByteString("<CC001C></CC001C>"))).value) {
+        _ mustBe Right(mt)
+      }
     }
 
-    "should try the body if the header does not contain a valid type" in forAll(messageTypeGenerator) {
-      mt =>
-        whenReady(sut.extract(Headers("X-Message-Type" -> "nope"), validBody(mt)).value) {
-          _ mustBe Right(mt)
-        }
+    "should try the body if the header does not contain a valid type" in forAll(messageTypeGenerator) { mt =>
+      whenReady(sut.extract(Headers("X-Message-Type" -> "nope"), validBody(mt)).value) {
+        _ mustBe Right(mt)
+      }
     }
 
-    "should fail with the body's error if the header and the body error out" in {
+    "should fail with the body's error if the header and the body error out" in
       whenReady(sut.extract(Headers("X-Message-Type" -> "nope"), Source.single(ByteString("nope"))).value) {
         _ mustBe Left(UnableToExtractFromBody)
       }
-    }
 
     "should fail with the unexpected if the stream is in a weird state" in {
       val error = new IllegalStateException()
