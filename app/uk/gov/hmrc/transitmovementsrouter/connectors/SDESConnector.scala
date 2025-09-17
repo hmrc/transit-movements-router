@@ -74,9 +74,7 @@ class SDESConnectorImpl @Inject() (httpClientV2: HttpClientV2, appConfig: AppCon
 
   private def logMessage(request: SdesFilereadyRequest, message: String) = {
     val properties = request.file.properties
-      .map(
-        prop => s"  ${prop.name}: ${prop.value}"
-      )
+      .map(prop => s"  ${prop.name}: ${prop.value}")
       .mkString(System.lineSeparator())
     s"""|Posting NCTS message via SDES:
         |
@@ -115,22 +113,20 @@ class SDESConnectorImpl @Inject() (httpClientV2: HttpClientV2, appConfig: AppCon
       .setHeader(RouterHeaderNames.CLIENT_ID -> clientId)
       .withBody(Json.toJson(request))
       .execute[HttpResponse]
-      .flatMap {
-        response =>
-          val logEntry = logMessage(request, s"Response status: ${response.status}")
-          response.status match {
-            case NO_CONTENT =>
-              logger.info(logEntry)
-              Future.successful(Right(()))
-            case _ =>
-              logger.error(logEntry)
-              Future.successful(Left(SDESError.UnexpectedError(Some(UpstreamErrorResponse(response.body, response.status)))))
-          }
+      .flatMap { response =>
+        val logEntry = logMessage(request, s"Response status: ${response.status}")
+        response.status match {
+          case NO_CONTENT =>
+            logger.info(logEntry)
+            Future.successful(Right(()))
+          case _ =>
+            logger.error(logEntry)
+            Future.successful(Left(SDESError.UnexpectedError(Some(UpstreamErrorResponse(response.body, response.status)))))
+        }
       }
-      .recoverWith {
-        case NonFatal(e) =>
-          logger.error(logMessage(request, s"Request Error: ${e.getMessage}"), e)
-          Future.successful(Left(SDESError.UnexpectedError(Some(e))))
+      .recoverWith { case NonFatal(e) =>
+        logger.error(logMessage(request, s"Request Error: ${e.getMessage}"), e)
+        Future.successful(Left(SDESError.UnexpectedError(Some(e))))
       }
   }
 

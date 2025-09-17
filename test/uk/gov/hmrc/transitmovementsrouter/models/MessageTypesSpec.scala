@@ -76,14 +76,12 @@ class MessageTypesSpec extends AnyFreeSpec with Matchers with MockitoSugar with 
   }
 
   "find" - {
-    "must return None when junk is provided" in forAll(Gen.stringOfN(6, Gen.alphaNumChar)) {
-      code =>
-        MessageType.withCode(code) must not be defined
+    "must return None when junk is provided" in forAll(Gen.stringOfN(6, Gen.alphaNumChar)) { code =>
+      MessageType.withCode(code) must not be defined
     }
 
-    "must return the correct message type when a correct code is provided" in forAll(Gen.oneOf(MessageType.values)) {
-      messageType =>
-        MessageType.withCode(messageType.code) mustBe Some(messageType)
+    "must return the correct message type when a correct code is provided" in forAll(Gen.oneOf(MessageType.values)) { messageType =>
+      MessageType.withCode(messageType.code) mustBe Some(messageType)
     }
   }
 }

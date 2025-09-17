@@ -51,140 +51,125 @@ class CustomOfficeExtractorServiceSpec
 
   "Extract customs office" - {
 
-    MessageType.departureRequestValues.foreach {
-      messageType =>
-        s"${messageType.code} should generate a valid departure office for a given GB payload" in forAll(
-          messageWithDepartureOfficeNode(messageType, "GB")
-        ) {
-          officeOfDepartureXML =>
-            val payload = createStream(officeOfDepartureXML._1)
-            val response = serviceUnderTest.extractCustomOffice(
-              payload,
-              messageType
-            )
+    MessageType.departureRequestValues.foreach { messageType =>
+      s"${messageType.code} should generate a valid departure office for a given GB payload" in forAll(
+        messageWithDepartureOfficeNode(messageType, "GB")
+      ) { officeOfDepartureXML =>
+        val payload  = createStream(officeOfDepartureXML._1)
+        val response = serviceUnderTest.extractCustomOffice(
+          payload,
+          messageType
+        )
 
-            whenReady(response.value, Timeout(2.seconds)) {
-              r =>
-                r.mustBe(Right(CustomsOffice(officeOfDepartureXML._2)))
+        whenReady(response.value, Timeout(2.seconds)) { r =>
+          r.mustBe(Right(CustomsOffice(officeOfDepartureXML._2)))
 
-            }
         }
+      }
 
-        s"${messageType.code} should generate a valid departure office for a given Xi payload" in forAll(
-          messageWithDepartureOfficeNode(messageType, "XI")
-        ) {
-          officeOfDepartureXML =>
-            val payload = createStream(officeOfDepartureXML._1)
-            val response = serviceUnderTest.extractCustomOffice(
-              payload,
-              messageType
-            )
+      s"${messageType.code} should generate a valid departure office for a given Xi payload" in forAll(
+        messageWithDepartureOfficeNode(messageType, "XI")
+      ) { officeOfDepartureXML =>
+        val payload  = createStream(officeOfDepartureXML._1)
+        val response = serviceUnderTest.extractCustomOffice(
+          payload,
+          messageType
+        )
 
-            whenReady(response.value, Timeout(2.seconds)) {
-              r =>
-                r.mustBe(Right(CustomsOffice(officeOfDepartureXML._2)))
+        whenReady(response.value, Timeout(2.seconds)) { r =>
+          r.mustBe(Right(CustomsOffice(officeOfDepartureXML._2)))
 
-            }
         }
+      }
 
-        s"${messageType.code} should generate an invalid office of destination for a non GB/XI payload" in forAll(
-          messageWithDepartureOfficeNode(messageType, "FR")
-        ) {
-          officeOfDeparture =>
-            val referenceNumber = officeOfDeparture._2
-            val payload         = createStream(officeOfDeparture._1)
-            val response = serviceUnderTest.extractCustomOffice(
-              payload,
-              messageType
+      s"${messageType.code} should generate an invalid office of destination for a non GB/XI payload" in forAll(
+        messageWithDepartureOfficeNode(messageType, "FR")
+      ) { officeOfDeparture =>
+        val referenceNumber = officeOfDeparture._2
+        val payload         = createStream(officeOfDeparture._1)
+        val response        = serviceUnderTest.extractCustomOffice(
+          payload,
+          messageType
+        )
+
+        whenReady(response.value, Timeout(2.seconds)) { r =>
+          r.mustBe(
+            Left(
+              CustomOfficeExtractorError.UnrecognisedOffice(
+                s"Did not recognise office: $referenceNumber",
+                CustomsOffice(referenceNumber),
+                messageType.officeNode
+              )
             )
-
-            whenReady(response.value, Timeout(2.seconds)) {
-              r =>
-                r.mustBe(
-                  Left(
-                    CustomOfficeExtractorError.UnrecognisedOffice(
-                      s"Did not recognise office: $referenceNumber",
-                      CustomsOffice(referenceNumber),
-                      messageType.officeNode
-                    )
-                  )
-                )
-
-            }
-        }
-
-        s"${messageType.code} returns NoElementFound(referenceNumber) when it does not find an office of departure element" in {
-          val payload = createStream(emptyMessage(messageType.rootNode))
-          val response = serviceUnderTest.extractCustomOffice(
-            payload,
-            messageType
           )
 
-          whenReady(response.value, Timeout(2.seconds)) {
-            r =>
-              r.mustBe(Left(NoElementFound("referenceNumber")))
-          }
         }
+      }
+
+      s"${messageType.code} returns NoElementFound(referenceNumber) when it does not find an office of departure element" in {
+        val payload  = createStream(emptyMessage(messageType.rootNode))
+        val response = serviceUnderTest.extractCustomOffice(
+          payload,
+          messageType
+        )
+
+        whenReady(response.value, Timeout(2.seconds)) { r =>
+          r.mustBe(Left(NoElementFound("referenceNumber")))
+        }
+      }
     }
 
-    MessageType.arrivalRequestValues.foreach {
-      messageType =>
-        s"${messageType.code} should generate a valid office of destination for a given GB payload" in forAll(
-          messageWithDestinationOfficeNode(messageType, "GB")
-        ) {
-          officeOfDestinationXML =>
-            val payload = createStream(officeOfDestinationXML._1)
-            val response = serviceUnderTest.extractCustomOffice(
-              payload,
-              messageType
-            )
+    MessageType.arrivalRequestValues.foreach { messageType =>
+      s"${messageType.code} should generate a valid office of destination for a given GB payload" in forAll(
+        messageWithDestinationOfficeNode(messageType, "GB")
+      ) { officeOfDestinationXML =>
+        val payload  = createStream(officeOfDestinationXML._1)
+        val response = serviceUnderTest.extractCustomOffice(
+          payload,
+          messageType
+        )
 
-            whenReady(response.value, Timeout(2.seconds)) {
-              r =>
-                r.mustBe(Right(CustomsOffice(officeOfDestinationXML._2)))
-            }
+        whenReady(response.value, Timeout(2.seconds)) { r =>
+          r.mustBe(Right(CustomsOffice(officeOfDestinationXML._2)))
         }
+      }
 
-        s"${messageType.code} should generate a valid office of destination for a given XI payload" in forAll(
-          messageWithDestinationOfficeNode(messageType, "XI")
-        ) {
-          officeOfDestinationXML =>
-            val payload = createStream(officeOfDestinationXML._1)
-            val response = serviceUnderTest.extractCustomOffice(
-              payload,
-              messageType
-            )
+      s"${messageType.code} should generate a valid office of destination for a given XI payload" in forAll(
+        messageWithDestinationOfficeNode(messageType, "XI")
+      ) { officeOfDestinationXML =>
+        val payload  = createStream(officeOfDestinationXML._1)
+        val response = serviceUnderTest.extractCustomOffice(
+          payload,
+          messageType
+        )
 
-            whenReady(response.value, Timeout(2.seconds)) {
-              r =>
-                r.mustBe(Right(CustomsOffice(officeOfDestinationXML._2)))
+        whenReady(response.value, Timeout(2.seconds)) { r =>
+          r.mustBe(Right(CustomsOffice(officeOfDestinationXML._2)))
 
-            }
         }
+      }
 
-        s"${messageType.code} should generate an invalid office of destination for a non GB/XI payload" in forAll(
-          messageWithDestinationOfficeNode(messageType, "FR")
-        ) {
-          officeOfDestinationXML =>
-            val payload = createStream(officeOfDestinationXML._1)
-            val response = serviceUnderTest.extractCustomOffice(
-              payload,
-              messageType
+      s"${messageType.code} should generate an invalid office of destination for a non GB/XI payload" in forAll(
+        messageWithDestinationOfficeNode(messageType, "FR")
+      ) { officeOfDestinationXML =>
+        val payload  = createStream(officeOfDestinationXML._1)
+        val response = serviceUnderTest.extractCustomOffice(
+          payload,
+          messageType
+        )
+
+        whenReady(response.value, Timeout(2.seconds)) { r =>
+          r.mustBe(
+            Left(
+              CustomOfficeExtractorError.UnrecognisedOffice(
+                s"Did not recognise office: ${officeOfDestinationXML._2}",
+                CustomsOffice(officeOfDestinationXML._2),
+                messageType.officeNode
+              )
             )
-
-            whenReady(response.value, Timeout(2.seconds)) {
-              r =>
-                r.mustBe(
-                  Left(
-                    CustomOfficeExtractorError.UnrecognisedOffice(
-                      s"Did not recognise office: ${officeOfDestinationXML._2}",
-                      CustomsOffice(officeOfDestinationXML._2),
-                      messageType.officeNode
-                    )
-                  )
-                )
-            }
+          )
         }
+      }
 
     }
   }
@@ -213,7 +198,5 @@ class CustomOfficeExtractorServiceSpec
 
   def emptyMessage(messageTypeNode: String): String = s"<$messageTypeNode/>"
 
-  def createReferenceNumberWithPrefix(prefix: String): Gen[String] = intWithMaxLength(7, 7).map(
-    n => s"$prefix$n"
-  )
+  def createReferenceNumberWithPrefix(prefix: String): Gen[String] = intWithMaxLength(7, 7).map(n => s"$prefix$n")
 }

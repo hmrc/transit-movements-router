@@ -108,141 +108,104 @@ class SDESConnectorSpec
       arbitrary[MovementId],
       arbitrary[MessageId],
       arbitrary[ObjectSummaryWithMd5]
-    ) {
-      (movementId, messageId, objectSummaryWithMd5) =>
-        server.resetAll()
+    ) { (movementId, messageId, objectSummaryWithMd5) =>
+      server.resetAll()
 
-        val sut: SDESConnector = new SDESConnectorImpl(httpClientV2, appConfig, SingleUUIDGenerator)
+      val sut: SDESConnector = new SDESConnectorImpl(httpClientV2, appConfig, SingleUUIDGenerator)
 
-        val expectedHash = FileMd5Checksum.fromBase64(objectSummaryWithMd5.contentMd5)
+      val expectedHash = FileMd5Checksum.fromBase64(objectSummaryWithMd5.contentMd5)
 
-        val expectedJson = Json.obj(
-          "informationType" -> "informationType",
-          "file" -> Json.obj(
-            "recipientOrSender" -> "srn",
-            "name"              -> objectSummaryWithMd5.location.fileName,
-            "location"          -> s"http://localhost/${objectSummaryWithMd5.location.asUri}",
-            "checksum" -> Json.obj(
-              "value"     -> expectedHash.value,
-              "algorithm" -> "md5"
-            ),
-            "size" -> objectSummaryWithMd5.contentLength,
-            "properties" -> Json.arr(
-              Json.obj("name" -> "x-conversation-id", "value" -> ConversationId(movementId, messageId).value.toString)
-            )
+      val expectedJson = Json.obj(
+        "informationType" -> "informationType",
+        "file"            -> Json.obj(
+          "recipientOrSender" -> "srn",
+          "name"              -> objectSummaryWithMd5.location.fileName,
+          "location"          -> s"http://localhost/${objectSummaryWithMd5.location.asUri}",
+          "checksum"          -> Json.obj(
+            "value"     -> expectedHash.value,
+            "algorithm" -> "md5"
           ),
-          "audit" -> Json.obj(
-            "correlationID" -> SingleUUIDGenerator.singleUUID.toString
+          "size"       -> objectSummaryWithMd5.contentLength,
+          "properties" -> Json.arr(
+            Json.obj("name" -> "x-conversation-id", "value" -> ConversationId(movementId, messageId).value.toString)
           )
+        ),
+        "audit" -> Json.obj(
+          "correlationID" -> SingleUUIDGenerator.singleUUID.toString
         )
+      )
 
-        server.stubFor(
-          post(
-            urlEqualTo(url)
-          ).withRequestBody(equalToJson(Json.stringify(expectedJson)))
-            .withHeader(HeaderNames.CONTENT_TYPE, equalTo(MimeTypes.JSON))
-            .withHeader("X-Client-Id", equalTo("clientId"))
-            .willReturn(aResponse().withStatus(NO_CONTENT))
+      server.stubFor(
+        post(
+          urlEqualTo(url)
+        ).withRequestBody(equalToJson(Json.stringify(expectedJson)))
+          .withHeader(HeaderNames.CONTENT_TYPE, equalTo(MimeTypes.JSON))
+          .withHeader("X-Client-Id", equalTo("clientId"))
+          .willReturn(aResponse().withStatus(NO_CONTENT))
+      )
+
+      whenReady(
+        sut.send(
+          movementId,
+          messageId,
+          FileName(objectSummaryWithMd5.location),
+          FileURL(objectSummaryWithMd5.location, "http://localhost"),
+          FileMd5Checksum.fromBase64(objectSummaryWithMd5.contentMd5),
+          FileSize(objectSummaryWithMd5.contentLength)
         )
-
-        whenReady(
-          sut.send(
-            movementId,
-            messageId,
-            FileName(objectSummaryWithMd5.location),
-            FileURL(objectSummaryWithMd5.location, "http://localhost"),
-            FileMd5Checksum.fromBase64(objectSummaryWithMd5.contentMd5),
-            FileSize(objectSummaryWithMd5.contentLength)
-          )
-        ) {
-          result =>
-            result mustBe Right(())
-        }
+      ) { result =>
+        result mustBe Right(())
+      }
     }
 
     "On an upstream internal server error, must returned a successful future with a Left of Unexpected Error" in forAll(
       arbitrary[MovementId],
       arbitrary[MessageId],
       arbitrary[ObjectSummaryWithMd5]
-    ) {
-      (movementId, messageId, objectSummaryWithMd5) =>
-        server.resetAll()
+    ) { (movementId, messageId, objectSummaryWithMd5) =>
+      server.resetAll()
 
-        val sut: SDESConnector = new SDESConnectorImpl(httpClientV2, appConfig, SingleUUIDGenerator)
+      val sut: SDESConnector = new SDESConnectorImpl(httpClientV2, appConfig, SingleUUIDGenerator)
 
-        val expectedHash = FileMd5Checksum.fromBase64(objectSummaryWithMd5.contentMd5)
+      val expectedHash = FileMd5Checksum.fromBase64(objectSummaryWithMd5.contentMd5)
 
-        val expectedJson = Json.obj(
-          "informationType" -> "informationType",
-          "file" -> Json.obj(
-            "recipientOrSender" -> "srn",
-            "name"              -> objectSummaryWithMd5.location.fileName,
-            "location"          -> s"http://localhost/${objectSummaryWithMd5.location.asUri}",
-            "checksum" -> Json.obj(
-              "value"     -> expectedHash.value,
-              "algorithm" -> "md5"
-            ),
-            "size" -> objectSummaryWithMd5.contentLength,
-            "properties" -> Json.arr(
-              Json.obj("name" -> "x-conversation-id", "value" -> ConversationId(movementId, messageId).value.toString)
-            )
+      val expectedJson = Json.obj(
+        "informationType" -> "informationType",
+        "file"            -> Json.obj(
+          "recipientOrSender" -> "srn",
+          "name"              -> objectSummaryWithMd5.location.fileName,
+          "location"          -> s"http://localhost/${objectSummaryWithMd5.location.asUri}",
+          "checksum"          -> Json.obj(
+            "value"     -> expectedHash.value,
+            "algorithm" -> "md5"
           ),
-          "audit" -> Json.obj(
-            "correlationID" -> SingleUUIDGenerator.singleUUID.toString
+          "size"       -> objectSummaryWithMd5.contentLength,
+          "properties" -> Json.arr(
+            Json.obj("name" -> "x-conversation-id", "value" -> ConversationId(movementId, messageId).value.toString)
           )
+        ),
+        "audit" -> Json.obj(
+          "correlationID" -> SingleUUIDGenerator.singleUUID.toString
         )
+      )
 
-        server.stubFor(
-          post(
-            urlEqualTo(url)
-          ).withRequestBody(equalToJson(Json.stringify(expectedJson)))
-            .withHeader(HeaderNames.CONTENT_TYPE, equalTo(MimeTypes.JSON))
-            .withHeader("X-Client-Id", equalTo("clientId"))
-            .willReturn(
-              aResponse()
-                .withStatus(INTERNAL_SERVER_ERROR)
-                .withBody(
-                  Json.stringify(Json.toJson(PresentationError.internalServiceError()))
-                )
-            )
-        )
-
-        val future =
-          sut.send(
-            movementId,
-            messageId,
-            FileName(objectSummaryWithMd5.location),
-            FileURL(objectSummaryWithMd5.location, "http://localhost"),
-            FileMd5Checksum.fromBase64(objectSummaryWithMd5.contentMd5),
-            FileSize(objectSummaryWithMd5.contentLength)
+      server.stubFor(
+        post(
+          urlEqualTo(url)
+        ).withRequestBody(equalToJson(Json.stringify(expectedJson)))
+          .withHeader(HeaderNames.CONTENT_TYPE, equalTo(MimeTypes.JSON))
+          .withHeader("X-Client-Id", equalTo("clientId"))
+          .willReturn(
+            aResponse()
+              .withStatus(INTERNAL_SERVER_ERROR)
+              .withBody(
+                Json.stringify(Json.toJson(PresentationError.internalServiceError()))
+              )
           )
+      )
 
-        whenReady(future) {
-          case Left(SDESError.UnexpectedError(Some(response: UpstreamErrorResponse))) =>
-            response.statusCode mustBe INTERNAL_SERVER_ERROR
-            Json.parse(response.message).validate[StandardError] mustBe JsSuccess(StandardError("Internal server error", ErrorCode.InternalServerError))
-          case x => fail(s"Expected an unexpected error, got $x")
-        }
-    }
-
-    "On an exception, must returned a successful future with a Left of Unexpected Error" in forAll(
-      arbitrary[MovementId],
-      arbitrary[MessageId],
-      arbitrary[ObjectSummaryWithMd5]
-    ) {
-      (movementId, messageId, objectSummaryWithMd5) =>
-        server.resetAll()
-
-        val mockHttpClientV2   = mock[HttpClientV2]
-        val mockRequestBuilder = mock[RequestBuilder]
-
-        when(mockRequestBuilder.setHeader(any)).thenReturn(mockRequestBuilder)
-        when(mockRequestBuilder.execute[HttpResponse](any(), any())).thenReturn(Future.failed(new RuntimeException))
-        when(mockRequestBuilder.withBody(any())(any(), any(), any())).thenReturn(mockRequestBuilder)
-        when(mockHttpClientV2.post(any[URL])(any[HeaderCarrier])).thenReturn(mockRequestBuilder)
-
-        val sut: SDESConnector = new SDESConnectorImpl(mockHttpClientV2, appConfig, SingleUUIDGenerator)
-        val future = sut.send(
+      val future =
+        sut.send(
           movementId,
           messageId,
           FileName(objectSummaryWithMd5.location),
@@ -251,10 +214,43 @@ class SDESConnectorSpec
           FileSize(objectSummaryWithMd5.contentLength)
         )
 
-        whenReady(future) {
-          case Left(SDESError.UnexpectedError(Some(_: RuntimeException))) => succeed
-          case x                                                          => fail(s"Expected an unexpected error with a runtime exception, got $x")
-        }
+      whenReady(future) {
+        case Left(SDESError.UnexpectedError(Some(response: UpstreamErrorResponse))) =>
+          response.statusCode mustBe INTERNAL_SERVER_ERROR
+          Json.parse(response.message).validate[StandardError] mustBe JsSuccess(StandardError("Internal server error", ErrorCode.InternalServerError))
+        case x => fail(s"Expected an unexpected error, got $x")
+      }
+    }
+
+    "On an exception, must returned a successful future with a Left of Unexpected Error" in forAll(
+      arbitrary[MovementId],
+      arbitrary[MessageId],
+      arbitrary[ObjectSummaryWithMd5]
+    ) { (movementId, messageId, objectSummaryWithMd5) =>
+      server.resetAll()
+
+      val mockHttpClientV2   = mock[HttpClientV2]
+      val mockRequestBuilder = mock[RequestBuilder]
+
+      when(mockRequestBuilder.setHeader(any)).thenReturn(mockRequestBuilder)
+      when(mockRequestBuilder.execute[HttpResponse](any(), any())).thenReturn(Future.failed(new RuntimeException))
+      when(mockRequestBuilder.withBody(any())(any(), any(), any())).thenReturn(mockRequestBuilder)
+      when(mockHttpClientV2.post(any[URL])(any[HeaderCarrier])).thenReturn(mockRequestBuilder)
+
+      val sut: SDESConnector = new SDESConnectorImpl(mockHttpClientV2, appConfig, SingleUUIDGenerator)
+      val future             = sut.send(
+        movementId,
+        messageId,
+        FileName(objectSummaryWithMd5.location),
+        FileURL(objectSummaryWithMd5.location, "http://localhost"),
+        FileMd5Checksum.fromBase64(objectSummaryWithMd5.contentMd5),
+        FileSize(objectSummaryWithMd5.contentLength)
+      )
+
+      whenReady(future) {
+        case Left(SDESError.UnexpectedError(Some(_: RuntimeException))) => succeed
+        case x                                                          => fail(s"Expected an unexpected error with a runtime exception, got $x")
+      }
     }
 
   }

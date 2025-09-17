@@ -82,9 +82,8 @@ class PersistenceConnectorSpec
 
   implicit val appConfig: AppConfig = mock[AppConfig]
   when(appConfig.internalAuthToken).thenReturn(token)
-  when(appConfig.persistenceServiceBaseUrl).thenAnswer {
-    _ =>
-      Url.parse(server.baseUrl())
+  when(appConfig.persistenceServiceBaseUrl).thenAnswer { _ =>
+    Url.parse(server.baseUrl())
   }
 
   implicit val hc: HeaderCarrier = HeaderCarrier()
@@ -139,31 +138,28 @@ class PersistenceConnectorSpec
       val body = Json.obj("messageId" -> messageId.value, "eori" -> eoriNumber, "clientId" -> Option(clientId), "isTransitional" -> true).toString()
 
       stubForPostBody(OK, Some(body))
-      whenReady(connector.postBody(movementId, messageId, DeclarationAmendment, source).value) {
-        x =>
-          x.isRight mustBe true
-          x mustBe Right(PersistenceResponse(messageId, eoriNumber, Option(clientId), isTransitional = true, sendNotification = None))
+      whenReady(connector.postBody(movementId, messageId, DeclarationAmendment, source).value) { x =>
+        x.isRight mustBe true
+        x mustBe Right(PersistenceResponse(messageId, eoriNumber, Option(clientId), isTransitional = true, sendNotification = None))
       }
     }
 
-    "return a PersistenceError when unsuccessful" in forAll(errorCodes) {
-      statusCode =>
-        server.resetAll()
+    "return a PersistenceError when unsuccessful" in forAll(errorCodes) { statusCode =>
+      server.resetAll()
 
-        stubForPostBody(statusCode)
+      stubForPostBody(statusCode)
 
-        whenReady(connector.postBody(movementId, messageId, DeclarationAmendment, source).value) {
-          x =>
-            x.isLeft mustBe true
+      whenReady(connector.postBody(movementId, messageId, DeclarationAmendment, source).value) { x =>
+        x.isLeft mustBe true
 
-            statusCode match {
-              case BAD_REQUEST           => x mustBe a[Left[Unexpected, ?]]
-              case NOT_FOUND             => x mustBe a[Left[MovementNotFound, ?]]
-              case INTERNAL_SERVER_ERROR => x mustBe a[Left[Unexpected, ?]]
-              case _                     => fail()
-            }
-
+        statusCode match {
+          case BAD_REQUEST           => x mustBe a[Left[Unexpected, ?]]
+          case NOT_FOUND             => x mustBe a[Left[MovementNotFound, ?]]
+          case INTERNAL_SERVER_ERROR => x mustBe a[Left[Unexpected, ?]]
+          case _                     => fail()
         }
+
+      }
     }
 
     "return Unexpected(throwable) when NonFatal exception is thrown" in {
@@ -173,10 +169,9 @@ class PersistenceConnectorSpec
 
       val failingSource = Source.single(ByteString.fromString("<abc>asdadsadads")).via(new EISMessageTransformersImpl().unwrap)
 
-      whenReady(connector.postBody(movementId, messageId, DeclarationAmendment, failingSource).value) {
-        res =>
-          res mustBe a[Left[Unexpected, ?]]
-          res.left.toOption.get.asInstanceOf[Unexpected].thr.isDefined
+      whenReady(connector.postBody(movementId, messageId, DeclarationAmendment, failingSource).value) { res =>
+        res mustBe a[Left[Unexpected, ?]]
+        res.left.toOption.get.asInstanceOf[Unexpected].thr.isDefined
       }
     }
 
@@ -187,28 +182,26 @@ class PersistenceConnectorSpec
 
       stubForPatchMessageStatus(OK)
 
-      whenReady(connector.patchMessageStatus(movementId, messageId, MessageUpdate(MessageStatus.Success)).value) {
-        x =>
-          x.isRight mustBe true
-          x mustBe Right(())
+      whenReady(connector.patchMessageStatus(movementId, messageId, MessageUpdate(MessageStatus.Success)).value) { x =>
+        x.isRight mustBe true
+        x mustBe Right(())
       }
     }
 
-    "return a PersistenceError when unsuccessful" in forAll(errorCodes) {
-      statusCode =>
-        server.resetAll()
+    "return a PersistenceError when unsuccessful" in forAll(errorCodes) { statusCode =>
+      server.resetAll()
 
-        stubForPatchMessageStatus(statusCode)
+      stubForPatchMessageStatus(statusCode)
 
-        whenReady(connector.patchMessageStatus(movementId, messageId, MessageUpdate(MessageStatus.Success)).value) {
-          case Left(error) =>
-            (statusCode: @unchecked) match {
-              case BAD_REQUEST           => error mustBe a[Unexpected]
-              case NOT_FOUND             => error mustBe a[MessageNotFound]
-              case INTERNAL_SERVER_ERROR => error mustBe a[Unexpected]
-            }
-          case Right(_) => fail("An error was expected")
-        }
+      whenReady(connector.patchMessageStatus(movementId, messageId, MessageUpdate(MessageStatus.Success)).value) {
+        case Left(error) =>
+          (statusCode: @unchecked) match {
+            case BAD_REQUEST           => error mustBe a[Unexpected]
+            case NOT_FOUND             => error mustBe a[MessageNotFound]
+            case INTERNAL_SERVER_ERROR => error mustBe a[Unexpected]
+          }
+        case Right(_) => fail("An error was expected")
+      }
     }
   }
 }

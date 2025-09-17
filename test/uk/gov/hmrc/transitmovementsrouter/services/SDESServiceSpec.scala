@@ -64,64 +64,62 @@ class SDESServiceSpec
       arbitrary[MovementId],
       arbitrary[MessageId],
       arbitrary[ObjectSummaryWithMd5]
-    ) {
-      (movementId, messageId, objectSummary) =>
-        val mockAppConfig = mock[AppConfig]
-        when(mockAppConfig.objectStoreUrl).thenReturn("http://test")
+    ) { (movementId, messageId, objectSummary) =>
+      val mockAppConfig = mock[AppConfig]
+      when(mockAppConfig.objectStoreUrl).thenReturn("http://test")
 
-        val mockConnector: SDESConnector = mock[SDESConnector]
-        val sut                          = new SDESServiceImpl(mockAppConfig, mockConnector)
-        when(
-          mockConnector.send(
-            MovementId(eqTo(movementId.value)),
-            MessageId(eqTo(messageId.value)),
-            FileName(eqTo(objectSummary.location.fileName)),
-            FileURL(eqTo(s"http://test/${objectSummary.location.asUri}")),
-            FileMd5Checksum(eqTo(FileMd5Checksum.fromBase64(objectSummary.contentMd5).value)),
-            FileSize(eqTo(objectSummary.contentLength))
-          )(
-            any[HeaderCarrier],
-            any[ExecutionContext]
-          )
+      val mockConnector: SDESConnector = mock[SDESConnector]
+      val sut                          = new SDESServiceImpl(mockAppConfig, mockConnector)
+      when(
+        mockConnector.send(
+          MovementId(eqTo(movementId.value)),
+          MessageId(eqTo(messageId.value)),
+          FileName(eqTo(objectSummary.location.fileName)),
+          FileURL(eqTo(s"http://test/${objectSummary.location.asUri}")),
+          FileMd5Checksum(eqTo(FileMd5Checksum.fromBase64(objectSummary.contentMd5).value)),
+          FileSize(eqTo(objectSummary.contentLength))
+        )(
+          any[HeaderCarrier],
+          any[ExecutionContext]
         )
-          .thenReturn(Future.successful(Right((): Unit)))
+      )
+        .thenReturn(Future.successful(Right((): Unit)))
 
-        val result = sut.send(movementId, messageId, objectSummary)
-        whenReady(result.value) {
-          _ mustBe Right(())
-        }
+      val result = sut.send(movementId, messageId, objectSummary)
+      whenReady(result.value) {
+        _ mustBe Right(())
+      }
     }
 
     "on a failed submission to SDES, should return a Left with an UnexpectedError" in forAll(
       arbitrary[MovementId],
       arbitrary[MessageId],
       arbitrary[ObjectSummaryWithMd5]
-    ) {
-      (movementId, messageId, objectSummary) =>
-        val mockAppConfig = mock[AppConfig]
-        when(mockAppConfig.objectStoreUrl).thenReturn("http://test")
+    ) { (movementId, messageId, objectSummary) =>
+      val mockAppConfig = mock[AppConfig]
+      when(mockAppConfig.objectStoreUrl).thenReturn("http://test")
 
-        val mockConnector: SDESConnector     = mock[SDESConnector]
-        val sut                              = new SDESServiceImpl(mockAppConfig, mockConnector)
-        val upstreamErrorResponse: Throwable = UpstreamErrorResponse("Internal service error", INTERNAL_SERVER_ERROR)
-        when(
-          mockConnector.send(
-            MovementId(eqTo(movementId.value)),
-            MessageId(eqTo(messageId.value)),
-            FileName(eqTo(objectSummary.location.fileName)),
-            FileURL(eqTo(s"http://test/${objectSummary.location.asUri}")),
-            FileMd5Checksum(eqTo(FileMd5Checksum.fromBase64(objectSummary.contentMd5).value)),
-            FileSize(eqTo(objectSummary.contentLength))
-          )(
-            any[HeaderCarrier],
-            any[ExecutionContext]
-          )
+      val mockConnector: SDESConnector     = mock[SDESConnector]
+      val sut                              = new SDESServiceImpl(mockAppConfig, mockConnector)
+      val upstreamErrorResponse: Throwable = UpstreamErrorResponse("Internal service error", INTERNAL_SERVER_ERROR)
+      when(
+        mockConnector.send(
+          MovementId(eqTo(movementId.value)),
+          MessageId(eqTo(messageId.value)),
+          FileName(eqTo(objectSummary.location.fileName)),
+          FileURL(eqTo(s"http://test/${objectSummary.location.asUri}")),
+          FileMd5Checksum(eqTo(FileMd5Checksum.fromBase64(objectSummary.contentMd5).value)),
+          FileSize(eqTo(objectSummary.contentLength))
+        )(
+          any[HeaderCarrier],
+          any[ExecutionContext]
         )
-          .thenReturn(Future.successful(Left(SDESError.UnexpectedError(Some(upstreamErrorResponse)))))
-        val result = sut.send(movementId, messageId, objectSummary)
-        whenReady(result.value) {
-          _ mustBe Left(SDESError.UnexpectedError(Some(upstreamErrorResponse)))
-        }
+      )
+        .thenReturn(Future.successful(Left(SDESError.UnexpectedError(Some(upstreamErrorResponse)))))
+      val result = sut.send(movementId, messageId, objectSummary)
+      whenReady(result.value) {
+        _ mustBe Left(SDESError.UnexpectedError(Some(upstreamErrorResponse)))
+      }
     }
 
   }

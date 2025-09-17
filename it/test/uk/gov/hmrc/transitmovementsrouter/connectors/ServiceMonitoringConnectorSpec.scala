@@ -92,8 +92,8 @@ class ServiceMonitoringConnectorSpec
             .willReturn(aResponse().withStatus(200))
         )
         val sut = new ServiceMonitoringConnectorImpl(mockAppConfig, httpClientV2, clock)
-        whenReady(sut.outgoing(movementId, messageId, messageType, customsOffice)) {
-          _ => succeed
+        whenReady(sut.outgoing(movementId, messageId, messageType, customsOffice)) { _ =>
+          succeed
         }
 
     }
@@ -124,82 +124,76 @@ class ServiceMonitoringConnectorSpec
         whenReady(
           sut
             .outgoing(movementId, messageId, messageType, customsOffice)
-            .map(
-              _ => fail("Expected a failure, got a success")
-            )
-            .recover {
-              case UpstreamErrorResponse(_, 500, _, _) => (): Unit
+            .map(_ => fail("Expected a failure, got a success"))
+            .recover { case UpstreamErrorResponse(_, 500, _, _) =>
+              (): Unit
             }
-        ) {
-          _ => succeed // will only execute if the upstream response was 500
+        ) { _ =>
+          succeed // will only execute if the upstream response was 500
         }
 
     }
   }
 
   "incoming" - {
-    "when successful" in forAll(arbitrary[MovementId], arbitrary[MessageId], arbitrary[MessageType]) {
-      (movementId, messageId, messageType) =>
-        server.resetAll()
+    "when successful" in forAll(arbitrary[MovementId], arbitrary[MessageId], arbitrary[MessageType]) { (movementId, messageId, messageType) =>
+      server.resetAll()
 
-        val expectedConversationId = ConversationId(movementId, messageId)
+      val expectedConversationId = ConversationId(movementId, messageId)
 
-        server.stubFor(
-          post("/incoming")
-            .withHeader("Content-Type", equalTo("text/plain; charset=UTF-8"))
-            .withRequestBody(
-              equalToJson(
-                s"""{
+      server.stubFor(
+        post("/incoming")
+          .withHeader("Content-Type", equalTo("text/plain; charset=UTF-8"))
+          .withRequestBody(
+            equalToJson(
+              s"""{
                    |    "id": "${expectedConversationId.value.toString}",
                    |    "timestamp": "2023-06-23T15:57:58.234",
                    |    "messageCode": "${messageType.code}"
                    |}
                    |""".stripMargin
-              )
             )
-            .willReturn(aResponse().withStatus(200))
-        )
-        val sut = new ServiceMonitoringConnectorImpl(mockAppConfig, httpClientV2, clock)
-        whenReady(sut.incoming(movementId, messageId, messageType)) {
-          _ => succeed
-        }
+          )
+          .willReturn(aResponse().withStatus(200))
+      )
+      val sut = new ServiceMonitoringConnectorImpl(mockAppConfig, httpClientV2, clock)
+      whenReady(sut.incoming(movementId, messageId, messageType)) { _ =>
+        succeed
+      }
 
     }
 
-    "when not successful" in forAll(arbitrary[MovementId], arbitrary[MessageId], arbitrary[MessageType]) {
-      (movementId, messageId, messageType) =>
-        server.resetAll()
+    "when not successful" in forAll(arbitrary[MovementId], arbitrary[MessageId], arbitrary[MessageType]) { (movementId, messageId, messageType) =>
+      server.resetAll()
 
-        val expectedConversationId = ConversationId(movementId, messageId)
+      val expectedConversationId = ConversationId(movementId, messageId)
 
-        server.stubFor(
-          post("/incoming")
-            .withHeader("Content-Type", equalTo("text/plain; charset=UTF-8"))
-            .withRequestBody(
-              equalToJson(
-                s"""{
+      server.stubFor(
+        post("/incoming")
+          .withHeader("Content-Type", equalTo("text/plain; charset=UTF-8"))
+          .withRequestBody(
+            equalToJson(
+              s"""{
                    |    "id": "${expectedConversationId.value.toString}",
                    |    "timestamp": "2023-06-23T15:57:58.234",
                    |    "messageCode": "${messageType.code}"
                    |}
                    |""".stripMargin
-              )
             )
-            .willReturn(aResponse().withStatus(500))
-        )
-        val sut = new ServiceMonitoringConnectorImpl(mockAppConfig, httpClientV2, clock)
-        whenReady(
-          sut
-            .incoming(movementId, messageId, messageType)
-            .map(
-              _ => fail("Expected a failure, got a success")
-            )
-            .recover {
-              case UpstreamErrorResponse(_, 500, _, _) => (): Unit
-            }
-        ) {
-          _ => succeed // will only execute if the upstream response was 500
-        }
+          )
+          .willReturn(aResponse().withStatus(500))
+      )
+      val sut = new ServiceMonitoringConnectorImpl(mockAppConfig, httpClientV2, clock)
+      whenReady(
+        sut
+          .incoming(movementId, messageId, messageType)
+          .map(_ => fail("Expected a failure, got a success"))
+          .recover { case UpstreamErrorResponse(_, 500, _, _) =>
+            (): Unit
+          }
+      ) { _ =>
+        succeed // will only execute if the upstream response was 500
+      }
 
     }
   }

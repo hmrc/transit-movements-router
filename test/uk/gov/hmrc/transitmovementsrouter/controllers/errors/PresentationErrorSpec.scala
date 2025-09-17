@@ -46,34 +46,30 @@ class PresentationErrorSpec extends AnyFreeSpec with Matchers with MockitoSugar 
 
     "for NotImplemented" in testStandard(PresentationError.notImplemented, "Not Implemented", "NOT_IMPLEMENTED")
 
-    "for InvalidOffice" in forAll(Gen.alphaNumStr, Gen.alphaStr) {
-      (office, field) =>
-        val error  = PresentationError.invalidOfficeError("Invalid Office", CustomsOffice(office), field)
-        val result = Json.toJson(error)
+    "for InvalidOffice" in forAll(Gen.alphaNumStr, Gen.alphaStr) { (office, field) =>
+      val error  = PresentationError.invalidOfficeError("Invalid Office", CustomsOffice(office), field)
+      val result = Json.toJson(error)
 
-        result mustBe Json.obj("message" -> "Invalid Office", "office" -> office, "field" -> field, "code" -> "INVALID_OFFICE")
+      result mustBe Json.obj("message" -> "Invalid Office", "office" -> office, "field" -> field, "code" -> "INVALID_OFFICE")
     }
 
-    Seq(Some(new IllegalStateException("message")), None).foreach {
-      exception =>
-        val textFragment = exception
-          .map(
-            _ => "contains"
-          )
-          .getOrElse("does not contain")
-        s"for an unexpected error that $textFragment a Throwable" in {
-          // Given this exception
-          val exception = new IllegalStateException("message")
+    Seq(Some(new IllegalStateException("message")), None).foreach { exception =>
+      val textFragment = exception
+        .map(_ => "contains")
+        .getOrElse("does not contain")
+      s"for an unexpected error that $textFragment a Throwable" in {
+        // Given this exception
+        val exception = new IllegalStateException("message")
 
-          // when we create an error for this
-          val sut = InternalServiceError.causedBy(exception)
+        // when we create an error for this
+        val sut = InternalServiceError.causedBy(exception)
 
-          // and when we turn it to Json
-          val json = Json.toJson(sut)
+        // and when we turn it to Json
+        val json = Json.toJson(sut)
 
-          // then we should get an expected output
-          json mustBe Json.obj("code" -> "INTERNAL_SERVER_ERROR", "message" -> "Internal server error")
-        }
+        // then we should get an expected output
+        json mustBe Json.obj("code" -> "INTERNAL_SERVER_ERROR", "message" -> "Internal server error")
+      }
     }
 
     "for an upstream error" in {

@@ -28,8 +28,11 @@ class AppConfig @Inject() (config: Configuration, servicesConfig: CTCServicesCon
 
   lazy val appName: String = config.get[String]("appName")
 
-  lazy val eisGbV2_1: EISInstanceConfig        = config.get[EISInstanceConfig]("microservice.services.eis.gb_v2_1")
-  lazy val eisXiV2_1: EISInstanceConfig        = config.get[EISInstanceConfig]("microservice.services.eis.xi_v2_1")
+  lazy val eisGbV2_1: EISInstanceConfig = config.get[EISInstanceConfig]("microservice.services.eis.gb_v2_1")
+  lazy val eisXiV2_1: EISInstanceConfig = config.get[EISInstanceConfig]("microservice.services.eis.xi_v2_1")
+  lazy val eisGbV3_0: EISInstanceConfig = config.get[EISInstanceConfig]("microservice.services.eis.gb_v3_0")
+  lazy val eisXiV3_0: EISInstanceConfig = config.get[EISInstanceConfig]("microservice.services.eis.xi_v3_0")
+
   lazy val logObfuscatedInboundBearer: Boolean = config.get[Boolean]("microservice.services.eis.log-obfuscated-inbound-bearer")
 
   lazy val persistenceServiceBaseUrl: Url = Url.parse(servicesConfig.baseUrl("transit-movements"))

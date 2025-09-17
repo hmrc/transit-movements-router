@@ -78,9 +78,7 @@ class EISMessageTransformersImpl extends EISMessageTransformers {
   private def lookingForMessageTypeElement(parseEvent: ParseEvent): (UnwrappingState, ParseEvent) = parseEvent match {
     case StartElement(name @ messageType(), attributes, Some(_), _, _) =>
       val phaseId = attributes
-        .find(
-          a => a.name == "PhaseID"
-        )
+        .find(a => a.name == "PhaseID")
         .map(_.value)
         .getOrElse("NCTS5.1")
 
@@ -108,9 +106,7 @@ class EISMessageTransformersImpl extends EISMessageTransformers {
   lazy val unwrap: Flow[ByteString, ByteString, ?] =
     Flow[ByteString]
       .via(XmlParsing.parser)
-      .statefulMap[UnwrappingState, ParseEvent](
-        () => LookingForWrappedElement
-      )(
+      .statefulMap[UnwrappingState, ParseEvent](() => LookingForWrappedElement)(
         (state, event) =>
           state match {
             case LookingForWrappedElement     => lookingForWrappedElement(event)
@@ -148,9 +144,7 @@ class EISMessageTransformersImpl extends EISMessageTransformers {
   lazy val wrap: Flow[ByteString, ByteString, ?] =
     Flow[ByteString]
       .via(XmlParsing.parser)
-      .statefulMap[WrappingState, Seq[ParseEvent]](
-        () => WrappingState.LookingForMessageType
-      )(
+      .statefulMap[WrappingState, Seq[ParseEvent]](() => WrappingState.LookingForMessageType)(
         (state, event) =>
           state match {
             case WrappingState.LookingForMessageType => lookingForMessageType(event)

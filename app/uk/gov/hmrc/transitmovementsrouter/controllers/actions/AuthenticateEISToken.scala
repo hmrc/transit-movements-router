@@ -57,7 +57,7 @@ class AuthenticateEISTokenImpl @Inject() (appConfig: AppConfig, parsers: BodyPar
         if incomingAuthConfig.acceptedTokens.contains(token)
       } yield token) match {
         case Some(_) => Future.successful(None)
-        case None =>
+        case None    =>
           if (appConfig.logObfuscatedInboundBearer) { obfuscatedLogging(request.headers.get("Authorization")) }
           Future.successful(Some(createUnauthorisedResponse(request.headers)))
       }
@@ -70,11 +70,9 @@ class AuthenticateEISTokenImpl @Inject() (appConfig: AppConfig, parsers: BodyPar
       s"${alteredString.take(2)}*****${alteredString.takeRight(2)}"
     }
 
-    val obfuscatedMdtpTokens = incomingAuthConfig.acceptedTokens.map(obfuscatedToken)
+    val obfuscatedMdtpTokens      = incomingAuthConfig.acceptedTokens.map(obfuscatedToken)
     val obfuscatedInboundEisToken = authVal
-      .map(
-        v => obfuscatedToken(v)
-      )
+      .map(v => obfuscatedToken(v))
       .getOrElse("empty")
 
     logger.error(s"Bearer token mismatch: MDTP tokens: ${obfuscatedMdtpTokens.mkString(",")} EIS inbound token: $obfuscatedInboundEisToken")
@@ -82,7 +80,7 @@ class AuthenticateEISTokenImpl @Inject() (appConfig: AppConfig, parsers: BodyPar
 
   private def createUnauthorisedResponse(headers: Headers): Result =
     Status(UNAUTHORIZED)(Json.toJson(PresentationError.unauthorisedError("Supplied Bearer token is invalid")))
-      .withHeaders(headers.headers.filter(_._1.toLowerCase == "x-correlation-id") *)
+      .withHeaders(headers.headers.filter(_._1.toLowerCase == "x-correlation-id")*)
 
   override def parser: BodyParser[AnyContent] = parsers
 }

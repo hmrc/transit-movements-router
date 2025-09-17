@@ -32,18 +32,20 @@ import java.util.concurrent.atomic.AtomicBoolean
 trait HasActionMetrics extends HasMetrics {
   self: BaseController =>
 
-  /** Execute a [[play.api.mvc.Action]] with a metrics timer.
-    * Intended for use in controllers that return HTTP responses.
+  /** Execute a [[play.api.mvc.Action]] with a metrics timer. Intended for use in controllers that return HTTP responses.
     *
-    * @param metricKey The id of the metric to be collected
-    * @param action The action to wrap with metrics collection
-    * @param ec The [[scala.concurrent.ExecutionContext]] on which the block of code should run
-    * @return an action which captures metrics about the wrapped action
+    * @param metricKey
+    *   The id of the metric to be collected
+    * @param action
+    *   The action to wrap with metrics collection
+    * @param ec
+    *   The [[scala.concurrent.ExecutionContext]] on which the block of code should run
+    * @return
+    *   an action which captures metrics about the wrapped action
     */
   def withMetricsTimerAction[A](metricKey: String)(action: Action[A])(implicit ec: ExecutionContext): Action[A] =
-    Action(action.parser).async {
-      request =>
-        withMetricsTimerResult(metricKey)(action(request))
+    Action(action.parser).async { request =>
+      withMetricsTimerResult(metricKey)(action(request))
     }
 }
 
@@ -74,70 +76,66 @@ trait HasMetrics {
       }
   }
 
-  /** Execute a block of code with a metrics timer.
-    * Intended for use in controllers that return HTTP responses.
+  /** Execute a block of code with a metrics timer. Intended for use in controllers that return HTTP responses.
     *
-    * @param metricKey The id of the metric to be collected
-    * @param block The block of code to execute asynchronously
-    * @param ec The [[scala.concurrent.ExecutionContext]] on which the block of code should run
-    * @return The result of the block of code
+    * @param metricKey
+    *   The id of the metric to be collected
+    * @param block
+    *   The block of code to execute asynchronously
+    * @param ec
+    *   The [[scala.concurrent.ExecutionContext]] on which the block of code should run
+    * @return
+    *   The result of the block of code
     */
   def withMetricsTimerResult(metricKey: String)(block: => Future[Result])(implicit ec: ExecutionContext): Future[Result] =
-    withMetricsTimer(metricKey) {
-      timer =>
-        val result = block
+    withMetricsTimer(metricKey) { timer =>
+      val result = block
 
-        // Clean up timer according to server response
-        result.foreach {
-          result =>
-            if (isFailureStatus(result.header.status))
-              timer.completeWithFailure()
-            else
-              timer.completeWithSuccess()
-        }
+      // Clean up timer according to server response
+      result.foreach { result =>
+        if (isFailureStatus(result.header.status))
+          timer.completeWithFailure()
+        else
+          timer.completeWithSuccess()
+      }
 
-        // Clean up timer for unhandled exceptions
-        result.failed.foreach(
-          _ => timer.completeWithFailure()
-        )
+      // Clean up timer for unhandled exceptions
+      result.failed.foreach(_ => timer.completeWithFailure())
 
-        result
+      result
     }
 
   /** Execute a block of code with a metrics timer.
     *
     * Intended for use in connectors that call other microservices.
     *
-    * It's expected that the user of this method might want to handle
-    * connector failures gracefully and therefore they are given a [[MetricsTimer]]
-    * to optionally record whether the call was a success or a failure.
+    * It's expected that the user of this method might want to handle connector failures gracefully and therefore they are given a [[MetricsTimer]] to
+    * optionally record whether the call was a success or a failure.
     *
-    * If the user does not specify otherwise the status of the result Future is
-    * used to determine whether the block was successful or not.
+    * If the user does not specify otherwise the status of the result Future is used to determine whether the block was successful or not.
     *
-    * @param metricKey The id of the metric to be collected
-    * @param block The block of code to execute asynchronously
-    * @param ec The [[scala.concurrent.ExecutionContext]] on which the block of code should run
-    * @return The result of the block of code
+    * @param metricKey
+    *   The id of the metric to be collected
+    * @param block
+    *   The block of code to execute asynchronously
+    * @param ec
+    *   The [[scala.concurrent.ExecutionContext]] on which the block of code should run
+    * @return
+    *   The result of the block of code
     */
   def withMetricsTimerAsync[T](
     metricKey: String
   )(block: MetricsTimer => Future[T])(implicit ec: ExecutionContext): Future[T] =
-    withMetricsTimer(metricKey) {
-      timer =>
-        val result = block(timer)
+    withMetricsTimer(metricKey) { timer =>
+      val result = block(timer)
 
-        // Clean up timer if the user doesn't
-        result.foreach(
-          _ => timer.completeWithSuccess()
-        )
+      // Clean up timer if the user doesn't
+      result.foreach(_ => timer.completeWithSuccess())
 
-        // Clean up timer on unhandled exceptions
-        result.failed.foreach(
-          _ => timer.completeWithFailure()
-        )
+      // Clean up timer on unhandled exceptions
+      result.failed.foreach(_ => timer.completeWithFailure())
 
-        result
+      result
     }
 
   private def withMetricsTimer[T](metricKey: String)(block: MetricsTimer => T): T = {

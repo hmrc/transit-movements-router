@@ -79,13 +79,12 @@ object UpscanResponse {
   private val upscanSuccessResponseFormat: OFormat[UpscanSuccessResponse] = Json.format[UpscanSuccessResponse]
   private val upscanFailedResponseFormat: OFormat[UpscanFailedResponse]   = Json.format[UpscanFailedResponse]
 
-  implicit val upscanResponseReads: Reads[UpscanResponse] = Reads[UpscanResponse] {
-    jsValue =>
-      jsValue \ "fileStatus" match {
-        case JsDefined(JsString("READY"))  => upscanSuccessResponseFormat.reads(jsValue)
-        case JsDefined(JsString("FAILED")) => upscanFailedResponseFormat.reads(jsValue)
-        case _                             => JsError("Invalid")
-      }
+  implicit val upscanResponseReads: Reads[UpscanResponse] = Reads[UpscanResponse] { jsValue =>
+    jsValue \ "fileStatus" match {
+      case JsDefined(JsString("READY"))  => upscanSuccessResponseFormat.reads(jsValue)
+      case JsDefined(JsString("FAILED")) => upscanFailedResponseFormat.reads(jsValue)
+      case _                             => JsError("Invalid")
+    }
   }
 
   implicit val upscanResponseWrites: OWrites[UpscanResponse] = OWrites[UpscanResponse] {

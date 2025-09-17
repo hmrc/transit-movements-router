@@ -34,31 +34,26 @@ trait ContentTypeRouting {
   self: BaseController & StreamingParsers =>
 
   def contentTypeRoute(routes: PartialFunction[Option[String], Action[?]])(implicit materializer: Materializer): Action[Source[ByteString, ?]] =
-    Action.async(streamFromMemory) {
-      (request: Request[Source[ByteString, ?]]) =>
-        routes
-          .lift(request.headers.get(HeaderNames.CONTENT_TYPE))
-          .map(
-            action => action(request).run(request.body)
-          )
-          .getOrElse {
-            // To avoid a memory leak, we need to ensure we run the request stream and ignore it.
-            request.body.to(Sink.ignore).run()
-            Future.successful(
-              UnsupportedMediaType(
-                Json.toJson(
-                  PresentationError.unsupportedMediaTypeError(
-                    request.headers
-                      .get(HeaderNames.CONTENT_TYPE)
-                      .map(
-                        headerValue => s"Content-type header $headerValue is not supported!"
-                      )
-                      .getOrElse("A content-type header is required!")
-                  )
+    Action.async(streamFromMemory) { (request: Request[Source[ByteString, ?]]) =>
+      routes
+        .lift(request.headers.get(HeaderNames.CONTENT_TYPE))
+        .map(action => action(request).run(request.body))
+        .getOrElse {
+          // To avoid a memory leak, we need to ensure we run the request stream and ignore it.
+          request.body.to(Sink.ignore).run()
+          Future.successful(
+            UnsupportedMediaType(
+              Json.toJson(
+                PresentationError.unsupportedMediaTypeError(
+                  request.headers
+                    .get(HeaderNames.CONTENT_TYPE)
+                    .map(headerValue => s"Content-type header $headerValue is not supported!")
+                    .getOrElse("A content-type header is required!")
                 )
               )
             )
-          }
+          )
+        }
     }
 
 }

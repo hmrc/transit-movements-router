@@ -27,9 +27,8 @@ class FileNameSpec extends AnyFreeSpec with Matchers with ScalaCheckDrivenProper
 
   "apply(Path.File)" - {
 
-    "for a file, store only the file name" in forAll(arbitrary[ObjectSummaryWithMd5]) {
-      summary =>
-        FileName(summary.location).value mustBe summary.location.fileName
+    "for a file, store only the file name" in forAll(arbitrary[ObjectSummaryWithMd5]) { summary =>
+      FileName(summary.location).value mustBe summary.location.fileName
     }
 
   }

@@ -21,11 +21,10 @@ import org.scalatest.matchers.must.Matchers
 
 class AuditTypeSpec extends AnyFreeSpec with Matchers {
 
-  "every AuditType must match the object name" - AuditType.values.foreach {
-    auditType =>
-      auditType.toString in {
-        auditType.name mustBe auditType.toString // toString prints the case object's identifier, so this is what we want
-      }
+  "every AuditType must match the object name" - AuditType.values.foreach { auditType =>
+    auditType.toString in {
+      auditType.name mustBe auditType.toString // toString prints the case object's identifier, so this is what we want
+    }
   }
 
 }

@@ -37,10 +37,12 @@ import play.api.http.Status.INTERNAL_SERVER_ERROR
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.UpstreamErrorResponse
 import uk.gov.hmrc.transitmovementsrouter.base.StreamTestHelpers.createStream
-import uk.gov.hmrc.transitmovementsrouter.base._
-import uk.gov.hmrc.transitmovementsrouter.connectors._
+import uk.gov.hmrc.transitmovementsrouter.base.*
+import uk.gov.hmrc.transitmovementsrouter.connectors.*
 import uk.gov.hmrc.transitmovementsrouter.generators.TestModelGenerators
-import uk.gov.hmrc.transitmovementsrouter.models._
+import uk.gov.hmrc.transitmovementsrouter.models
+import uk.gov.hmrc.transitmovementsrouter.models.*
+import uk.gov.hmrc.transitmovementsrouter.models.APIVersionHeader.v2_1
 
 import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
@@ -70,73 +72,66 @@ class RoutingServiceSpec
       when(mockMessageConnectorProvider.gbV2_1).thenReturn(mockMessageConnector)
       when(mockMessageConnectorProvider.xiV2_1).thenReturn(mockMessageConnector)
 
-      MessageType.departureRequestValues.foreach {
-        messageType =>
-          s"${messageType.code} should return valid response for a GB payload" in forAll(
-            arbitrary[MessageId],
-            arbitrary[MovementId],
-            messageWithDepartureOfficeNode(messageType, "GB")
-          ) {
-            (messageId, movementId, officeOfDepartureXML) =>
-              when(
-                mockMessageConnector.post(
-                  MovementId(anyString()),
-                  MessageId(anyString()),
-                  any[Source[ByteString, ?]],
-                  any[HeaderCarrier]
-                )
-              )
-                .thenReturn(Future.successful(Right(())))
+      MessageType.departureRequestValues.foreach { messageType =>
+        s"${messageType.code} should return valid response for a GB payload" in forAll(
+          arbitrary[MessageId],
+          arbitrary[MovementId],
+          messageWithDepartureOfficeNode(messageType, "GB")
+        ) { (messageId, movementId, officeOfDepartureXML) =>
+          when(
+            mockMessageConnector.post(
+              MovementId(anyString()),
+              MessageId(anyString()),
+              any[Source[ByteString, ?]],
+              any[HeaderCarrier]
+            )
+          )
+            .thenReturn(Future.successful(Right(())))
 
-              val mockEISMessageTransformer = mock[EISMessageTransformers]
-              when(mockEISMessageTransformer.wrap).thenAnswer(
-                _ => Flow[ByteString]
-              )
+          val mockEISMessageTransformer = mock[EISMessageTransformers]
+          when(mockEISMessageTransformer.wrap).thenAnswer(_ => Flow[ByteString])
 
-              val serviceUnderTest = new RoutingServiceImpl(mockEISMessageTransformer, mockMessageConnectorProvider)
-              val payload          = createStream(officeOfDepartureXML._1)
-              val response = serviceUnderTest.submitMessage(
-                MovementType("departures"),
-                movementId,
-                messageId,
-                payload,
-                CustomsOffice(officeOfDepartureXML._2)
-              )
+          val serviceUnderTest = new RoutingServiceImpl(mockEISMessageTransformer, mockMessageConnectorProvider)
+          val payload          = createStream(officeOfDepartureXML._1)
+          val response         = serviceUnderTest.submitMessage(
+            MovementType("departures"),
+            movementId,
+            messageId,
+            payload,
+            CustomsOffice(officeOfDepartureXML._2),
+            APIVersionHeader.v2_1
+          )
 
-              whenReady(response.value, Timeout(2.seconds)) {
-                r =>
-                  r.mustBe(Right(()))
-                  verify(mockEISMessageTransformer, times(1)).wrap
-              }
+          whenReady(response.value, Timeout(2.seconds)) { r =>
+            r.mustBe(Right(()))
+            verify(mockEISMessageTransformer, times(1)).wrap
           }
+        }
 
-          s"${messageType.code} should return valid response for a Xi payload" in forAll(
-            arbitrary[MessageId],
-            arbitrary[MovementId],
-            messageWithDepartureOfficeNode(messageType, "XI")
-          ) {
-            (messageId, movementId, officeOfDepartureXML) =>
-              val mockEISMessageTransformer = mock[EISMessageTransformers]
-              when(mockEISMessageTransformer.wrap).thenAnswer(
-                _ => Flow[ByteString]
-              )
+        s"${messageType.code} should return valid response for a Xi payload" in forAll(
+          arbitrary[MessageId],
+          arbitrary[MovementId],
+          messageWithDepartureOfficeNode(messageType, "XI")
+        ) { (messageId, movementId, officeOfDepartureXML) =>
+          val mockEISMessageTransformer = mock[EISMessageTransformers]
+          when(mockEISMessageTransformer.wrap).thenAnswer(_ => Flow[ByteString])
 
-              val serviceUnderTest = new RoutingServiceImpl(mockEISMessageTransformer, mockMessageConnectorProvider)
-              val payload          = createStream(officeOfDepartureXML._1)
-              val response = serviceUnderTest.submitMessage(
-                MovementType("departures"),
-                movementId,
-                messageId,
-                payload,
-                CustomsOffice(officeOfDepartureXML._2)
-              )
+          val serviceUnderTest = new RoutingServiceImpl(mockEISMessageTransformer, mockMessageConnectorProvider)
+          val payload          = createStream(officeOfDepartureXML._1)
+          val response         = serviceUnderTest.submitMessage(
+            MovementType("departures"),
+            movementId,
+            messageId,
+            payload,
+            CustomsOffice(officeOfDepartureXML._2),
+            APIVersionHeader.v2_1
+          )
 
-              whenReady(response.value, Timeout(2.seconds)) {
-                r =>
-                  r.mustBe(Right(()))
-                  verify(mockEISMessageTransformer, times(1)).wrap
-              }
+          whenReady(response.value, Timeout(2.seconds)) { r =>
+            r.mustBe(Right(()))
+            verify(mockEISMessageTransformer, times(1)).wrap
           }
+        }
 
       }
     }
@@ -147,74 +142,70 @@ class RoutingServiceSpec
         arbitrary[MessageId],
         arbitrary[MovementId],
         messageWithDepartureOfficeNode(MessageType.DeclarationData, "GB")
-      ) {
-        (messageId, movementId, officeOfDepartureXML) =>
-          val upstreamErrorResponse: Throwable = UpstreamErrorResponse("Internal service error", INTERNAL_SERVER_ERROR)
-          when(
-            mockMessageConnector.post(
-              MovementId(anyString()),
-              MessageId(anyString()),
-              any[Source[ByteString, ?]],
-              any[HeaderCarrier]
-            )
+      ) { (messageId, movementId, officeOfDepartureXML) =>
+        val upstreamErrorResponse: Throwable = UpstreamErrorResponse("Internal service error", INTERNAL_SERVER_ERROR)
+        when(
+          mockMessageConnector.post(
+            MovementId(anyString()),
+            MessageId(anyString()),
+            any[Source[ByteString, ?]],
+            any[HeaderCarrier]
           )
-            .thenReturn(Future.failed(upstreamErrorResponse))
-          val mockEISMessageTransformer = mock[EISMessageTransformers]
-          when(mockEISMessageTransformer.wrap).thenAnswer(
-            _ => Flow[ByteString]
-          )
+        )
+          .thenReturn(Future.failed(upstreamErrorResponse))
+        val mockEISMessageTransformer = mock[EISMessageTransformers]
+        when(mockEISMessageTransformer.wrap).thenAnswer(_ => Flow[ByteString])
 
-          val serviceUnderTest = new RoutingServiceImpl(mockEISMessageTransformer, mockMessageConnectorProvider)
-          val payload          = createStream(officeOfDepartureXML._1)
-          val response = serviceUnderTest.submitMessage(
-            MovementType("departures"),
-            movementId,
-            messageId,
-            payload,
-            CustomsOffice(officeOfDepartureXML._2)
-          )
+        val serviceUnderTest = new RoutingServiceImpl(mockEISMessageTransformer, mockMessageConnectorProvider)
+        val payload          = createStream(officeOfDepartureXML._1)
+        val response         = serviceUnderTest.submitMessage(
+          MovementType("departures"),
+          movementId,
+          messageId,
+          payload,
+          CustomsOffice(officeOfDepartureXML._2),
+          APIVersionHeader.v2_1
+        )
 
-          whenReady(response.value.failed, Timeout(2.seconds)) {
-            r => r.mustBe(upstreamErrorResponse)
+        whenReady(response.value.failed, Timeout(2.seconds)) { r =>
+          r.mustBe(upstreamErrorResponse)
 
-          }
+        }
       }
 
       s"should return error response for a GB payload" in forAll(
         arbitrary[MessageId],
         arbitrary[MovementId],
         messageWithDepartureOfficeNode(MessageType.DeclarationData, "GB")
-      ) {
-        (messageId, movementId, officeOfDepartureXML) =>
-          val upstreamErrorResponse: Throwable = UpstreamErrorResponse("Internal service error", INTERNAL_SERVER_ERROR)
-          when(
-            mockMessageConnector.post(
-              MovementId(anyString()),
-              MessageId(anyString()),
-              any[Source[ByteString, ?]],
-              any[HeaderCarrier]
-            )
+      ) { (messageId, movementId, officeOfDepartureXML) =>
+        val upstreamErrorResponse: Throwable = UpstreamErrorResponse("Internal service error", INTERNAL_SERVER_ERROR)
+        when(
+          mockMessageConnector.post(
+            MovementId(anyString()),
+            MessageId(anyString()),
+            any[Source[ByteString, ?]],
+            any[HeaderCarrier]
           )
-            .thenReturn(Future.failed(upstreamErrorResponse))
-          val mockEISMessageTransformer = mock[EISMessageTransformers]
-          when(mockEISMessageTransformer.wrap).thenAnswer(
-            _ => Flow[ByteString]
-          )
+        )
+          .thenReturn(Future.failed(upstreamErrorResponse))
+        val mockEISMessageTransformer = mock[EISMessageTransformers]
+        when(mockEISMessageTransformer.wrap).thenAnswer(_ => Flow[ByteString])
 
-          val serviceUnderTest = new RoutingServiceImpl(mockEISMessageTransformer, mockMessageConnectorProvider)
-          val payload          = createStream(officeOfDepartureXML._1)
-          val response = serviceUnderTest.submitMessage(
-            MovementType("departures"),
-            movementId,
-            messageId,
-            payload,
-            CustomsOffice(officeOfDepartureXML._2)
-          )
+        val serviceUnderTest = new RoutingServiceImpl(mockEISMessageTransformer, mockMessageConnectorProvider)
+        val payload          = createStream(officeOfDepartureXML._1)
+        val response         = serviceUnderTest.submitMessage(
+          MovementType("departures"),
+          movementId,
+          messageId,
+          payload,
+          CustomsOffice(officeOfDepartureXML._2),
+          APIVersionHeader.v2_1
+        )
 
-          whenReady(response.value.failed, Timeout(2.seconds)) {
-            r => r.mustBe(upstreamErrorResponse)
+        whenReady(response.value.failed, Timeout(2.seconds)) { r =>
+          r.mustBe(upstreamErrorResponse)
 
-          }
+        }
       }
     }
 
@@ -222,81 +213,75 @@ class RoutingServiceSpec
       arbitrary[MessageId],
       arbitrary[MovementId],
       messageWithDepartureOfficeNode(MessageType.DeclarationData, "XI")
-    ) {
-      (messageId, movementId, officeOfDepartureXML) =>
-        val upstreamErrorResponse: Throwable = UpstreamErrorResponse("Internal service error", INTERNAL_SERVER_ERROR)
-        when(
-          mockMessageConnector.post(
-            MovementId(anyString()),
-            MessageId(anyString()),
-            any[Source[ByteString, ?]],
-            any[HeaderCarrier]
-          )
+    ) { (messageId, movementId, officeOfDepartureXML) =>
+      val upstreamErrorResponse: Throwable = UpstreamErrorResponse("Internal service error", INTERNAL_SERVER_ERROR)
+      when(
+        mockMessageConnector.post(
+          MovementId(anyString()),
+          MessageId(anyString()),
+          any[Source[ByteString, ?]],
+          any[HeaderCarrier]
         )
-          .thenReturn(Future.failed(upstreamErrorResponse))
-        val mockEISMessageTransformer = mock[EISMessageTransformers]
-        when(mockEISMessageTransformer.wrap).thenAnswer(
-          _ => Flow[ByteString]
-        )
+      )
+        .thenReturn(Future.failed(upstreamErrorResponse))
+      val mockEISMessageTransformer = mock[EISMessageTransformers]
+      when(mockEISMessageTransformer.wrap).thenAnswer(_ => Flow[ByteString])
 
-        val serviceUnderTest = new RoutingServiceImpl(mockEISMessageTransformer, mockMessageConnectorProvider)
-        val payload          = createStream(officeOfDepartureXML._1)
-        val response = serviceUnderTest.submitMessage(
-          MovementType("departures"),
-          movementId,
-          messageId,
-          payload,
-          CustomsOffice(officeOfDepartureXML._2)
-        )
+      val serviceUnderTest = new RoutingServiceImpl(mockEISMessageTransformer, mockMessageConnectorProvider)
+      val payload          = createStream(officeOfDepartureXML._1)
+      val response         = serviceUnderTest.submitMessage(
+        MovementType("departures"),
+        movementId,
+        messageId,
+        payload,
+        CustomsOffice(officeOfDepartureXML._2),
+        APIVersionHeader.v2_1
+      )
 
-        whenReady(response.value.failed, Timeout(2.seconds)) {
-          r => r.mustBe(upstreamErrorResponse)
+      whenReady(response.value.failed, Timeout(2.seconds)) { r =>
+        r.mustBe(upstreamErrorResponse)
 
-        }
+      }
     }
 
     s"should return error response for a XI payload" in forAll(
       arbitrary[MessageId],
       arbitrary[MovementId],
       messageWithDepartureOfficeNode(MessageType.DeclarationData, "XI")
-    ) {
-      (messageId, movementId, officeOfDepartureXML) =>
-        val upstreamErrorResponse: Throwable = UpstreamErrorResponse("Internal service error", INTERNAL_SERVER_ERROR)
-        when(
-          mockMessageConnector.post(
-            MovementId(anyString()),
-            MessageId(anyString()),
-            any[Source[ByteString, ?]],
-            any[HeaderCarrier]
-          )
+    ) { (messageId, movementId, officeOfDepartureXML) =>
+      val upstreamErrorResponse: Throwable = UpstreamErrorResponse("Internal service error", INTERNAL_SERVER_ERROR)
+      when(
+        mockMessageConnector.post(
+          MovementId(anyString()),
+          MessageId(anyString()),
+          any[Source[ByteString, ?]],
+          any[HeaderCarrier]
         )
-          .thenReturn(Future.failed(upstreamErrorResponse))
-        val mockEISMessageTransformer = mock[EISMessageTransformers]
-        when(mockEISMessageTransformer.wrap).thenAnswer(
-          _ => Flow[ByteString]
-        )
+      )
+        .thenReturn(Future.failed(upstreamErrorResponse))
+      val mockEISMessageTransformer = mock[EISMessageTransformers]
+      when(mockEISMessageTransformer.wrap).thenAnswer(_ => Flow[ByteString])
 
-        val serviceUnderTest = new RoutingServiceImpl(mockEISMessageTransformer, mockMessageConnectorProvider)
-        val payload          = createStream(officeOfDepartureXML._1)
-        val response = serviceUnderTest.submitMessage(
-          MovementType("departures"),
-          movementId,
-          messageId,
-          payload,
-          CustomsOffice(officeOfDepartureXML._2)
-        )
+      val serviceUnderTest = new RoutingServiceImpl(mockEISMessageTransformer, mockMessageConnectorProvider)
+      val payload          = createStream(officeOfDepartureXML._1)
+      val response         = serviceUnderTest.submitMessage(
+        MovementType("departures"),
+        movementId,
+        messageId,
+        payload,
+        CustomsOffice(officeOfDepartureXML._2),
+        APIVersionHeader.v2_1
+      )
 
-        whenReady(response.value.failed, Timeout(2.seconds)) {
-          r => r.mustBe(upstreamErrorResponse)
+      whenReady(response.value.failed, Timeout(2.seconds)) { r =>
+        r.mustBe(upstreamErrorResponse)
 
-        }
+      }
     }
 
   }
 
-  def createReferenceNumberWithPrefix(prefix: String): Gen[String] = intWithMaxLength(7, 7).map(
-    n => s"$prefix$n"
-  )
+  def createReferenceNumberWithPrefix(prefix: String): Gen[String] = intWithMaxLength(7, 7).map(n => s"$prefix$n")
 
   def messageWithDepartureOfficeNode(messageType: RequestMessageType, referenceType: String): Gen[(String, String)] =
     for {

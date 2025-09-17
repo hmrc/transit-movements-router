@@ -33,10 +33,9 @@ trait TestSourceProvider {
 
   private def singleUseSource0[A](iterator: => Iterator[A]): Source[A, ?] = {
     lazy val singleUseIterator = iterator
-    Source.fromIterator {
-      () =>
-        if (singleUseIterator.hasNext) singleUseIterator
-        else throw new IllegalStateException("Iterator used more than once!")
+    Source.fromIterator { () =>
+      if (singleUseIterator.hasNext) singleUseIterator
+      else throw new IllegalStateException("Iterator used more than once!")
     }
   }
 

@@ -116,37 +116,36 @@ class AuditingConnectorImpl @Inject() (httpClient: HttpClientV2, val metrics: Me
   )(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
-  ): Future[Unit] = withMetricsTimerAsync(MetricsKeys.AuditingBackend.Post) {
-    _ =>
-      val (url: Url, path: String) = getUrlAndPath(auditType, hc)
+  ): Future[Unit] = withMetricsTimerAsync(MetricsKeys.AuditingBackend.Post) { _ =>
+    val (url: Url, path: String) = getUrlAndPath(auditType, hc)
 
-      val originalHeaders: Seq[(String, String)] = Seq(
-        HeaderNames.CONTENT_TYPE -> contentType,
-        "X-ContentLength"        -> contentLength.toString,
-        "X-Audit-Meta-Path"      -> path,
-        "X-Audit-Source"         -> "transit-movements-router"
+    val originalHeaders: Seq[(String, String)] = Seq(
+      HeaderNames.CONTENT_TYPE -> contentType,
+      "X-ContentLength"        -> contentLength.toString,
+      "X-Audit-Meta-Path"      -> path,
+      "X-Audit-Source"         -> "transit-movements-router"
+    )
+
+    val allHeaders: Seq[(String, String)] = originalHeaders
+
+    httpClient
+      .post(url"$url")
+      .withInternalAuthToken
+      .withMovementId(movementId)
+      .withMessageId(messageId)
+      .withEoriNumber(enrolmentEORI)
+      .withMovementType(movementType)
+      .withAuditMessageType(messageType)
+      .withClientId(clientId)
+      .setHeader(
+        allHeaders*
       )
-
-      val allHeaders: Seq[(String, String)] = originalHeaders
-
-      httpClient
-        .post(url"$url")
-        .withInternalAuthToken
-        .withMovementId(movementId)
-        .withMessageId(messageId)
-        .withEoriNumber(enrolmentEORI)
-        .withMovementType(movementType)
-        .withAuditMessageType(messageType)
-        .withClientId(clientId)
-        .setHeader(
-          allHeaders *
-        )
-        .withBody(payload)
-        .execute[HttpResponse]
-        .flatMap(handleResponse)
-        .recover {
-          case NonFatal(thr) => Future.failed(thr)
-        }
+      .withBody(payload)
+      .execute[HttpResponse]
+      .flatMap(handleResponse)
+      .recover { case NonFatal(thr) =>
+        Future.failed(thr)
+      }
   }
 
   override def postStatus(
@@ -161,25 +160,24 @@ class AuditingConnectorImpl @Inject() (httpClient: HttpClientV2, val metrics: Me
   )(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
-  ): Future[Unit] = withMetricsTimerAsync(MetricsKeys.AuditingBackend.Post) {
-    _ =>
-      val (url: Url, path: String) = getUrlAndPath(auditType, hc)
-      val metadata                 = Metadata(path, movementId, messageId, enrolmentEORI, movementType, messageType)
-      val details                  = Details(metadata, payload.map(_.as[JsObject]))
-      httpClient
-        .post(url"$url")
-        .withInternalAuthToken
-        .withClientId(clientId)
-        .setHeader(
-          "X-Audit-Source"         -> "transit-movements-router",
-          HeaderNames.CONTENT_TYPE -> MimeTypes.JSON
-        )
-        .withBody(Json.toJson(details))
-        .execute[HttpResponse]
-        .flatMap(handleResponse)
-        .recover {
-          case NonFatal(thr) => Future.failed(thr)
-        }
+  ): Future[Unit] = withMetricsTimerAsync(MetricsKeys.AuditingBackend.Post) { _ =>
+    val (url: Url, path: String) = getUrlAndPath(auditType, hc)
+    val metadata                 = Metadata(path, movementId, messageId, enrolmentEORI, movementType, messageType)
+    val details                  = Details(metadata, payload.map(_.as[JsObject]))
+    httpClient
+      .post(url"$url")
+      .withInternalAuthToken
+      .withClientId(clientId)
+      .setHeader(
+        "X-Audit-Source"         -> "transit-movements-router",
+        HeaderNames.CONTENT_TYPE -> MimeTypes.JSON
+      )
+      .withBody(Json.toJson(details))
+      .execute[HttpResponse]
+      .flatMap(handleResponse)
+      .recover { case NonFatal(thr) =>
+        Future.failed(thr)
+      }
   }
 
   private def handleResponse(response: HttpResponse): Future[Unit] =
@@ -191,9 +189,9 @@ class AuditingConnectorImpl @Inject() (httpClient: HttpClientV2, val metrics: Me
   private def getUrlAndPath(auditType: AuditType, hc: HeaderCarrier): (Url, String) = {
     val auditRoute = UrlPath.parse(s"$auditingBaseRoute/audit/${auditType.name}")
     val url        = appConfig.auditingUrl.withPath(auditRoute).toUrl
-    val path = hc.otherHeaders
-      .collectFirst {
-        case ("path", value) => value
+    val path       = hc.otherHeaders
+      .collectFirst { case ("path", value) =>
+        value
       }
       .getOrElse("-")
     (url, path)

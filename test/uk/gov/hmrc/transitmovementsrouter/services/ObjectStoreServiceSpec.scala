@@ -75,16 +75,37 @@ class ObjectStoreServiceSpec extends AnyFreeSpec with Matchers with MockitoSugar
       arbitrary[ConversationId],
       Gen.alphaNumStr,
       arbitrary[ObjectSummaryWithMd5]
-    ) {
-      (conversationId, body, summary) =>
-        val source = Source.single(ByteString(body))
+    ) { (conversationId, body, summary) =>
+      val source = Source.single(ByteString(body))
 
-        val clock: Clock         = Clock.fixed(LocalDateTime.of(2023, 4, 24, 11, 47, 42, 0).toInstant(ZoneOffset.UTC), ZoneOffset.UTC)
-        val appConfig: AppConfig = mock[AppConfig]
-        val mockObjectStore      = mock[PlayObjectStoreClientEither]
-        val dateFormat           = "20230424-114742"
-        when(
-          mockObjectStore.putObject[Source[ByteString, ?]](
+      val clock: Clock         = Clock.fixed(LocalDateTime.of(2023, 4, 24, 11, 47, 42, 0).toInstant(ZoneOffset.UTC), ZoneOffset.UTC)
+      val appConfig: AppConfig = mock[AppConfig]
+      val mockObjectStore      = mock[PlayObjectStoreClientEither]
+      val dateFormat           = "20230424-114742"
+      when(
+        mockObjectStore.putObject[Source[ByteString, ?]](
+          path = eqTo(Path.File(s"sdes/${conversationId.value.toString}-$dateFormat.xml")),
+          content = eqTo(source),
+          retentionPeriod = eqTo(RetentionPeriod.OneWeek),
+          contentType = eqTo(Some(MimeTypes.XML)),
+          contentMd5 = eqTo(None),
+          owner = eqTo("transit-movements-router")
+        )(any(), any())
+      )
+        .thenReturn(Future.successful(Right(summary)))
+      val objectStoreService: ObjectStoreServiceImpl = new ObjectStoreServiceImpl(clock, mockObjectStore)
+
+      when(appConfig.objectStoreUrl).thenReturn("http://localhost:8084/object-store/object")
+      val result = objectStoreService.storeOutgoing(
+        conversationId,
+        source
+      )
+
+      whenReady(result.value, timeout(Span(6, Seconds))) {
+        case Left(e)  => fail(s"Expected Right, instead got Left($e)")
+        case Right(x) =>
+          x mustBe summary
+          verify(mockObjectStore, times(1)).putObject(
             path = eqTo(Path.File(s"sdes/${conversationId.value.toString}-$dateFormat.xml")),
             content = eqTo(source),
             retentionPeriod = eqTo(RetentionPeriod.OneWeek),
@@ -92,45 +113,43 @@ class ObjectStoreServiceSpec extends AnyFreeSpec with Matchers with MockitoSugar
             contentMd5 = eqTo(None),
             owner = eqTo("transit-movements-router")
           )(any(), any())
-        )
-          .thenReturn(Future.successful(Right(summary)))
-        val objectStoreService: ObjectStoreServiceImpl = new ObjectStoreServiceImpl(clock, mockObjectStore)
-
-        when(appConfig.objectStoreUrl).thenReturn("http://localhost:8084/object-store/object")
-        val result = objectStoreService.storeOutgoing(
-          conversationId,
-          source
-        )
-
-        whenReady(result.value, timeout(Span(6, Seconds))) {
-          case Left(e) => fail(s"Expected Right, instead got Left($e)")
-          case Right(x) =>
-            x mustBe summary
-            verify(mockObjectStore, times(1)).putObject(
-              path = eqTo(Path.File(s"sdes/${conversationId.value.toString}-$dateFormat.xml")),
-              content = eqTo(source),
-              retentionPeriod = eqTo(RetentionPeriod.OneWeek),
-              contentType = eqTo(Some(MimeTypes.XML)),
-              contentMd5 = eqTo(None),
-              owner = eqTo("transit-movements-router")
-            )(any(), any())
-        }
+      }
     }
 
     "given an exception is thrown in the service, should return a Left with the exception in an ObjectStoreError" in forAll(
       arbitrary[ConversationId],
       Gen.alphaNumStr
-    ) {
-      (conversationId, body) =>
-        val source = Source.single(ByteString(body))
+    ) { (conversationId, body) =>
+      val source = Source.single(ByteString(body))
 
-        val exception            = UpstreamErrorResponse("error", NOT_FOUND)
-        val clock: Clock         = Clock.fixed(LocalDateTime.of(2023, 4, 24, 11, 47, 42, 0).toInstant(ZoneOffset.UTC), ZoneOffset.UTC)
-        val appConfig: AppConfig = mock[AppConfig]
-        val mockObjectStore      = mock[PlayObjectStoreClientEither]
-        val dateFormat           = "20230424-114742"
-        when(
-          mockObjectStore.putObject[Source[ByteString, ?]](
+      val exception            = UpstreamErrorResponse("error", NOT_FOUND)
+      val clock: Clock         = Clock.fixed(LocalDateTime.of(2023, 4, 24, 11, 47, 42, 0).toInstant(ZoneOffset.UTC), ZoneOffset.UTC)
+      val appConfig: AppConfig = mock[AppConfig]
+      val mockObjectStore      = mock[PlayObjectStoreClientEither]
+      val dateFormat           = "20230424-114742"
+      when(
+        mockObjectStore.putObject[Source[ByteString, ?]](
+          path = eqTo(Path.File(s"sdes/${conversationId.value.toString}-$dateFormat.xml")),
+          content = eqTo(source),
+          retentionPeriod = eqTo(RetentionPeriod.OneWeek),
+          contentType = eqTo(Some(MimeTypes.XML)),
+          contentMd5 = eqTo(None),
+          owner = eqTo("transit-movements-router")
+        )(any(), any())
+      )
+        .thenReturn(Future.successful(Left(exception)))
+      val objectStoreService: ObjectStoreServiceImpl = new ObjectStoreServiceImpl(clock, mockObjectStore)
+
+      when(appConfig.objectStoreUrl).thenReturn("http://localhost:8084/object-store/object")
+
+      val result = objectStoreService.storeOutgoing(
+        conversationId,
+        source
+      )
+
+      whenReady(result.value, timeout(Span(6, Seconds))) {
+        case Left(ObjectStoreError.UnexpectedError(Some(`exception`))) =>
+          verify(mockObjectStore, times(1)).putObject(
             path = eqTo(Path.File(s"sdes/${conversationId.value.toString}-$dateFormat.xml")),
             content = eqTo(source),
             retentionPeriod = eqTo(RetentionPeriod.OneWeek),
@@ -138,29 +157,8 @@ class ObjectStoreServiceSpec extends AnyFreeSpec with Matchers with MockitoSugar
             contentMd5 = eqTo(None),
             owner = eqTo("transit-movements-router")
           )(any(), any())
-        )
-          .thenReturn(Future.successful(Left(exception)))
-        val objectStoreService: ObjectStoreServiceImpl = new ObjectStoreServiceImpl(clock, mockObjectStore)
-
-        when(appConfig.objectStoreUrl).thenReturn("http://localhost:8084/object-store/object")
-
-        val result = objectStoreService.storeOutgoing(
-          conversationId,
-          source
-        )
-
-        whenReady(result.value, timeout(Span(6, Seconds))) {
-          case Left(ObjectStoreError.UnexpectedError(Some(`exception`))) =>
-            verify(mockObjectStore, times(1)).putObject(
-              path = eqTo(Path.File(s"sdes/${conversationId.value.toString}-$dateFormat.xml")),
-              content = eqTo(source),
-              retentionPeriod = eqTo(RetentionPeriod.OneWeek),
-              contentType = eqTo(Some(MimeTypes.XML)),
-              contentMd5 = eqTo(None),
-              owner = eqTo("transit-movements-router")
-            )(any(), any())
-          case x => fail(s"Expected Left of unexpected error, instead got $x")
-        }
+        case x => fail(s"Expected Left of unexpected error, instead got $x")
+      }
     }
   }
 

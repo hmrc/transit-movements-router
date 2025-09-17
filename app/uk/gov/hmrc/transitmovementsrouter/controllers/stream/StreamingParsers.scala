@@ -52,49 +52,46 @@ trait StreamingParsers {
   implicit val materializerExecutionContext: ExecutionContext =
     ExecutionContext.fromExecutorService(Executors.newCachedThreadPool())
 
-  lazy val streamFromMemory: BodyParser[Source[ByteString, ?]] = BodyParser {
-    _ =>
-      Accumulator.source[ByteString].map(Right.apply)
+  lazy val streamFromMemory: BodyParser[Source[ByteString, ?]] = BodyParser { _ =>
+    Accumulator.source[ByteString].map(Right.apply)
   }
 
   val config: AppConfig
 
   implicit class ActionBuilderStreamHelpers(actionBuilder: ActionBuilder[Request, ?]) {
 
-    /** Updates the [[Source]] in the [[Request]] with a version that can be used
-      * multiple times via the use of a temporary file.
+    /** Updates the [[Source]] in the [[Request]] with a version that can be used multiple times via the use of a temporary file.
       *
-      * @param block The code to use the with the reusable source
-      * @return An [[Action]]
+      * @param block
+      *   The code to use the with the reusable source
+      * @return
+      *   An [[Action]]
       */
 
     def streamWithSize(transformer: Flow[ByteString, ByteString, ?])(
       block: Request[Source[ByteString, ?]] => Long => Future[Result]
     )(implicit temporaryFileCreator: TemporaryFileCreator): Action[Source[ByteString, ?]] =
-      actionBuilder.async(streamFromMemory) {
-        request =>
-          // This is outside the for comprehension because we need access to the file
-          // if the rest of the futures fail, which we wouldn't get if it was in there.
-          Future
-            .fromTry(Try(temporaryFileCreator.create()))
-            .flatMap {
-              file =>
-                (for {
-                  _      <- request.body.via(transformer).runWith(FileIO.toPath(file))
-                  size   <- Future.fromTry(Try(Files.size(file)))
-                  result <- block(request.withBody(FileIO.fromPath(file)))(size)
-                } yield result)
-                  .attemptTap {
-                    _ =>
-                      file.delete()
-                      Future.successful(())
-                  }
-            }
-            .recover {
-              case error: IOOperationIncompleteException if error.getCause.isInstanceOf[IllegalStateException] || error.getCause.isInstanceOf[WFCException] =>
-                if (config.logIncoming) {
-                  logger.error(
-                    s"""Unable to process message from EIS -- bad request:
+      actionBuilder.async(streamFromMemory) { request =>
+        // This is outside the for comprehension because we need access to the file
+        // if the rest of the futures fail, which we wouldn't get if it was in there.
+        Future
+          .fromTry(Try(temporaryFileCreator.create()))
+          .flatMap { file =>
+            (for {
+              _      <- request.body.via(transformer).runWith(FileIO.toPath(file))
+              size   <- Future.fromTry(Try(Files.size(file)))
+              result <- block(request.withBody(FileIO.fromPath(file)))(size)
+            } yield result)
+              .attemptTap { _ =>
+                file.delete()
+                Future.successful(())
+              }
+          }
+          .recover {
+            case error: IOOperationIncompleteException if error.getCause.isInstanceOf[IllegalStateException] || error.getCause.isInstanceOf[WFCException] =>
+              if (config.logIncoming) {
+                logger.error(
+                  s"""Unable to process message from EIS -- bad request:
                        |
                        |Request ID: ${request.headers.get(HeaderNames.xRequestId).getOrElse("unavailable")}
                        |Correlation ID: ${request.headers.get(RouterHeaderNames.CORRELATION_ID).getOrElse("unavailable")}
@@ -102,14 +99,14 @@ trait StreamingParsers {
                        |Message: ${error.getMessage}
                        |
                        |Failed to transform XML""".stripMargin,
-                    error
-                  )
-                }
-                Status(BAD_REQUEST)(Json.toJson(PresentationError.badRequestError(error.getCause.getMessage)))
-              case error: Throwable =>
-                if (config.logIncoming) {
-                  logger.error(
-                    s"""Unable to process message from EIS -- internal server error:
+                  error
+                )
+              }
+              Status(BAD_REQUEST)(Json.toJson(PresentationError.badRequestError(error.getCause.getMessage)))
+            case error: Throwable =>
+              if (config.logIncoming) {
+                logger.error(
+                  s"""Unable to process message from EIS -- internal server error:
                        |
                        |Request ID: ${request.headers.get(HeaderNames.xRequestId).getOrElse("unavailable")}
                        |Correlation ID: ${request.headers.get(RouterHeaderNames.CORRELATION_ID).getOrElse("unavailable")}
@@ -117,11 +114,11 @@ trait StreamingParsers {
                        |Message: ${error.getMessage}
                        |
                        |Failed to transform XML""".stripMargin,
-                    error
-                  )
-                }
-                Status(INTERNAL_SERVER_ERROR)(Json.toJson(PresentationError.internalServiceError(cause = Some(error))))
-            }
+                  error
+                )
+              }
+              Status(INTERNAL_SERVER_ERROR)(Json.toJson(PresentationError.internalServiceError(cause = Some(error))))
+          }
       }
 
     def streamWithSize(

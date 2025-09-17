@@ -216,8 +216,8 @@ object MessageType {
     case _               => JsError()
   }
 
-  implicit val messageTypeWrites: Writes[MessageType] = Writes {
-    obj => JsString(obj.code)
+  implicit val messageTypeWrites: Writes[MessageType] = Writes { obj =>
+    JsString(obj.code)
   }
 
 }

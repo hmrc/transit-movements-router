@@ -28,12 +28,11 @@ trait XmlParsingServiceHelpers {
   implicit class FlowOps[A](value: Flow[ParseEvent, A, NotUsed]) {
 
     def single(element: String): Flow[ParseEvent, ParseResult[A], NotUsed] =
-      value.fold[Either[CustomOfficeExtractorError, A]](Left(CustomOfficeExtractorError.NoElementFound(element)))(
-        (current, next) =>
-          current match {
-            case Left(CustomOfficeExtractorError.NoElementFound(_)) => Right(next)
-            case _                                                  => Left(CustomOfficeExtractorError.TooManyElementsFound(element))
-          }
+      value.fold[Either[CustomOfficeExtractorError, A]](Left(CustomOfficeExtractorError.NoElementFound(element)))((current, next) =>
+        current match {
+          case Left(CustomOfficeExtractorError.NoElementFound(_)) => Right(next)
+          case _                                                  => Left(CustomOfficeExtractorError.TooManyElementsFound(element))
+        }
       )
 
   }

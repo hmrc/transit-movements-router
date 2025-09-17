@@ -20,7 +20,7 @@ import org.apache.pekko.stream.scaladsl.Source
 import org.apache.pekko.util.ByteString
 import cats.data.EitherT
 import org.mockito.ArgumentMatchers.any
-import org.mockito.ArgumentMatchers.{eq => eqTo}
+import org.mockito.ArgumentMatchers.eq as eqTo
 import org.mockito.Mockito.reset
 import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
@@ -70,6 +70,7 @@ import uk.gov.hmrc.transitmovementsrouter.connectors.PushNotificationsConnector
 import uk.gov.hmrc.transitmovementsrouter.connectors.UpscanConnector
 import uk.gov.hmrc.transitmovementsrouter.controllers.actions.AuthenticateEISToken
 import uk.gov.hmrc.transitmovementsrouter.controllers.actions.InternalAuthActionProvider
+import uk.gov.hmrc.transitmovementsrouter.controllers.actions.ValidateVersionRefiner
 import uk.gov.hmrc.transitmovementsrouter.controllers.errors.PresentationError
 import uk.gov.hmrc.transitmovementsrouter.fakes.actions.FakeXmlTransformer
 import uk.gov.hmrc.transitmovementsrouter.generators.TestModelGenerators
@@ -79,6 +80,8 @@ import uk.gov.hmrc.transitmovementsrouter.models.MessageType.DeclarationAmendmen
 import uk.gov.hmrc.transitmovementsrouter.models.MessageType.GoodsReleaseNotification
 import uk.gov.hmrc.transitmovementsrouter.models.MessageType.MrnAllocated
 import uk.gov.hmrc.transitmovementsrouter.models.*
+import uk.gov.hmrc.transitmovementsrouter.models.APIVersionHeader.v2_1
+import uk.gov.hmrc.transitmovementsrouter.models.APIVersionHeader.v3_0
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.MovementNotFound
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.Unexpected
 import uk.gov.hmrc.transitmovementsrouter.models.errors.*
@@ -152,9 +155,11 @@ class MessageControllerSpec
   }
 
   val mockInternalAuthActionProvider: InternalAuthActionProvider = mock[InternalAuthActionProvider]
-  val mockMessageTypeExtractor: MessageTypeExtractor             = mock[MessageTypeExtractor]
-  val mockStatusMonitoringService: ServiceMonitoringService      = mock[ServiceMonitoringService]
-  val config: AppConfig                                          = mock[AppConfig]
+  val validateVersionRefiner: ValidateVersionRefiner             = new ValidateVersionRefiner(stubControllerComponents())
+
+  val mockMessageTypeExtractor: MessageTypeExtractor        = mock[MessageTypeExtractor]
+  val mockStatusMonitoringService: ServiceMonitoringService = mock[ServiceMonitoringService]
+  val config: AppConfig                                     = mock[AppConfig]
 
   def controller(eisMessageTransformer: EISMessageTransformers = new FakeXmlTransformer(trimmedXml)): MessagesController =
     new MessagesController(
@@ -172,7 +177,8 @@ class MessageControllerSpec
       mockInternalAuthActionProvider,
       mockStatusMonitoringService,
       mockAuditingService,
-      config
+      config,
+      validateVersionRefiner
     ) {
       // suppress logging
       override protected val logger: Logger = mock[Logger]
@@ -237,49 +243,61 @@ class MessageControllerSpec
     super.afterEach()
   }
 
+  extension (fh: FakeHeaders) {
+    def addApiVersionHeader(versionHeader: APIVersionHeader): FakeHeaders =
+      FakeHeaders(fh.headers :+ "APIVersion" -> versionHeader.value)
+
+    def addInvalidApiVersionHeader(versionHeader: String): FakeHeaders =
+      FakeHeaders(fh.headers :+ "APIVersion" -> versionHeader)
+
+    def addXMessageType(messageType: MessageType): FakeHeaders =
+      FakeHeaders(fh.headers :+ "X-Message-Type" -> messageType.code)
+  }
+
   lazy val submitDeclarationEither: EitherT[Future, RoutingError, Unit] =
     EitherT.liftF(Future.unit)
 
-  def messageTypeHeader(messageType: MessageType): FakeHeaders = FakeHeaders(Seq(("X-Message-Type", messageType.code)))
-  lazy val messageTypeHeaderDepartureDeclaration: FakeHeaders  = messageTypeHeader(MessageType.DeclarationData)
+  lazy val messageTypeHeaderDepartureDeclaration: FakeHeaders = FakeHeaders().addXMessageType(MessageType.DeclarationData)
 
-  "POST outgoing" - {
+  "V2_1 POST outgoing" - {
     "must return CREATED when declaration is submitted successfully via the EIS route" in forAll(
       arbitrary[CustomsOffice],
       arbitrary[RequestMessageType]
-    ) {
-      (customsOffice, messageType) =>
-        resetAuthActionAndStatusMonitoring()
-        when(
-          mockRoutingService.submitMessage(
-            any[String].asInstanceOf[MovementType],
-            any[String].asInstanceOf[MovementId],
-            any[String].asInstanceOf[MessageId],
-            any[Source[ByteString, ?]],
-            any[String].asInstanceOf[CustomsOffice]
-          )(any[HeaderCarrier], any[ExecutionContext])
-        ).thenReturn(submitDeclarationEither)
+    ) { (customsOffice, messageType) =>
+      resetAuthActionAndStatusMonitoring()
+      when(
+        mockRoutingService.submitMessage(
+          any[String].asInstanceOf[MovementType],
+          any[String].asInstanceOf[MovementId],
+          any[String].asInstanceOf[MessageId],
+          any[Source[ByteString, ?]],
+          any[String].asInstanceOf[CustomsOffice],
+          eqTo(v2_1)
+        )(any[HeaderCarrier], any[ExecutionContext])
+      ).thenReturn(submitDeclarationEither)
 
-        when(mockMessageTypeExtractor.extractFromHeaders(any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](messageType))
+      when(mockMessageTypeExtractor.extractFromHeaders(any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](messageType))
 
-        when(mockCustomOfficeExtractorService.extractCustomOffice(any(), any()))
-          .thenReturn(EitherT.rightT[Future, CustomOfficeExtractorError](customsOffice))
+      when(mockCustomOfficeExtractorService.extractCustomOffice(any(), any()))
+        .thenReturn(EitherT.rightT[Future, CustomOfficeExtractorError](customsOffice))
 
-        val result =
-          controller().outgoing(eori, movementType, movementId, messageId)(fakeRequest(cc015cOfficeOfDepartureGB, outgoing, messageTypeHeader(messageType)))
+      val result =
+        controller().outgoing(eori, movementType, movementId, messageId)(
+          fakeRequest(cc015cOfficeOfDepartureGB, outgoing, FakeHeaders().addXMessageType(messageType).addApiVersionHeader(v2_1))
+        )
 
-        status(result) mustBe CREATED
+      status(result) mustBe CREATED
 
-        verify(mockInternalAuthActionProvider, times(1)).apply(
-          eqTo(Predicate.Permission(Resource(ResourceType("transit-movements-router"), ResourceLocation("message")), IAAction("WRITE")))
-        )(any())
+      verify(mockInternalAuthActionProvider, times(1)).apply(
+        eqTo(Predicate.Permission(Resource(ResourceType("transit-movements-router"), ResourceLocation("message")), IAAction("WRITE")))
+      )(any())
 
-        verify(mockStatusMonitoringService, times(1)).outgoing(
-          MovementId(eqTo(movementId.value)),
-          MessageId(eqTo(messageId.value)),
-          eqTo(messageType),
-          CustomsOffice(eqTo(customsOffice.value))
-        )(any(), any())
+      verify(mockStatusMonitoringService, times(1)).outgoing(
+        MovementId(eqTo(movementId.value)),
+        MessageId(eqTo(messageId.value)),
+        eqTo(messageType),
+        CustomsOffice(eqTo(customsOffice.value))
+      )(any(), any())
     }
 
     "must return ACCEPTED when declaration is submitted successfully via the SDES route" in forAll(
@@ -289,83 +307,82 @@ class MessageControllerSpec
       arbitrary[MessageId],
       arbitrary[ObjectSummaryWithMd5],
       arbitrary[RequestMessageType]
-    ) {
-      (eori, movementType, movementId, messageId, summary, messageType) =>
-        resetAuthActionAndStatusMonitoring()
-        val expectedConversationId = ConversationId(movementId, messageId)
+    ) { (eori, movementType, movementId, messageId, summary, messageType) =>
+      resetAuthActionAndStatusMonitoring()
+      val expectedConversationId = ConversationId(movementId, messageId)
 
-        when(config.eisSizeLimit).thenReturn(-1L)
+      when(config.eisSizeLimit).thenReturn(-1L)
 
-        when(mockMessageTypeExtractor.extractFromHeaders(any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](messageType))
+      when(mockMessageTypeExtractor.extractFromHeaders(any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](messageType))
 
-        when(mockCustomOfficeExtractorService.extractCustomOffice(any(), eqTo(messageType)))
-          .thenReturn(EitherT.rightT[Future, CustomOfficeExtractorError](CustomsOffice("GB1234567")))
+      when(mockCustomOfficeExtractorService.extractCustomOffice(any(), eqTo(messageType)))
+        .thenReturn(EitherT.rightT[Future, CustomOfficeExtractorError](CustomsOffice("GB1234567")))
 
-        when(
-          mockObjectStoreService
-            .storeOutgoing(ConversationId(eqTo(expectedConversationId.value)), any[Source[ByteString, ?]])(any[HeaderCarrier], any[ExecutionContext])
-        )
-          .thenReturn(EitherT.rightT[Future, ObjectSummaryWithMd5](summary))
+      when(
+        mockObjectStoreService
+          .storeOutgoing(ConversationId(eqTo(expectedConversationId.value)), any[Source[ByteString, ?]])(any[HeaderCarrier], any[ExecutionContext])
+      )
+        .thenReturn(EitherT.rightT[Future, ObjectSummaryWithMd5](summary))
 
-        when(mockSDESService.send(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(summary))(any(), any()))
-          .thenReturn(EitherT.liftF(Future.unit))
+      when(mockSDESService.send(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(summary))(any(), any()))
+        .thenReturn(EitherT.liftF(Future.unit))
 
-        val result = controller().outgoing(eori, movementType, movementId, messageId)(
-          fakeRequest(cc015cOfficeOfDepartureGB, outgoing, messageTypeHeaderDepartureDeclaration)
-        )
+      val result = controller().outgoing(eori, movementType, movementId, messageId)(
+        fakeRequest(cc015cOfficeOfDepartureGB, outgoing, messageTypeHeaderDepartureDeclaration.addApiVersionHeader(v2_1))
+      )
 
-        status(result) mustBe ACCEPTED
+      status(result) mustBe ACCEPTED
 
-        verify(mockRoutingService, times(0)).submitMessage(
-          any[String].asInstanceOf[MovementType],
-          any[String].asInstanceOf[MovementId],
-          any[String].asInstanceOf[MessageId],
-          any[Source[ByteString, ?]],
-          any[String].asInstanceOf[CustomsOffice]
-        )(any[HeaderCarrier], any[ExecutionContext])
+      verify(mockRoutingService, times(0)).submitMessage(
+        any[String].asInstanceOf[MovementType],
+        any[String].asInstanceOf[MovementId],
+        any[String].asInstanceOf[MessageId],
+        any[Source[ByteString, ?]],
+        any[String].asInstanceOf[CustomsOffice],
+        eqTo(v2_1)
+      )(any[HeaderCarrier], any[ExecutionContext])
 
-        verify(mockSDESService, times(1)).send(
-          MovementId(eqTo(movementId.value)),
-          MessageId(eqTo(messageId.value)),
-          eqTo(summary)
-        )(any[ExecutionContext], any[HeaderCarrier])
+      verify(mockSDESService, times(1)).send(
+        MovementId(eqTo(movementId.value)),
+        MessageId(eqTo(messageId.value)),
+        eqTo(summary)
+      )(any[ExecutionContext], any[HeaderCarrier])
 
-        verify(mockInternalAuthActionProvider, times(1)).apply(
-          eqTo(Predicate.Permission(Resource(ResourceType("transit-movements-router"), ResourceLocation("message")), IAAction("WRITE")))
-        )(any())
+      verify(mockInternalAuthActionProvider, times(1)).apply(
+        eqTo(Predicate.Permission(Resource(ResourceType("transit-movements-router"), ResourceLocation("message")), IAAction("WRITE")))
+      )(any())
 
-        verifyNoInteractions(mockStatusMonitoringService)
+      verifyNoInteractions(mockStatusMonitoringService)
     }
 
     "must return BAD_REQUEST when declaration submission fails" - {
 
-      "returns INVALID_OFFICE when an invalid custom office supplied in payload" in forAll(Gen.alphaNumStr, Gen.alphaStr) {
-        (office, field) =>
-          resetAuthActionAndStatusMonitoring()
-          when(mockCustomOfficeExtractorService.extractCustomOffice(any(), any()))
-            .thenReturn(
-              EitherT[Future, CustomOfficeExtractorError, CustomsOffice](
-                Future.successful(Left(CustomOfficeExtractorError.UnrecognisedOffice("office", CustomsOffice(office), field)))
-              )
+      "returns INVALID_OFFICE when an invalid custom office supplied in payload" in forAll(Gen.alphaNumStr, Gen.alphaStr) { (office, field) =>
+        resetAuthActionAndStatusMonitoring()
+        when(mockCustomOfficeExtractorService.extractCustomOffice(any(), any()))
+          .thenReturn(
+            EitherT[Future, CustomOfficeExtractorError, CustomsOffice](
+              Future.successful(Left(CustomOfficeExtractorError.UnrecognisedOffice("office", CustomsOffice(office), field)))
             )
-
-          when(mockMessageTypeExtractor.extractFromHeaders(any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](MessageType.DeclarationData))
-
-          val result = controller().outgoing(eori, movementType, movementId, messageId)(
-            fakeRequest(cc015cOfficeOfDepartureGB, outgoing, messageTypeHeaderDepartureDeclaration)
           )
 
-          status(result) mustBe BAD_REQUEST
-          contentAsJson(result) mustBe Json.obj(
-            "code"    -> "INVALID_OFFICE",
-            "message" -> "office",
-            "office"  -> office,
-            "field"   -> field
-          )
+        when(mockMessageTypeExtractor.extractFromHeaders(any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](MessageType.DeclarationData))
 
-          verify(mockInternalAuthActionProvider, times(1)).apply(
-            eqTo(Predicate.Permission(Resource(ResourceType("transit-movements-router"), ResourceLocation("message")), IAAction("WRITE")))
-          )(any())
+        val result = controller().outgoing(eori, movementType, movementId, messageId)(
+          fakeRequest(cc015cOfficeOfDepartureGB, outgoing, messageTypeHeaderDepartureDeclaration.addApiVersionHeader(v2_1))
+        )
+
+        status(result) mustBe BAD_REQUEST
+        contentAsJson(result) mustBe Json.obj(
+          "code"    -> "INVALID_OFFICE",
+          "message" -> "office",
+          "office"  -> office,
+          "field"   -> field
+        )
+
+        verify(mockInternalAuthActionProvider, times(1)).apply(
+          eqTo(Predicate.Permission(Resource(ResourceType("transit-movements-router"), ResourceLocation("message")), IAAction("WRITE")))
+        )(any())
       }
 
       "returns message to indicate element not found" in {
@@ -378,7 +395,7 @@ class MessageControllerSpec
         when(mockMessageTypeExtractor.extractFromHeaders(any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](MessageType.DeclarationData))
 
         val result = controller().outgoing(eori, movementType, movementId, messageId)(
-          fakeRequest(cc015cOfficeOfDepartureGB, outgoing, messageTypeHeaderDepartureDeclaration)
+          fakeRequest(cc015cOfficeOfDepartureGB, outgoing, messageTypeHeaderDepartureDeclaration.addApiVersionHeader(v2_1))
         )
 
         status(result) mustBe BAD_REQUEST
@@ -402,7 +419,7 @@ class MessageControllerSpec
         when(mockMessageTypeExtractor.extractFromHeaders(any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](MessageType.DeclarationData))
 
         val result = controller().outgoing(eori, movementType, movementId, messageId)(
-          fakeRequest(cc015cOfficeOfDepartureGB, outgoing, messageTypeHeaderDepartureDeclaration)
+          fakeRequest(cc015cOfficeOfDepartureGB, outgoing, messageTypeHeaderDepartureDeclaration.addApiVersionHeader(v2_1))
         )
 
         status(result) mustBe BAD_REQUEST
@@ -422,7 +439,7 @@ class MessageControllerSpec
           .thenReturn(EitherT.leftT[Future, MessageType](MessageTypeExtractionError.InvalidMessageType("IE140")))
 
         val result = controller().outgoing(eori, movementType, movementId, messageId)(
-          fakeRequest(cc015cOfficeOfDepartureGB, outgoing, FakeHeaders(Seq(("X-Message-Type", "IE140"))))
+          fakeRequest(cc015cOfficeOfDepartureGB, outgoing, FakeHeaders(Seq(("X-Message-Type", "IE140"))).addApiVersionHeader(v2_1))
         )
 
         status(result) mustBe BAD_REQUEST
@@ -441,7 +458,9 @@ class MessageControllerSpec
         when(mockMessageTypeExtractor.extractFromHeaders(any()))
           .thenReturn(EitherT.leftT[Future, MessageType](MessageTypeExtractionError.UnableToExtractFromHeader))
 
-        val result = controller().outgoing(eori, movementType, movementId, messageId)(fakeRequest(cc015cOfficeOfDepartureGB, outgoing))
+        val result = controller().outgoing(eori, movementType, movementId, messageId)(
+          fakeRequest(cc015cOfficeOfDepartureGB, outgoing).withHeaders(FakeHeaders().addApiVersionHeader(v2_1))
+        )
 
         status(result) mustBe BAD_REQUEST
         contentAsJson(result) mustBe Json.obj(
@@ -460,7 +479,7 @@ class MessageControllerSpec
           .thenReturn(EitherT.leftT[Future, MessageType](MessageTypeExtractionError.InvalidMessageType("invalid")))
 
         val result = controller().outgoing(eori, movementType, movementId, messageId)(
-          fakeRequest(cc015cOfficeOfDepartureGB, outgoing, FakeHeaders(Seq(("X-Message-Type", "invalid"))))
+          fakeRequest(cc015cOfficeOfDepartureGB, outgoing, FakeHeaders(Seq(("X-Message-Type", "invalid"))).addApiVersionHeader(v2_1))
         )
 
         status(result) mustBe BAD_REQUEST
@@ -478,7 +497,9 @@ class MessageControllerSpec
 
         when(mockMessageTypeExtractor.extractFromHeaders(any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](MessageType.Discrepancies))
         lazy val messageTypeHeader = FakeHeaders(Seq(("X-Message-Type", MessageType.Discrepancies.code)))
-        val result                 = controller().outgoing(eori, movementType, movementId, messageId)(fakeRequest(cc015cOfficeOfDepartureGB, outgoing, messageTypeHeader))
+        val result                 = controller().outgoing(eori, movementType, movementId, messageId)(
+          fakeRequest(cc015cOfficeOfDepartureGB, outgoing, messageTypeHeader.addApiVersionHeader(v2_1))
+        )
 
         status(result) mustBe BAD_REQUEST
         contentAsJson(result) mustBe Json.obj(
@@ -500,7 +521,8 @@ class MessageControllerSpec
           any[String].asInstanceOf[MovementId],
           any[String].asInstanceOf[MessageId],
           any[Source[ByteString, ?]],
-          any[String].asInstanceOf[CustomsOffice]
+          any[String].asInstanceOf[CustomsOffice],
+          eqTo(v2_1)
         )(any[HeaderCarrier], any[ExecutionContext])
       ).thenReturn(
         EitherT[Future, RoutingError, Unit](
@@ -514,7 +536,7 @@ class MessageControllerSpec
       when(mockMessageTypeExtractor.extractFromHeaders(any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](MessageType.DeclarationData))
 
       val result = controller().outgoing(eori, movementType, movementId, messageId)(
-        fakeRequest(cc015cOfficeOfDepartureGB, outgoing, messageTypeHeaderDepartureDeclaration)
+        fakeRequest(cc015cOfficeOfDepartureGB, outgoing, messageTypeHeaderDepartureDeclaration.addApiVersionHeader(v2_1))
       )
 
       status(result) mustBe INTERNAL_SERVER_ERROR
@@ -527,7 +549,344 @@ class MessageControllerSpec
         eqTo(Predicate.Permission(Resource(ResourceType("transit-movements-router"), ResourceLocation("message")), IAAction("WRITE")))
       )(any())
     }
+  }
 
+  "V3_0 POST outgoing" - {
+    "must return CREATED when declaration is submitted successfully via the EIS route" in forAll(
+      arbitrary[CustomsOffice],
+      arbitrary[RequestMessageType]
+    ) { (customsOffice, messageType) =>
+      resetAuthActionAndStatusMonitoring()
+      when(
+        mockRoutingService.submitMessage(
+          any[String].asInstanceOf[MovementType],
+          any[String].asInstanceOf[MovementId],
+          any[String].asInstanceOf[MessageId],
+          any[Source[ByteString, ?]],
+          any[String].asInstanceOf[CustomsOffice],
+          eqTo(v3_0)
+        )(any[HeaderCarrier], any[ExecutionContext])
+      ).thenReturn(submitDeclarationEither)
+
+      when(mockMessageTypeExtractor.extractFromHeaders(any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](messageType))
+
+      when(mockCustomOfficeExtractorService.extractCustomOffice(any(), any()))
+        .thenReturn(EitherT.rightT[Future, CustomOfficeExtractorError](customsOffice))
+
+      val result =
+        controller().outgoing(eori, movementType, movementId, messageId)(
+          fakeRequest(cc015cOfficeOfDepartureGB, outgoing, FakeHeaders().addXMessageType(messageType).addApiVersionHeader(v3_0))
+        )
+
+      status(result) mustBe CREATED
+
+      verify(mockInternalAuthActionProvider, times(1)).apply(
+        eqTo(Predicate.Permission(Resource(ResourceType("transit-movements-router"), ResourceLocation("message")), IAAction("WRITE")))
+      )(any())
+
+      verify(mockStatusMonitoringService, times(1)).outgoing(
+        MovementId(eqTo(movementId.value)),
+        MessageId(eqTo(messageId.value)),
+        eqTo(messageType),
+        CustomsOffice(eqTo(customsOffice.value))
+      )(any(), any())
+    }
+
+    "must return ACCEPTED when declaration is submitted successfully via the SDES route" in forAll(
+      arbitrary[EoriNumber],
+      arbitrary[MovementType],
+      arbitrary[MovementId],
+      arbitrary[MessageId],
+      arbitrary[ObjectSummaryWithMd5],
+      arbitrary[RequestMessageType]
+    ) { (eori, movementType, movementId, messageId, summary, messageType) =>
+      resetAuthActionAndStatusMonitoring()
+      val expectedConversationId = ConversationId(movementId, messageId)
+
+      when(config.eisSizeLimit).thenReturn(-1L)
+
+      when(mockMessageTypeExtractor.extractFromHeaders(any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](messageType))
+
+      when(mockCustomOfficeExtractorService.extractCustomOffice(any(), eqTo(messageType)))
+        .thenReturn(EitherT.rightT[Future, CustomOfficeExtractorError](CustomsOffice("GB1234567")))
+
+      when(
+        mockObjectStoreService
+          .storeOutgoing(ConversationId(eqTo(expectedConversationId.value)), any[Source[ByteString, ?]])(any[HeaderCarrier], any[ExecutionContext])
+      )
+        .thenReturn(EitherT.rightT[Future, ObjectSummaryWithMd5](summary))
+
+      when(mockSDESService.send(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(summary))(any(), any()))
+        .thenReturn(EitherT.liftF(Future.unit))
+
+      val result = controller().outgoing(eori, movementType, movementId, messageId)(
+        fakeRequest(cc015cOfficeOfDepartureGB, outgoing, messageTypeHeaderDepartureDeclaration.addApiVersionHeader(v2_1))
+      )
+
+      status(result) mustBe ACCEPTED
+
+      verify(mockRoutingService, times(0)).submitMessage(
+        any[String].asInstanceOf[MovementType],
+        any[String].asInstanceOf[MovementId],
+        any[String].asInstanceOf[MessageId],
+        any[Source[ByteString, ?]],
+        any[String].asInstanceOf[CustomsOffice],
+        eqTo(v3_0)
+      )(any[HeaderCarrier], any[ExecutionContext])
+
+      verify(mockSDESService, times(1)).send(
+        MovementId(eqTo(movementId.value)),
+        MessageId(eqTo(messageId.value)),
+        eqTo(summary)
+      )(any[ExecutionContext], any[HeaderCarrier])
+
+      verify(mockInternalAuthActionProvider, times(1)).apply(
+        eqTo(Predicate.Permission(Resource(ResourceType("transit-movements-router"), ResourceLocation("message")), IAAction("WRITE")))
+      )(any())
+
+      verifyNoInteractions(mockStatusMonitoringService)
+    }
+
+    "must return BAD_REQUEST when declaration submission fails" - {
+
+      "returns BAD_REQUEST if the apiVersion header is missing" in {
+        when(mockCustomOfficeExtractorService.extractCustomOffice(any(), any()))
+          .thenReturn(
+            EitherT[Future, CustomOfficeExtractorError, CustomsOffice](Future.successful(Left(CustomOfficeExtractorError.NoElementFound("messageSender"))))
+          )
+
+        when(mockMessageTypeExtractor.extractFromHeaders(any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](MessageType.DeclarationData))
+
+        val result = controller().outgoing(eori, movementType, movementId, messageId)(
+          fakeRequest(cc015cOfficeOfDepartureGB, outgoing, messageTypeHeaderDepartureDeclaration)
+        )
+
+        status(result) mustBe BAD_REQUEST
+        contentAsJson(result) mustBe Json.obj(
+          "code"    -> "BAD_REQUEST",
+          "message" -> "Missing APIVersion header"
+        )
+
+        verify(mockInternalAuthActionProvider, times(1)).apply(
+          eqTo(Predicate.Permission(Resource(ResourceType("transit-movements-router"), ResourceLocation("message")), IAAction("WRITE")))
+        )(any())
+      }
+
+      "returns BAD_REQUEST if the apiVersion header is invalid" in {
+        when(mockCustomOfficeExtractorService.extractCustomOffice(any(), any()))
+          .thenReturn(
+            EitherT[Future, CustomOfficeExtractorError, CustomsOffice](Future.successful(Left(CustomOfficeExtractorError.NoElementFound("messageSender"))))
+          )
+
+        when(mockMessageTypeExtractor.extractFromHeaders(any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](MessageType.DeclarationData))
+
+        val result = controller().outgoing(eori, movementType, movementId, messageId)(
+          fakeRequest(cc015cOfficeOfDepartureGB, outgoing, messageTypeHeaderDepartureDeclaration.addInvalidApiVersionHeader("1.0"))
+        )
+
+        status(result) mustBe UNSUPPORTED_MEDIA_TYPE
+        contentAsJson(result) mustBe Json.obj(
+          "code"    -> "UNSUPPORTED_MEDIA_TYPE",
+          "message" -> "The APIVersion header 1.0 is not supported."
+        )
+
+        verify(mockInternalAuthActionProvider, times(1)).apply(
+          eqTo(Predicate.Permission(Resource(ResourceType("transit-movements-router"), ResourceLocation("message")), IAAction("WRITE")))
+        )(any())
+      }
+
+      "returns INVALID_OFFICE when an invalid custom office supplied in payload" in forAll(Gen.alphaNumStr, Gen.alphaStr) { (office, field) =>
+        resetAuthActionAndStatusMonitoring()
+        when(mockCustomOfficeExtractorService.extractCustomOffice(any(), any()))
+          .thenReturn(
+            EitherT[Future, CustomOfficeExtractorError, CustomsOffice](
+              Future.successful(Left(CustomOfficeExtractorError.UnrecognisedOffice("office", CustomsOffice(office), field)))
+            )
+          )
+
+        when(mockMessageTypeExtractor.extractFromHeaders(any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](MessageType.DeclarationData))
+
+        val result = controller().outgoing(eori, movementType, movementId, messageId)(
+          fakeRequest(cc015cOfficeOfDepartureGB, outgoing, messageTypeHeaderDepartureDeclaration.addApiVersionHeader(v2_1))
+        )
+
+        status(result) mustBe BAD_REQUEST
+        contentAsJson(result) mustBe Json.obj(
+          "code"    -> "INVALID_OFFICE",
+          "message" -> "office",
+          "office"  -> office,
+          "field"   -> field
+        )
+
+        verify(mockInternalAuthActionProvider, times(1)).apply(
+          eqTo(Predicate.Permission(Resource(ResourceType("transit-movements-router"), ResourceLocation("message")), IAAction("WRITE")))
+        )(any())
+      }
+
+      "returns message to indicate element not found" in {
+
+        when(mockCustomOfficeExtractorService.extractCustomOffice(any(), any()))
+          .thenReturn(
+            EitherT[Future, CustomOfficeExtractorError, CustomsOffice](Future.successful(Left(CustomOfficeExtractorError.NoElementFound("messageSender"))))
+          )
+
+        when(mockMessageTypeExtractor.extractFromHeaders(any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](MessageType.DeclarationData))
+
+        val result = controller().outgoing(eori, movementType, movementId, messageId)(
+          fakeRequest(cc015cOfficeOfDepartureGB, outgoing, messageTypeHeaderDepartureDeclaration.addApiVersionHeader(v3_0))
+        )
+
+        status(result) mustBe BAD_REQUEST
+        contentAsJson(result) mustBe Json.obj(
+          "code"    -> "BAD_REQUEST",
+          "message" -> "Element messageSender not found"
+        )
+
+        verify(mockInternalAuthActionProvider, times(1)).apply(
+          eqTo(Predicate.Permission(Resource(ResourceType("transit-movements-router"), ResourceLocation("message")), IAAction("WRITE")))
+        )(any())
+      }
+
+      "returns message to indicate too many elements" in {
+
+        when(mockCustomOfficeExtractorService.extractCustomOffice(any(), any()))
+          .thenReturn(
+            EitherT[Future, CustomOfficeExtractorError, CustomsOffice](Future.successful(Left(CustomOfficeExtractorError.TooManyElementsFound("eori"))))
+          )
+
+        when(mockMessageTypeExtractor.extractFromHeaders(any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](MessageType.DeclarationData))
+
+        val result = controller().outgoing(eori, movementType, movementId, messageId)(
+          fakeRequest(cc015cOfficeOfDepartureGB, outgoing, messageTypeHeaderDepartureDeclaration.addApiVersionHeader(v3_0))
+        )
+
+        status(result) mustBe BAD_REQUEST
+        contentAsJson(result) mustBe Json.obj(
+          "code"    -> "BAD_REQUEST",
+          "message" -> "Found too many elements of type eori"
+        )
+
+        verify(mockInternalAuthActionProvider, times(1)).apply(
+          eqTo(Predicate.Permission(Resource(ResourceType("transit-movements-router"), ResourceLocation("message")), IAAction("WRITE")))
+        )(any())
+      }
+
+      "returns message to inform that the X-Message-Type header value IE140 is invalid" in {
+
+        when(mockMessageTypeExtractor.extractFromHeaders(any()))
+          .thenReturn(EitherT.leftT[Future, MessageType](MessageTypeExtractionError.InvalidMessageType("IE140")))
+
+        val result = controller().outgoing(eori, movementType, movementId, messageId)(
+          fakeRequest(cc015cOfficeOfDepartureGB, outgoing, FakeHeaders(Seq(("X-Message-Type", "IE140"))).addApiVersionHeader(v3_0))
+        )
+
+        status(result) mustBe BAD_REQUEST
+        contentAsJson(result) mustBe Json.obj(
+          "code"    -> "BAD_REQUEST",
+          "message" -> "Invalid message type: IE140"
+        )
+
+        verify(mockInternalAuthActionProvider, times(1)).apply(
+          eqTo(Predicate.Permission(Resource(ResourceType("transit-movements-router"), ResourceLocation("message")), IAAction("WRITE")))
+        )(any())
+      }
+
+      "returns message to inform that the X-Message-Type header is not present" in {
+
+        when(mockMessageTypeExtractor.extractFromHeaders(any()))
+          .thenReturn(EitherT.leftT[Future, MessageType](MessageTypeExtractionError.UnableToExtractFromHeader))
+
+        val result = controller().outgoing(eori, movementType, movementId, messageId)(
+          fakeRequest(cc015cOfficeOfDepartureGB, outgoing).withHeaders(FakeHeaders().addApiVersionHeader(v3_0))
+        )
+
+        status(result) mustBe BAD_REQUEST
+        contentAsJson(result) mustBe Json.obj(
+          "code"    -> "BAD_REQUEST",
+          "message" -> "Missing header: X-Message-Type"
+        )
+
+        verify(mockInternalAuthActionProvider, times(1)).apply(
+          eqTo(Predicate.Permission(Resource(ResourceType("transit-movements-router"), ResourceLocation("message")), IAAction("WRITE")))
+        )(any())
+      }
+
+      "returns message to inform that the X-Message-Type header value is invalid" in {
+
+        when(mockMessageTypeExtractor.extractFromHeaders(any()))
+          .thenReturn(EitherT.leftT[Future, MessageType](MessageTypeExtractionError.InvalidMessageType("invalid")))
+
+        val result = controller().outgoing(eori, movementType, movementId, messageId)(
+          fakeRequest(cc015cOfficeOfDepartureGB, outgoing, FakeHeaders(Seq(("X-Message-Type", "invalid"))).addApiVersionHeader(v3_0))
+        )
+
+        status(result) mustBe BAD_REQUEST
+        contentAsJson(result) mustBe Json.obj(
+          "code"    -> "BAD_REQUEST",
+          "message" -> "Invalid message type: invalid"
+        )
+
+        verify(mockInternalAuthActionProvider, times(1)).apply(
+          eqTo(Predicate.Permission(Resource(ResourceType("transit-movements-router"), ResourceLocation("message")), IAAction("WRITE")))
+        )(any())
+      }
+
+      "returns message is not a request message" in {
+
+        when(mockMessageTypeExtractor.extractFromHeaders(any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](MessageType.Discrepancies))
+        lazy val messageTypeHeader = FakeHeaders(Seq(("X-Message-Type", MessageType.Discrepancies.code)))
+        val result                 = controller().outgoing(eori, movementType, movementId, messageId)(
+          fakeRequest(cc015cOfficeOfDepartureGB, outgoing, messageTypeHeader.addApiVersionHeader(v3_0))
+        )
+
+        status(result) mustBe BAD_REQUEST
+        contentAsJson(result) mustBe Json.obj(
+          "code"    -> "BAD_REQUEST",
+          "message" -> s"${MessageType.Discrepancies.code} is not valid for requests"
+        )
+
+        verify(mockInternalAuthActionProvider, times(1)).apply(
+          eqTo(Predicate.Permission(Resource(ResourceType("transit-movements-router"), ResourceLocation("message")), IAAction("WRITE")))
+        )(any())
+      }
+    }
+
+    "must return INTERNAL_SERVER_ERROR when declaration submission fails due to unexpected error" in {
+
+      when(
+        mockRoutingService.submitMessage(
+          any[String].asInstanceOf[MovementType],
+          any[String].asInstanceOf[MovementId],
+          any[String].asInstanceOf[MessageId],
+          any[Source[ByteString, ?]],
+          any[String].asInstanceOf[CustomsOffice],
+          eqTo(v3_0)
+        )(any[HeaderCarrier], any[ExecutionContext])
+      ).thenReturn(
+        EitherT[Future, RoutingError, Unit](
+          Future.successful(Left(RoutingError.Unexpected("unexpected error", Some(new Exception("An unexpected error occurred")))))
+        )
+      )
+
+      when(mockCustomOfficeExtractorService.extractCustomOffice(any(), any()))
+        .thenReturn(EitherT.rightT[Future, CustomOfficeExtractorError](CustomsOffice("GB1234567")))
+
+      when(mockMessageTypeExtractor.extractFromHeaders(any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](MessageType.DeclarationData))
+
+      val result = controller().outgoing(eori, movementType, movementId, messageId)(
+        fakeRequest(cc015cOfficeOfDepartureGB, outgoing, messageTypeHeaderDepartureDeclaration.addApiVersionHeader(v3_0))
+      )
+
+      status(result) mustBe INTERNAL_SERVER_ERROR
+      contentAsJson(result) mustBe Json.obj(
+        "code"    -> "INTERNAL_SERVER_ERROR",
+        "message" -> "Internal server error"
+      )
+
+      verify(mockInternalAuthActionProvider, times(1)).apply(
+        eqTo(Predicate.Permission(Resource(ResourceType("transit-movements-router"), ResourceLocation("message")), IAAction("WRITE")))
+      )(any())
+    }
   }
 
   "POST incoming from EIS" - {
@@ -538,89 +897,24 @@ class MessageControllerSpec
       Gen.option(arbitrary[ClientId]),
       arbitrary[EoriNumber],
       arbitrary[Boolean]
-    ) {
-      (movementId, messageId, messageType, clientId, eoriNumber, isTransitional) =>
-        val persistenceResponse = PersistenceResponse(messageId, eoriNumber, clientId, isTransitional, None)
+    ) { (movementId, messageId, messageType, clientId, eoriNumber, isTransitional) =>
+      val persistenceResponse = PersistenceResponse(messageId, eoriNumber, clientId, isTransitional, None)
 
-        when(mockMessageTypeExtractor.extract(any(), any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](messageType))
+      when(mockMessageTypeExtractor.extract(any(), any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](messageType))
 
-        when(mockPersistenceConnector.postBody(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(messageType), any())(any(), any()))
-          .thenReturn(EitherT.liftF(Future.successful(PersistenceResponse(messageId, eoriNumber, clientId, isTransitional, None))))
+      when(mockPersistenceConnector.postBody(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(messageType), any())(any(), any()))
+        .thenReturn(EitherT.liftF(Future.successful(PersistenceResponse(messageId, eoriNumber, clientId, isTransitional, None))))
 
-        when(
-          mockPushNotificationsConnector
-            .postMessageReceived(MovementId(eqTo(movementId.value)), eqTo(persistenceResponse), eqTo(messageType), any[Source[ByteString, ?]])(
-              any[HeaderCarrier],
-              any[ExecutionContext]
-            )
-        ).thenReturn(EitherT.liftF(Future.unit))
+      when(
+        mockPushNotificationsConnector
+          .postMessageReceived(MovementId(eqTo(movementId.value)), eqTo(persistenceResponse), eqTo(messageType), any[Source[ByteString, ?]])(
+            any[HeaderCarrier],
+            any[ExecutionContext]
+          )
+      ).thenReturn(EitherT.liftF(Future.unit))
 
-        when(
-          mockAuditingService.auditStatusEvent(
-            eqTo(NCTSRequestedMissingMovement),
-            eqTo(Some(Json.toJson(PresentationError.notFoundError(s"Movement ${movementId.value} not found")))),
-            eqTo(Some(movementId)),
-            eqTo(None),
-            eqTo(None),
-            eqTo(Some(messageType.movementType)),
-            eqTo(Some(messageType)),
-            eqTo(None)
-          )(any[HeaderCarrier], any[ExecutionContext])
-        ).thenReturn(Future.successful(()))
-
-        when(
-          mockAuditingService.auditStatusEvent(
-            eqTo(NCTSToTraderSubmissionSuccessful),
-            eqTo(None),
-            eqTo(Some(movementId)),
-            eqTo(Some(messageId)),
-            eqTo(Some(eoriNumber)),
-            eqTo(Some(messageType.movementType)),
-            eqTo(Some(messageType)),
-            eqTo(clientId)
-          )(any[HeaderCarrier], any[ExecutionContext])
-        ).thenReturn(Future.successful(()))
-
-        val request = fakeRequest(incomingXml, incoming)
-          .withHeaders(FakeHeaders().add("X-Message-Type" -> GoodsReleaseNotification.code))
-
-        val result = controller().incomingViaEIS(ConversationId(movementId, messageId))(request)
-
-        status(result) mustBe CREATED
-        header("X-Message-Id", result) mustBe Some(messageId.value)
-
-        verifyNoInteractions(mockInternalAuthActionProvider)
-        verify(mockStatusMonitoringService, times(1)).incoming(
-          MovementId(eqTo(movementId.value)),
-          MessageId(eqTo(messageId.value)),
-          eqTo(messageType)
-        )(any[HeaderCarrier](), any[ExecutionContext]())
-
-        verify(mockAuditingService, times(1)).auditMessageEvent(
-          eqTo(messageType.auditType.get),
-          eqTo(MimeTypes.XML),
-          any(),
-          any(),
-          eqTo(Some(movementId)),
-          eqTo(Some(messageId)),
-          eqTo(Some(eoriNumber)),
-          eqTo(Some(messageType.movementType)),
-          eqTo(Some(messageType)),
-          eqTo(clientId),
-          eqTo(isTransitional)
-        )(any[HeaderCarrier](), any[ExecutionContext]())
-        verify(mockAuditingService, times(1)).auditStatusEvent(
-          eqTo(NCTSToTraderSubmissionSuccessful),
-          eqTo(None),
-          eqTo(Some(movementId)),
-          eqTo(Some(messageId)),
-          eqTo(Some(eoriNumber)),
-          eqTo(Some(messageType.movementType)),
-          eqTo(Some(messageType)),
-          eqTo(clientId)
-        )(any[HeaderCarrier], any[ExecutionContext])
-
-        verify(mockAuditingService, times(0)).auditStatusEvent(
+      when(
+        mockAuditingService.auditStatusEvent(
           eqTo(NCTSRequestedMissingMovement),
           eqTo(Some(Json.toJson(PresentationError.notFoundError(s"Movement ${movementId.value} not found")))),
           eqTo(Some(movementId)),
@@ -630,6 +924,70 @@ class MessageControllerSpec
           eqTo(Some(messageType)),
           eqTo(None)
         )(any[HeaderCarrier], any[ExecutionContext])
+      ).thenReturn(Future.successful(()))
+
+      when(
+        mockAuditingService.auditStatusEvent(
+          eqTo(NCTSToTraderSubmissionSuccessful),
+          eqTo(None),
+          eqTo(Some(movementId)),
+          eqTo(Some(messageId)),
+          eqTo(Some(eoriNumber)),
+          eqTo(Some(messageType.movementType)),
+          eqTo(Some(messageType)),
+          eqTo(clientId)
+        )(any[HeaderCarrier], any[ExecutionContext])
+      ).thenReturn(Future.successful(()))
+
+      val request = fakeRequest(incomingXml, incoming)
+        .withHeaders(FakeHeaders().add("X-Message-Type" -> GoodsReleaseNotification.code))
+
+      val result = controller().incomingViaEIS(ConversationId(movementId, messageId))(request)
+
+      status(result) mustBe CREATED
+      header("X-Message-Id", result) mustBe Some(messageId.value)
+
+      verifyNoInteractions(mockInternalAuthActionProvider)
+      verify(mockStatusMonitoringService, times(1)).incoming(
+        MovementId(eqTo(movementId.value)),
+        MessageId(eqTo(messageId.value)),
+        eqTo(messageType)
+      )(any[HeaderCarrier](), any[ExecutionContext]())
+
+      verify(mockAuditingService, times(1)).auditMessageEvent(
+        eqTo(messageType.auditType.get),
+        eqTo(MimeTypes.XML),
+        any(),
+        any(),
+        eqTo(Some(movementId)),
+        eqTo(Some(messageId)),
+        eqTo(Some(eoriNumber)),
+        eqTo(Some(messageType.movementType)),
+        eqTo(Some(messageType)),
+        eqTo(clientId),
+        eqTo(isTransitional)
+      )(any[HeaderCarrier](), any[ExecutionContext]())
+      verify(mockAuditingService, times(1)).auditStatusEvent(
+        eqTo(NCTSToTraderSubmissionSuccessful),
+        eqTo(None),
+        eqTo(Some(movementId)),
+        eqTo(Some(messageId)),
+        eqTo(Some(eoriNumber)),
+        eqTo(Some(messageType.movementType)),
+        eqTo(Some(messageType)),
+        eqTo(clientId)
+      )(any[HeaderCarrier], any[ExecutionContext])
+
+      verify(mockAuditingService, times(0)).auditStatusEvent(
+        eqTo(NCTSRequestedMissingMovement),
+        eqTo(Some(Json.toJson(PresentationError.notFoundError(s"Movement ${movementId.value} not found")))),
+        eqTo(Some(movementId)),
+        eqTo(None),
+        eqTo(None),
+        eqTo(Some(messageType.movementType)),
+        eqTo(Some(messageType)),
+        eqTo(None)
+      )(any[HeaderCarrier], any[ExecutionContext])
     }
     "must return BAD_REQUEST when the X-Message-Type header is missing or body seems to not contain an appropriate root tag" in {
 
@@ -657,7 +1015,7 @@ class MessageControllerSpec
       verifyNoInteractions(mockAuditingService)
     }
 
-    "must return BAD_REQUEST when message type is not a response message" in { //TODO: or should this be INTERNAL_SERVER_ERROR ?
+    "must return BAD_REQUEST when message type is not a response message" in { // TODO: or should this be INTERNAL_SERVER_ERROR ?
 
       val request = fakeRequest(incomingXml, incoming)
         .withHeaders(FakeHeaders().add("X-Message-Type" -> "IE015"))
@@ -827,41 +1185,40 @@ class MessageControllerSpec
       arbitrary[MessageType],
       Gen.option(arbitrary[ClientId]),
       arbitrary[EoriNumber]
-    ) {
-      (successUpscanResponse, movementId, messageId, messageType, clientId, eoriNumber) =>
-        val source: Source[ByteString, ?] = singleUseStringSource("abc")
+    ) { (successUpscanResponse, movementId, messageId, messageType, clientId, eoriNumber) =>
+      val source: Source[ByteString, ?] = singleUseStringSource("abc")
 
-        val persistenceResponse = PersistenceResponse(messageId, eoriNumber, clientId, isTransitional, None)
+      val persistenceResponse = PersistenceResponse(messageId, eoriNumber, clientId, isTransitional, None)
 
-        when(mockUpscanConnector.streamFile(DownloadUrl(eqTo(successUpscanResponse.downloadUrl.value)))(any(), any(), any()))
-          .thenReturn(EitherT.rightT[Future, Source[ByteString, ?]](source))
+      when(mockUpscanConnector.streamFile(DownloadUrl(eqTo(successUpscanResponse.downloadUrl.value)))(any(), any(), any()))
+        .thenReturn(EitherT.rightT[Future, Source[ByteString, ?]](source))
 
-        when(mockMessageTypeExtractor.extractFromBody(any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](messageType))
+      when(mockMessageTypeExtractor.extractFromBody(any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](messageType))
 
-        when(mockPersistenceConnector.postBody(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(messageType), any())(any(), any()))
-          .thenReturn(EitherT.fromEither[Future](Right(PersistenceResponse(messageId, eoriNumber, clientId, isTransitional, None))))
+      when(mockPersistenceConnector.postBody(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(messageType), any())(any(), any()))
+        .thenReturn(EitherT.fromEither[Future](Right(PersistenceResponse(messageId, eoriNumber, clientId, isTransitional, None))))
 
-        when(
-          mockPushNotificationsConnector
-            .postMessageReceived(MovementId(eqTo(movementId.value)), eqTo(persistenceResponse), eqTo(messageType), any[Source[ByteString, ?]])(
-              any(),
-              any()
-            )
-        ).thenReturn(EitherT.liftF(Future.unit))
+      when(
+        mockPushNotificationsConnector
+          .postMessageReceived(MovementId(eqTo(movementId.value)), eqTo(persistenceResponse), eqTo(messageType), any[Source[ByteString, ?]])(
+            any(),
+            any()
+          )
+      ).thenReturn(EitherT.liftF(Future.unit))
 
-        val request = fakeRequestLargeMessage(Json.toJson[UpscanResponse](successUpscanResponse), incomingLargeMessage)
+      val request = fakeRequestLargeMessage(Json.toJson[UpscanResponse](successUpscanResponse), incomingLargeMessage)
 
-        val result = controller().incomingViaUpscan(movementId, messageId)(request)
+      val result = controller().incomingViaUpscan(movementId, messageId)(request)
 
-        status(result) mustBe CREATED
-        header("X-Message-Id", result) mustBe Some(messageId.value)
-        verifyNoInteractions(mockInternalAuthActionProvider)
+      status(result) mustBe CREATED
+      header("X-Message-Id", result) mustBe Some(messageId.value)
+      verifyNoInteractions(mockInternalAuthActionProvider)
 
-        verify(mockStatusMonitoringService, times(1)).incoming(
-          MovementId(eqTo(movementId.value)),
-          MessageId(eqTo(messageId.value)),
-          eqTo(messageType)
-        )(any(), any())
+      verify(mockStatusMonitoringService, times(1)).incoming(
+        MovementId(eqTo(movementId.value)),
+        MessageId(eqTo(messageId.value)),
+        eqTo(messageType)
+      )(any(), any())
     }
 
     "must return NOT_FOUND when target movement is invalid or archived" in forAll(
@@ -869,96 +1226,91 @@ class MessageControllerSpec
       arbitraryMovementId.arbitrary,
       arbitraryMessageId.arbitrary,
       arbitrary[MessageType]
-    ) {
-      (successUpscanResponse, movementId, messageId, messageType) =>
-        val source: Source[ByteString, ?] = singleUseStringSource("abc")
+    ) { (successUpscanResponse, movementId, messageId, messageType) =>
+      val source: Source[ByteString, ?] = singleUseStringSource("abc")
 
-        when(mockUpscanConnector.streamFile(DownloadUrl(eqTo(successUpscanResponse.downloadUrl.value)))(any(), any(), any()))
-          .thenReturn(EitherT.rightT[Future, Source[ByteString, ?]](source))
+      when(mockUpscanConnector.streamFile(DownloadUrl(eqTo(successUpscanResponse.downloadUrl.value)))(any(), any(), any()))
+        .thenReturn(EitherT.rightT[Future, Source[ByteString, ?]](source))
 
-        when(mockMessageTypeExtractor.extractFromBody(any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](messageType))
+      when(mockMessageTypeExtractor.extractFromBody(any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](messageType))
 
-        when(mockPersistenceConnector.postBody(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(messageType), any())(any(), any()))
-          .thenReturn(EitherT.fromEither[Future](Left(MovementNotFound(movementId))))
+      when(mockPersistenceConnector.postBody(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(messageType), any())(any(), any()))
+        .thenReturn(EitherT.fromEither[Future](Left(MovementNotFound(movementId))))
 
-        val request = fakeRequestLargeMessage(Json.toJson[UpscanResponse](successUpscanResponse), incomingLargeMessage)
-        val result  = controller().incomingViaUpscan(movementId, messageId)(request)
+      val request = fakeRequestLargeMessage(Json.toJson[UpscanResponse](successUpscanResponse), incomingLargeMessage)
+      val result  = controller().incomingViaUpscan(movementId, messageId)(request)
 
-        status(result) mustBe NOT_FOUND
+      status(result) mustBe NOT_FOUND
 
-        verifyNoInteractions(mockPushNotificationsConnector)
-        verifyNoInteractions(mockInternalAuthActionProvider)
+      verifyNoInteractions(mockPushNotificationsConnector)
+      verifyNoInteractions(mockInternalAuthActionProvider)
     }
 
     "must return BAD_REQUEST when malformed json received from callback" in forAll(
       arbitraryMovementId.arbitrary,
       arbitraryMessageId.arbitrary
-    ) {
+    ) { (movementId, messageId) =>
+      when(
+        mockUpscanResponseParser.parseAndLogUpscanResponse(
+          any[String].asInstanceOf[JsValue]
+        )
+      ).thenReturn(EitherT.fromEither[Future](Left(PresentationError.badRequestError("Unexpected Upscan callback response"))))
 
-      (movementId, messageId) =>
-        when(
-          mockUpscanResponseParser.parseAndLogUpscanResponse(
-            any[String].asInstanceOf[JsValue]
-          )
-        ).thenReturn(EitherT.fromEither[Future](Left(PresentationError.badRequestError("Unexpected Upscan callback response"))))
+      val request = fakeRequestLargeMessage(Json.obj("reference" -> "abc"), incomingLargeMessage)
+      val result  = controller().incomingViaUpscan(movementId, messageId)(request)
 
-        val request = fakeRequestLargeMessage(Json.obj("reference" -> "abc"), incomingLargeMessage)
-        val result  = controller().incomingViaUpscan(movementId, messageId)(request)
-
-        status(result) mustBe BAD_REQUEST
-        verifyNoInteractions(mockUpscanConnector)
-        verifyNoInteractions(mockMessageTypeExtractor)
-        verifyNoInteractions(mockPersistenceConnector)
-        verifyNoInteractions(mockPushNotificationsConnector)
-        verifyNoInteractions(mockInternalAuthActionProvider)
+      status(result) mustBe BAD_REQUEST
+      verifyNoInteractions(mockUpscanConnector)
+      verifyNoInteractions(mockMessageTypeExtractor)
+      verifyNoInteractions(mockPersistenceConnector)
+      verifyNoInteractions(mockPushNotificationsConnector)
+      verifyNoInteractions(mockInternalAuthActionProvider)
     }
 
     "must return BAD_REQUEST when body seems to not contain an appropriate root tag" in forAll(
       arbitrary[UpscanSuccessResponse],
       arbitraryMovementId.arbitrary,
       arbitraryMessageId.arbitrary
-    ) {
-      (successUpscanResponse, movementId, messageId) =>
-        val source: Source[ByteString, ?] = singleUseStringSource("abc")
+    ) { (successUpscanResponse, movementId, messageId) =>
+      val source: Source[ByteString, ?] = singleUseStringSource("abc")
 
-        when(mockUpscanConnector.streamFile(DownloadUrl(eqTo(successUpscanResponse.downloadUrl.value)))(any(), any(), any()))
-          .thenReturn(EitherT.rightT[Future, Source[ByteString, ?]](source))
+      when(mockUpscanConnector.streamFile(DownloadUrl(eqTo(successUpscanResponse.downloadUrl.value)))(any(), any(), any()))
+        .thenReturn(EitherT.rightT[Future, Source[ByteString, ?]](source))
 
-        when(mockMessageTypeExtractor.extractFromBody(any())).thenReturn(EitherT.leftT[Future, MessageType](MessageTypeExtractionError.UnableToExtractFromBody))
+      when(mockMessageTypeExtractor.extractFromBody(any())).thenReturn(EitherT.leftT[Future, MessageType](MessageTypeExtractionError.UnableToExtractFromBody))
 
-        val request = fakeRequestLargeMessage(Json.toJson[UpscanResponse](successUpscanResponse), incomingLargeMessage)
-        val result  = controller().incomingViaUpscan(movementId, messageId)(request)
+      val request = fakeRequestLargeMessage(Json.toJson[UpscanResponse](successUpscanResponse), incomingLargeMessage)
+      val result  = controller().incomingViaUpscan(movementId, messageId)(request)
 
-        status(result) mustBe BAD_REQUEST
+      status(result) mustBe BAD_REQUEST
 
-        verifyNoInteractions(mockPersistenceConnector)
-        verifyNoInteractions(mockPushNotificationsConnector)
-        verifyNoInteractions(mockInternalAuthActionProvider)
+      verifyNoInteractions(mockPersistenceConnector)
+      verifyNoInteractions(mockPushNotificationsConnector)
+      verifyNoInteractions(mockInternalAuthActionProvider)
     }
 
     "must return BAD_REQUEST when message type is invalid" in forAll(
       arbitrary[UpscanSuccessResponse],
       arbitraryMovementId.arbitrary,
       arbitraryMessageId.arbitrary
-    ) {
-      (successUpscanResponse, movementId, messageId) =>
-        val source: Source[ByteString, ?] = singleUseStringSource("abc")
+    ) { (successUpscanResponse, movementId, messageId) =>
+      val source: Source[ByteString, ?] = singleUseStringSource("abc")
 
-        when(mockUpscanConnector.streamFile(DownloadUrl(eqTo(successUpscanResponse.downloadUrl.value)))(any(), any(), any()))
-          .thenReturn(EitherT.rightT[Future, Source[ByteString, ?]](source))
+      when(mockUpscanConnector.streamFile(DownloadUrl(eqTo(successUpscanResponse.downloadUrl.value)))(any(), any(), any()))
+        .thenReturn(EitherT.rightT[Future, Source[ByteString, ?]](source))
 
-        when(mockMessageTypeExtractor.extractFromBody(any()))
-          .thenReturn(EitherT.leftT[Future, MessageType](MessageTypeExtractionError.InvalidMessageType("abcde")))
+      when(mockMessageTypeExtractor.extractFromBody(any()))
+        .thenReturn(EitherT.leftT[Future, MessageType](MessageTypeExtractionError.InvalidMessageType("abcde")))
 
-        val request = fakeRequestLargeMessage(Json.toJson[UpscanResponse](successUpscanResponse), incomingLargeMessage)
-        val result  = controller().incomingViaUpscan(movementId, messageId)(request)
+      val request = fakeRequestLargeMessage(Json.toJson[UpscanResponse](successUpscanResponse), incomingLargeMessage)
+      val result  = controller().incomingViaUpscan(movementId, messageId)(request)
 
-        status(result) mustBe BAD_REQUEST
+      status(result) mustBe BAD_REQUEST
 
-        verifyNoInteractions(mockPersistenceConnector)
-        verifyNoInteractions(mockPushNotificationsConnector)
-        verifyNoInteractions(mockInternalAuthActionProvider)
-        verifyNoInteractions(mockStatusMonitoringService)
+      verifyNoInteractions(mockPersistenceConnector)
+      verifyNoInteractions(mockPushNotificationsConnector)
+      verifyNoInteractions(mockInternalAuthActionProvider)
+      verifyNoInteractions(mockStatusMonitoringService)
     }
 
     "must return INTERNAL_SERVER_ERROR when persistence service fails unexpectedly" in forAll(
@@ -966,32 +1318,31 @@ class MessageControllerSpec
       arbitraryMovementId.arbitrary,
       arbitraryMessageId.arbitrary,
       arbitrary[MessageType]
-    ) {
-      (successUpscanResponse, movementId, messageId, messageType) =>
-        val source: Source[ByteString, ?] = singleUseStringSource("abc")
+    ) { (successUpscanResponse, movementId, messageId, messageType) =>
+      val source: Source[ByteString, ?] = singleUseStringSource("abc")
 
-        when(mockUpscanConnector.streamFile(DownloadUrl(eqTo(successUpscanResponse.downloadUrl.value)))(any(), any(), any()))
-          .thenReturn(EitherT.rightT[Future, Source[ByteString, ?]](source))
+      when(mockUpscanConnector.streamFile(DownloadUrl(eqTo(successUpscanResponse.downloadUrl.value)))(any(), any(), any()))
+        .thenReturn(EitherT.rightT[Future, Source[ByteString, ?]](source))
 
-        when(mockMessageTypeExtractor.extractFromBody(any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](messageType))
+      when(mockMessageTypeExtractor.extractFromBody(any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](messageType))
 
-        when(mockPersistenceConnector.postBody(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(messageType), any())(any(), any()))
-          .thenReturn(EitherT.fromEither[Future](Left(Unexpected(None))))
+      when(mockPersistenceConnector.postBody(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(messageType), any())(any(), any()))
+        .thenReturn(EitherT.fromEither[Future](Left(Unexpected(None))))
 
-        val request = fakeRequestLargeMessage(Json.toJson[UpscanResponse](successUpscanResponse), incomingLargeMessage)
-        val result  = controller().incomingViaUpscan(movementId, messageId)(request)
+      val request = fakeRequestLargeMessage(Json.toJson[UpscanResponse](successUpscanResponse), incomingLargeMessage)
+      val result  = controller().incomingViaUpscan(movementId, messageId)(request)
 
-        status(result) mustBe INTERNAL_SERVER_ERROR
+      status(result) mustBe INTERNAL_SERVER_ERROR
 
-        verifyNoInteractions(mockPushNotificationsConnector)
-        verifyNoInteractions(mockInternalAuthActionProvider)
+      verifyNoInteractions(mockPushNotificationsConnector)
+      verifyNoInteractions(mockInternalAuthActionProvider)
 
-        // It was our fault, not other bits, so we should still report availability
-        verify(mockStatusMonitoringService, times(1)).incoming(
-          MovementId(eqTo(movementId.value)),
-          MessageId(eqTo(messageId.value)),
-          eqTo(messageType)
-        )(any(), any())
+      // It was our fault, not other bits, so we should still report availability
+      verify(mockStatusMonitoringService, times(1)).incoming(
+        MovementId(eqTo(movementId.value)),
+        MessageId(eqTo(messageId.value)),
+        eqTo(messageType)
+      )(any(), any())
     }
   }
 
@@ -1004,7 +1355,7 @@ class MessageControllerSpec
 
       val ppnsMessage = Json.toJson(
         Json.obj(
-          "code" -> "SUCCESS",
+          "code"    -> "SUCCESS",
           "message" ->
             s"The message ${messageId.value} for movement ${movementId.value} was successfully processed"
         )
@@ -1113,7 +1464,7 @@ class MessageControllerSpec
       val conversationId          = ConversationId(UUID.randomUUID())
       val (movementId, messageId) = conversationId.toMovementAndMessageId
       val sdesResponse            = arbitrarySdesResponse(conversationId).arbitrary.sample.get
-      val ppnsMessage = Json.obj(
+      val ppnsMessage             = Json.obj(
         "code"    -> "INTERNAL_SERVER_ERROR",
         "message" -> "Internal server error"
       )
@@ -1183,14 +1534,13 @@ class MessageControllerSpec
 
       import MessagesController.PresentationEitherTHelper
 
-      "for an EitherT with a Right, return the right" in forAll(Gen.option(Gen.oneOf(MessageType.values))) {
-        messageTypeMaybe =>
-          val incoming: EitherT[Future, RoutingError, Unit]                    = EitherT(Future.successful[Either[RoutingError, Unit]](Right((): Unit)))
-          val expected: Either[(PresentationError, Option[MessageType]), Unit] = Right((): Unit)
+      "for an EitherT with a Right, return the right" in forAll(Gen.option(Gen.oneOf(MessageType.values))) { messageTypeMaybe =>
+        val incoming: EitherT[Future, RoutingError, Unit]                    = EitherT(Future.successful[Either[RoutingError, Unit]](Right((): Unit)))
+        val expected: Either[(PresentationError, Option[MessageType]), Unit] = Right((): Unit)
 
-          whenReady(incoming.asPresentationWithMessageType(messageTypeMaybe).value) {
-            _ mustBe expected
-          }
+        whenReady(incoming.asPresentationWithMessageType(messageTypeMaybe).value) {
+          _ mustBe expected
+        }
       }
 
       "for an EitherT with a Left, return the left with the appropriate message type, if any" in forAll(Gen.option(Gen.oneOf(MessageType.values))) {

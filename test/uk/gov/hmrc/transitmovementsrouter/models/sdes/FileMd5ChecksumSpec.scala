@@ -31,12 +31,11 @@ class FileMd5ChecksumSpec extends AnyFreeSpec with Matchers with ScalaCheckDrive
 
   "fromBase64(Md5Hash)" - {
 
-    "for a file, store the location" in forAll(Gen.alphaNumStr) {
-      string =>
-        val messageDigest = MessageDigest.getInstance("MD5").digest(string.getBytes(StandardCharsets.UTF_8))
-        val base64        = Base64.getEncoder.encodeToString(messageDigest)
-        val hex           = messageDigest.map("%02x".format(_)).mkString
-        FileMd5Checksum.fromBase64(Md5Hash(base64)).value mustBe hex
+    "for a file, store the location" in forAll(Gen.alphaNumStr) { string =>
+      val messageDigest = MessageDigest.getInstance("MD5").digest(string.getBytes(StandardCharsets.UTF_8))
+      val base64        = Base64.getEncoder.encodeToString(messageDigest)
+      val hex           = messageDigest.map("%02x".format(_)).mkString
+      FileMd5Checksum.fromBase64(Md5Hash(base64)).value mustBe hex
     }
 
     "ensure that the empty Md5 hash in Base64 returns the Hex equivalent" in {

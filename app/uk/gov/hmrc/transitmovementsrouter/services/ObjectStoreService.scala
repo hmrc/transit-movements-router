@@ -69,8 +69,8 @@ class ObjectStoreServiceImpl @Inject() (clock: Clock, client: PlayObjectStoreCli
         owner = "transit-movements-router",
         contentMd5 = None
       )
-    ).leftMap[ObjectStoreError] {
-      case NonFatal(thr) => ObjectStoreError.UnexpectedError(thr = Some(thr))
+    ).leftMap[ObjectStoreError] { case NonFatal(thr) =>
+      ObjectStoreError.UnexpectedError(thr = Some(thr))
     }
 
   private def dateFormat: String =
