@@ -22,12 +22,11 @@ import scala.jdk.CollectionConverters._
 
 object IncomingAuthConfig {
 
-  implicit lazy val configLoader: ConfigLoader[IncomingAuthConfig] = ConfigLoader {
-    rootConfig => rootPath =>
-      IncomingAuthConfig(
-        rootConfig.getConfig(rootPath).getBoolean("enabled"),
-        rootConfig.getConfig(rootPath).getStringList("acceptedTokens").asScala.toSeq
-      )
+  implicit lazy val configLoader: ConfigLoader[IncomingAuthConfig] = ConfigLoader { rootConfig => rootPath =>
+    IncomingAuthConfig(
+      rootConfig.getConfig(rootPath).getBoolean("enabled"),
+      rootConfig.getConfig(rootPath).getStringList("acceptedTokens").asScala.toSeq
+    )
   }
 }
 

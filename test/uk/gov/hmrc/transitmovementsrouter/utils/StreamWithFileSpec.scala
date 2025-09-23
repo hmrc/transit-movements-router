@@ -69,20 +69,18 @@ class StreamWithFileSpec
       val string = Gen.stringOfN(10, Gen.alphaNumChar).sample.value
       val source = singleUseStringSource(string)
 
-      Harness.withReusableSource(source) {
-        source =>
-          EitherT[Future, PresentationError, Unit] {
-            source
-              .runWith(Sink.ignore)
-              .map {
-                _ =>
-                  // we now load the file, and it should contain the string
-                  val fileContents = Source.fromFile(temporaryFileCreator.temporaryFile.toFile)
-                  try fileContents.mkString mustBe string
-                  finally fileContents.close()
-                  Right(()) // this simply fulfils the contract
-              }
-          }
+      Harness.withReusableSource(source) { source =>
+        EitherT[Future, PresentationError, Unit] {
+          source
+            .runWith(Sink.ignore)
+            .map { _ =>
+              // we now load the file, and it should contain the string
+              val fileContents = Source.fromFile(temporaryFileCreator.temporaryFile.toFile)
+              try fileContents.mkString mustBe string
+              finally fileContents.close()
+              Right(()) // this simply fulfils the contract
+            }
+        }
       }
     }
 
@@ -95,24 +93,22 @@ class StreamWithFileSpec
       val string = Gen.stringOfN(10, Gen.alphaNumChar).sample.value
       val source = singleUseStringSource(string)
 
-      Harness.withReusableSource(source) {
-        source =>
-          val future = for {
-            first  <- source.runWith(Sink.head).map(_.utf8String)
-            second <- source.runWith(Sink.head).map(_.utf8String)
-            third  <- source.runWith(Sink.head).map(_.utf8String)
-            fourth <- source.runWith(Sink.head).map(_.utf8String)
-          } yield (first, second, third, fourth)
+      Harness.withReusableSource(source) { source =>
+        val future = for {
+          first  <- source.runWith(Sink.head).map(_.utf8String)
+          second <- source.runWith(Sink.head).map(_.utf8String)
+          third  <- source.runWith(Sink.head).map(_.utf8String)
+          fourth <- source.runWith(Sink.head).map(_.utf8String)
+        } yield (first, second, third, fourth)
 
-          whenReady(future) {
-            result =>
-              result._1 mustBe string
-              result._2 mustBe string
-              result._3 mustBe string
-              result._4 mustBe string
-          }
+        whenReady(future) { result =>
+          result._1 mustBe string
+          result._2 mustBe string
+          result._3 mustBe string
+          result._4 mustBe string
+        }
 
-          EitherT.rightT[Future, PresentationError](())
+        EitherT.rightT[Future, PresentationError](())
       }
     }
   }

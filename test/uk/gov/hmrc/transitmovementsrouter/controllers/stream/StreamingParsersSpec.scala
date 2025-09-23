@@ -81,63 +81,50 @@ class StreamingParsersSpec extends AnyFreeSpec with Matchers with TestActorSyste
     implicit val temporaryFileCreator: Files.SingletonTemporaryFileCreator.type = SingletonTemporaryFileCreator
     implicit val materializer: Materializer                                     = Materializer(TestActorSystem.system)
 
-    def testFromMemory: Action[Source[ByteString, ?]] = Action.async(streamFromMemory) {
-      request => result.apply(request).run(request.body)(materializer)
+    def testFromMemory: Action[Source[ByteString, ?]] = Action.async(streamFromMemory) { request =>
+      result.apply(request).run(request.body)(materializer)
     }
 
-    def result: Action[String] = Action.async(parse.text) {
-      request =>
-        Future.successful(Ok(request.body))
+    def result: Action[String] = Action.async(parse.text) { request =>
+      Future.successful(Ok(request.body))
     }
 
-    def resultStream: Action[Source[ByteString, ?]] = Action.andThen(TestActionBuilder).streamWithSize {
-      request => _ =>
-        (for {
-          a <- request.body.runWith(Sink.last)
-          b <- request.body.runWith(Sink.last)
-        } yield (a ++ b).utf8String)
-          .map(
-            r => Ok(r)
-          )
+    def resultStream: Action[Source[ByteString, ?]] = Action.andThen(TestActionBuilder).streamWithSize { request => _ =>
+      (for {
+        a <- request.body.runWith(Sink.last)
+        b <- request.body.runWith(Sink.last)
+      } yield (a ++ b).utf8String)
+        .map(r => Ok(r))
     }
 
     def transformStream: Action[Source[ByteString, ?]] = Action
       .andThen(TestActionBuilder)
       .streamWithSize(
-        Flow.fromFunction[ByteString, ByteString](
-          a => a ++ a
-        )
-      ) {
-        request => _ =>
-          (for {
-            a <- request.body.runWith(Sink.last)
-            b <- request.body.runWith(Sink.last)
-          } yield (a ++ b).utf8String)
-            .map(
-              r => Ok(r)
-            )
+        Flow.fromFunction[ByteString, ByteString](a => a ++ a)
+      ) { request => _ =>
+        (for {
+          a <- request.body.runWith(Sink.last)
+          b <- request.body.runWith(Sink.last)
+        } yield (a ++ b).utf8String)
+          .map(r => Ok(r))
       }
 
     def errorStream: Action[Source[ByteString, ?]] = Action
       .andThen(TestActionBuilder)
       .streamWithSize(
-        Flow.fromFunction[ByteString, ByteString](
-          _ => throw new IllegalStateException("this happened")
-        )
-      ) {
-        _ => _ =>
-          Future.successful(Ok("but should never happen"))
+        Flow.fromFunction[ByteString, ByteString](_ => throw new IllegalStateException("this happened"))
+      ) { _ => _ =>
+        Future.successful(Ok("but should never happen"))
       }
 
     def internalErrorStream: Action[Source[ByteString, ?]] = Action
       .andThen(TestActionBuilder)
       .streamWithSize(
-        Flow.fromFunction[ByteString, ByteString](
-          _ => throw new NumberFormatException() // doesn't matter - we're just not expecting it
+        Flow.fromFunction[ByteString, ByteString](_ =>
+          throw new NumberFormatException() // doesn't matter - we're just not expecting it
         )
-      ) {
-        _ => _ =>
-          Future.successful(Ok("but should never happen"))
+      ) { _ => _ =>
+        Future.successful(Ok("but should never happen"))
       }
 
     override val config: AppConfig = mock[AppConfig]
@@ -156,18 +143,16 @@ class StreamingParsersSpec extends AnyFreeSpec with Matchers with TestActorSyste
     Source(byteString.grouped(1024).toSeq)
 
   "Streaming" - {
-    "from Memory" - {
-      (1 to 5).foreach {
-        value =>
-          s"~$value kb string is created" in {
-            val byteString = generateByteString(value)
-            val request    = FakeRequest("POST", "/", headers, generateSource(byteString))
-            val result     = Harness.testFromMemory()(request)
-            status(result) mustBe OK
-            contentAsString(result) mustBe byteString.utf8String
-          }
+    "from Memory" -
+      (1 to 5).foreach { value =>
+        s"~$value kb string is created" in {
+          val byteString = generateByteString(value)
+          val request    = FakeRequest("POST", "/", headers, generateSource(byteString))
+          val result     = Harness.testFromMemory()(request)
+          status(result) mustBe OK
+          contentAsString(result) mustBe byteString.utf8String
+        }
       }
-    }
 
     "via the stream extension method" in {
       val string  = Gen.stringOfN(20, Gen.alphaNumChar).sample.get

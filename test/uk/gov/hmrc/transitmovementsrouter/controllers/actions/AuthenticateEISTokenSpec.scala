@@ -54,17 +54,16 @@ class AuthenticateEISTokenSpec extends AnyFreeSpec with Matchers with OptionValu
       }
     }
 
-    "ensure we always return no result with a gibberish authorisation header, allowing the action to proceed" in forAll(Gen.alphaNumStr) {
-      token =>
-        val mockAppConfig = mock[AppConfig]
-        when(mockAppConfig.incomingAuth).thenReturn(disabledConfig)
-        val sut = new AuthenticateEISTokenImpl(mockAppConfig, mockParsers)
+    "ensure we always return no result with a gibberish authorisation header, allowing the action to proceed" in forAll(Gen.alphaNumStr) { token =>
+      val mockAppConfig = mock[AppConfig]
+      when(mockAppConfig.incomingAuth).thenReturn(disabledConfig)
+      val sut = new AuthenticateEISTokenImpl(mockAppConfig, mockParsers)
 
-        val request = FakeRequest("POST", "/", FakeHeaders(Seq("Authentication" -> token)), "")
+      val request = FakeRequest("POST", "/", FakeHeaders(Seq("Authentication" -> token)), "")
 
-        whenReady(sut.filter(request)) {
-          _ mustBe None
-        }
+      whenReady(sut.filter(request)) {
+        _ mustBe None
+      }
     }
 
     "ensure we always return no result with a good authorisation header, allowing the action to proceed" in {
@@ -96,47 +95,44 @@ class AuthenticateEISTokenSpec extends AnyFreeSpec with Matchers with OptionValu
       }
     }
 
-    "ensure we always return unauthorized with a gibberish authorisation header" in forAll(Gen.alphaNumStr) {
-      token =>
-        val mockAppConfig = mock[AppConfig]
-        when(mockAppConfig.incomingAuth).thenReturn(enabledConfig)
-        val sut = new AuthenticateEISTokenImpl(mockAppConfig, mockParsers)
+    "ensure we always return unauthorized with a gibberish authorisation header" in forAll(Gen.alphaNumStr) { token =>
+      val mockAppConfig = mock[AppConfig]
+      when(mockAppConfig.incomingAuth).thenReturn(enabledConfig)
+      val sut = new AuthenticateEISTokenImpl(mockAppConfig, mockParsers)
 
-        val request = FakeRequest("POST", "/", FakeHeaders(Seq("Authorization" -> token)), "")
+      val request = FakeRequest("POST", "/", FakeHeaders(Seq("Authorization" -> token)), "")
 
-        whenReady(sut.filter(request)) {
-          case Some(value) => value.header.status mustBe UNAUTHORIZED
-          case None        => fail("Should have returned a result")
-        }
+      whenReady(sut.filter(request)) {
+        case Some(value) => value.header.status mustBe UNAUTHORIZED
+        case None        => fail("Should have returned a result")
+      }
     }
 
-    "ensure we always return unauthorized with a bad authorisation header" in forAll(Gen.alphaNumStr.map(_.toLowerCase)) {
-      token =>
-        val mockAppConfig = mock[AppConfig]
-        when(mockAppConfig.incomingAuth).thenReturn(enabledConfig)
-        val sut = new AuthenticateEISTokenImpl(mockAppConfig, mockParsers)
+    "ensure we always return unauthorized with a bad authorisation header" in forAll(Gen.alphaNumStr.map(_.toLowerCase)) { token =>
+      val mockAppConfig = mock[AppConfig]
+      when(mockAppConfig.incomingAuth).thenReturn(enabledConfig)
+      val sut = new AuthenticateEISTokenImpl(mockAppConfig, mockParsers)
 
-        val request = FakeRequest("POST", "/", FakeHeaders(Seq("Authorization" -> s"Bearer $token")), "")
+      val request = FakeRequest("POST", "/", FakeHeaders(Seq("Authorization" -> s"Bearer $token")), "")
 
-        whenReady(sut.filter(request)) {
-          case Some(value) => value.header.status mustBe UNAUTHORIZED
-          case None        => fail("Should have returned a result")
-        }
+      whenReady(sut.filter(request)) {
+        case Some(value) => value.header.status mustBe UNAUTHORIZED
+        case None        => fail("Should have returned a result")
+      }
     }
 
-    "ensure we always return unauthorized with a bad authorisation header and log obfuscated bearers" in forAll(Gen.alphaNumStr.map(_.toLowerCase)) {
-      token =>
-        val mockAppConfig = mock[AppConfig]
-        when(mockAppConfig.incomingAuth).thenReturn(enabledConfig)
-        when(mockAppConfig.logObfuscatedInboundBearer).thenReturn(true)
-        val sut = new AuthenticateEISTokenImpl(mockAppConfig, mockParsers)
+    "ensure we always return unauthorized with a bad authorisation header and log obfuscated bearers" in forAll(Gen.alphaNumStr.map(_.toLowerCase)) { token =>
+      val mockAppConfig = mock[AppConfig]
+      when(mockAppConfig.incomingAuth).thenReturn(enabledConfig)
+      when(mockAppConfig.logObfuscatedInboundBearer).thenReturn(true)
+      val sut = new AuthenticateEISTokenImpl(mockAppConfig, mockParsers)
 
-        val request = FakeRequest("POST", "/", FakeHeaders(Seq("Authorization" -> s"Bearer $token")), "")
+      val request = FakeRequest("POST", "/", FakeHeaders(Seq("Authorization" -> s"Bearer $token")), "")
 
-        whenReady(sut.filter(request)) {
-          case Some(value) => value.header.status mustBe UNAUTHORIZED
-          case None        => fail("Should have returned a result")
-        }
+      whenReady(sut.filter(request)) {
+        case Some(value) => value.header.status mustBe UNAUTHORIZED
+        case None        => fail("Should have returned a result")
+      }
     }
 
     "ensure we always return no result with a good authorisation header, allowing the action to proceed" in {

@@ -22,19 +22,18 @@ import play.api.Configuration
 object EISInstanceConfig {
 
   implicit lazy val configLoader: ConfigLoader[EISInstanceConfig] =
-    ConfigLoader {
-      rootConfig => path =>
-        val config = Configuration(rootConfig.getConfig(path))
-        EISInstanceConfig(
-          config.get[String]("protocol"),
-          config.get[String]("host"),
-          config.get[Int]("port"),
-          config.get[String]("uri"),
-          config.get[Headers]("headers"),
-          config.get[CircuitBreakerConfig]("circuit-breaker"),
-          config.get[RetryConfig]("retry"),
-          config.get[Boolean]("forward-client-id")
-        )
+    ConfigLoader { rootConfig => path =>
+      val config = Configuration(rootConfig.getConfig(path))
+      EISInstanceConfig(
+        config.get[String]("protocol"),
+        config.get[String]("host"),
+        config.get[Int]("port"),
+        config.get[String]("uri"),
+        config.get[Headers]("headers"),
+        config.get[CircuitBreakerConfig]("circuit-breaker"),
+        config.get[RetryConfig]("retry"),
+        config.get[Boolean]("forward-client-id")
+      )
     }
 
 }

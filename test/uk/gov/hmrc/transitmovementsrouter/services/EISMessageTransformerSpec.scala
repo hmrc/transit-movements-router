@@ -44,12 +44,12 @@ class EISMessageTransformerSpec extends AnyFreeSpec with Matchers with ScalaFutu
         .single(ByteString.fromString(input))
         .via(sut.unwrap)
         .runReduce(_ ++ _)
-        .map {
-          x => x.utf8String
+        .map { x =>
+          x.utf8String
         }
 
-      whenReady(result) {
-        r => XML.loadString(r) mustBe <ncts:CC029C xmlns:ncts="http://ncts.dgtaxud.ec" PhaseID="NCTS5.0">text</ncts:CC029C>
+      whenReady(result) { r =>
+        XML.loadString(r) mustBe <ncts:CC029C xmlns:ncts="http://ncts.dgtaxud.ec" PhaseID="NCTS5.0">text</ncts:CC029C>
       }
     }
 
@@ -67,13 +67,12 @@ class EISMessageTransformerSpec extends AnyFreeSpec with Matchers with ScalaFutu
         .single(ByteString.fromString(input))
         .via(sut.unwrap)
         .runReduce(_ ++ _)
-        .map {
-          x => x.utf8String
+        .map { x =>
+          x.utf8String
         }
 
-      whenReady(result) {
-        r =>
-          XML.loadString(r) mustBe <ncts:CC015C xmlns:ncts="http://ncts.dgtaxud.ec" PhaseID="NCTS5.1">
+      whenReady(result) { r =>
+        XML.loadString(r) mustBe <ncts:CC015C xmlns:ncts="http://ncts.dgtaxud.ec" PhaseID="NCTS5.1">
             <messageSender>sender</messageSender>
             <messageReceiver>receiver</messageReceiver>
             <something>else</something>
@@ -118,13 +117,12 @@ class EISMessageTransformerSpec extends AnyFreeSpec with Matchers with ScalaFutu
         .single(ByteString.fromString(input))
         .via(sut.unwrap)
         .runReduce(_ ++ _)
-        .map {
-          x => x.utf8String
+        .map { x =>
+          x.utf8String
         }
 
-      whenReady(result) {
-        r =>
-          XML.loadString(r) mustBe <ncts:CC004C PhaseID="NCTS5.0" xmlns:ncts="http://ncts.dgtaxud.ec">
+      whenReady(result) { r =>
+        XML.loadString(r) mustBe <ncts:CC004C PhaseID="NCTS5.0" xmlns:ncts="http://ncts.dgtaxud.ec">
             <messageSender>!</messageSender>
             <messageRecipient>!</messageRecipient>
             <preparationDateAndTime>0231-11-23T10:03:02</preparationDateAndTime>
@@ -163,15 +161,15 @@ class EISMessageTransformerSpec extends AnyFreeSpec with Matchers with ScalaFutu
           .single(ByteString.fromString(input))
           .via(sut.unwrap)
           .runReduce(_ ++ _)
-          .map {
-            x => x.utf8String
+          .map { x =>
+            x.utf8String
           }
 
       whenReady(result.transform {
         case Success(_) => Failure(fail())
         case Failure(x) => Success(x)
-      }) {
-        res => res mustBe a[Throwable]
+      }) { res =>
+        res mustBe a[Throwable]
       }
 
     }
@@ -184,15 +182,15 @@ class EISMessageTransformerSpec extends AnyFreeSpec with Matchers with ScalaFutu
           .single(ByteString.fromString(input))
           .via(sut.unwrap)
           .runReduce(_ ++ _)
-          .map {
-            x => x.utf8String
+          .map { x =>
+            x.utf8String
           }
 
       whenReady(result.transform {
         case Success(_) => Failure(fail())
         case Failure(x) => Success(x)
-      }) {
-        res => res mustBe a[Throwable]
+      }) { res =>
+        res mustBe a[Throwable]
       }
 
     }
@@ -208,12 +206,11 @@ class EISMessageTransformerSpec extends AnyFreeSpec with Matchers with ScalaFutu
         .single(ByteString.fromString(input))
         .via(sut.wrap)
         .runReduce(_ ++ _)
-        .map {
-          x => x.utf8String
+        .map { x =>
+          x.utf8String
         }
 
-      whenReady(result) {
-        r =>
+      whenReady(result) { r =>
           // format: off
           XML.loadString(r) mustBe
             <n1:TraderChannelSubmission xmlns:txd="http://ncts.dgtaxud.ec" xmlns:n1="http://www.hmrc.gov.uk/eis/ncts5/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.hmrc.gov.uk/eis/ncts5/v1 EIS_WrapperV10_TraderChannelSubmission-51.8.xsd"><txd:CC029C PhaseID="NCTS5.0">text</txd:CC029C></n1:TraderChannelSubmission>
@@ -225,19 +222,18 @@ class EISMessageTransformerSpec extends AnyFreeSpec with Matchers with ScalaFutu
       // We do this instead of forAll as forAll seems to then use substrings of the prefix,
       // and this test fails when we have an empty string.
       val prefix = Gen.stringOfN(3, Gen.alphaLowerChar).sample.get
-      val input =
+      val input  =
         s"""<$prefix:CC029C xmlns:$prefix="http://ncts.dgtaxud.ec" PhaseID="NCTS5.0">text</$prefix:CC029C>"""
 
       val result = Source
         .single(ByteString.fromString(input))
         .via(sut.wrap)
         .runReduce(_ ++ _)
-        .map {
-          x => x.utf8String
+        .map { x =>
+          x.utf8String
         }
 
-      whenReady(result) {
-        r =>
+      whenReady(result) { r =>
           // format: off
           XML.loadString(r) mustBe
             <n1:TraderChannelSubmission xmlns:txd="http://ncts.dgtaxud.ec" xmlns:n1="http://www.hmrc.gov.uk/eis/ncts5/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.hmrc.gov.uk/eis/ncts5/v1 EIS_WrapperV10_TraderChannelSubmission-51.8.xsd"><txd:CC029C PhaseID="NCTS5.0">text</txd:CC029C></n1:TraderChannelSubmission>
@@ -253,15 +249,15 @@ class EISMessageTransformerSpec extends AnyFreeSpec with Matchers with ScalaFutu
           .single(ByteString.fromString(input))
           .via(sut.wrap)
           .runReduce(_ ++ _)
-          .map {
-            x => x.utf8String
+          .map { x =>
+            x.utf8String
           }
 
       whenReady(result.transform {
         case Success(x) => Failure(fail(s"Success was found when it should not have succeeded. Output: $x"))
         case Failure(x) => Success(x)
-      }) {
-        res => res mustBe a[Throwable]
+      }) { res =>
+        res mustBe a[Throwable]
       }
 
     }

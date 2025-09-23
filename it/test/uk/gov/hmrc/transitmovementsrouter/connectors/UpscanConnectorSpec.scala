@@ -82,7 +82,7 @@ class UpscanConnectorSpec
           .willReturn(aResponse().withStatus(NOT_FOUND))
       )
 
-      val sut = new UpscanConnectorImpl(httpClientV2)
+      val sut    = new UpscanConnectorImpl(httpClientV2)
       val result = sut
         .streamFile(DownloadUrl(s"http://localhost:${server.port()}/test.xml"))
 
@@ -98,7 +98,7 @@ class UpscanConnectorSpec
           .willReturn(aResponse().withStatus(INTERNAL_SERVER_ERROR))
       )
 
-      val sut = new UpscanConnectorImpl(httpClientV2)
+      val sut    = new UpscanConnectorImpl(httpClientV2)
       val result = sut
         .streamFile(DownloadUrl(s"http://localhost:${server.port()}/test.xml"))
 

@@ -104,9 +104,8 @@ class AuditingServiceImpl @Inject() (auditingConnector: AuditingConnector) exten
         clientId,
         isTransitional
       )
-      .recover {
-        case NonFatal(e) =>
-          logger.warn("Unable to audit payload due to an exception", e)
+      .recover { case NonFatal(e) =>
+        logger.warn("Unable to audit payload due to an exception", e)
       }
 
   def auditStatusEvent(
@@ -122,9 +121,8 @@ class AuditingServiceImpl @Inject() (auditingConnector: AuditingConnector) exten
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Future[Unit] =
-    auditingConnector.postStatus(auditType, payload, movementId, messageId, enrolmentEORI, movementType, messageType, clientId).recover {
-      case NonFatal(e) =>
-        logger.warn("Unable to audit payload due to an exception", e)
+    auditingConnector.postStatus(auditType, payload, movementId, messageId, enrolmentEORI, movementType, messageType, clientId).recover { case NonFatal(e) =>
+      logger.warn("Unable to audit payload due to an exception", e)
 
     }
 }

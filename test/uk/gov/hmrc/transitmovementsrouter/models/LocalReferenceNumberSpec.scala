@@ -26,13 +26,11 @@ import play.api.libs.json.JsSuccess
 
 class LocalReferenceNumberSpec extends AnyFreeSpec with Matchers {
 
-  "when LRN is serialized, return a JsString" in forAll(Gen.stringOfN(22, Gen.alphaNumChar)) {
-    string =>
-      LocalReferenceNumber.lrnFormat.writes(LocalReferenceNumber(string)) mustBe JsString(string)
+  "when LRN is serialized, return a JsString" in forAll(Gen.stringOfN(22, Gen.alphaNumChar)) { string =>
+    LocalReferenceNumber.lrnFormat.writes(LocalReferenceNumber(string)) mustBe JsString(string)
   }
 
-  "when JsString is deserialized, return a MovementReferenceNumber" in forAll(Gen.stringOfN(22, Gen.alphaNumChar)) {
-    string =>
-      LocalReferenceNumber.lrnFormat.reads(JsString(string)) mustBe JsSuccess(LocalReferenceNumber(string))
+  "when JsString is deserialized, return a MovementReferenceNumber" in forAll(Gen.stringOfN(22, Gen.alphaNumChar)) { string =>
+    LocalReferenceNumber.lrnFormat.reads(JsString(string)) mustBe JsSuccess(LocalReferenceNumber(string))
   }
 }

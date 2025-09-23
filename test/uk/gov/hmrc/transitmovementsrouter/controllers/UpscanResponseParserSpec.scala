@@ -43,32 +43,26 @@ class UpscanResponseParserSpec extends AnyFreeSpec with ScalaFutures with Matche
   "parseUpscanResponse" - {
     "given a successful response in the callback, returns a defined option with value of UploadDetails" in forAll(
       arbitrary[UpscanSuccessResponse]
-    ) {
-      successUpscanResponse =>
-        val json = Json.toJson[UpscanResponse](successUpscanResponse)
-        whenReady(testController.parseAndLogUpscanResponse(json).value) {
-          either =>
-            either mustBe Right(successUpscanResponse)
-        }
+    ) { successUpscanResponse =>
+      val json = Json.toJson[UpscanResponse](successUpscanResponse)
+      whenReady(testController.parseAndLogUpscanResponse(json).value) { either =>
+        either mustBe Right(successUpscanResponse)
+      }
     }
 
     "given a failure response in the callback, returns a defined option with value of FailedDetails" in forAll(
       arbitrary[UpscanFailedResponse]
-    ) {
-      failureUpscanResponse =>
-        val json = Json.toJson[UpscanResponse](failureUpscanResponse)
-        whenReady(testController.parseAndLogUpscanResponse(json).value) {
-          either =>
-            either mustBe Right(failureUpscanResponse)
-        }
-    }
-
-    "given a response in the callback that we cannot deserialize, returns a PresentationError" in {
-      whenReady(testController.parseAndLogUpscanResponse(Json.obj("reference" -> "abc")).value) {
-        either =>
-          either mustBe Left(PresentationError.badRequestError("Unexpected Upscan callback response"))
+    ) { failureUpscanResponse =>
+      val json = Json.toJson[UpscanResponse](failureUpscanResponse)
+      whenReady(testController.parseAndLogUpscanResponse(json).value) { either =>
+        either mustBe Right(failureUpscanResponse)
       }
     }
+
+    "given a response in the callback that we cannot deserialize, returns a PresentationError" in
+      whenReady(testController.parseAndLogUpscanResponse(Json.obj("reference" -> "abc")).value) { either =>
+        either mustBe Left(PresentationError.badRequestError("Unexpected Upscan callback response"))
+      }
   }
 
 }

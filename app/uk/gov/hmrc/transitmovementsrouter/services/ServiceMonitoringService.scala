@@ -58,8 +58,8 @@ class ServiceMonitoringServiceImpl @Inject() (appConfig: AppConfig, statusMonito
         statusMonitoringConnector
           .outgoing(movementId, messageId, messageType, office)
           .map(Right.apply)
-          .recover {
-            case NonFatal(ex) => Left(ServiceMonitoringError.Unknown(Some(ex)))
+          .recover { case NonFatal(ex) =>
+            Left(ServiceMonitoringError.Unknown(Some(ex)))
           }
       }
     } else EitherT.rightT(())
@@ -73,8 +73,8 @@ class ServiceMonitoringServiceImpl @Inject() (appConfig: AppConfig, statusMonito
         statusMonitoringConnector
           .incoming(movementId, messageId, messageType)
           .map(Right.apply)
-          .recover {
-            case NonFatal(ex) => Left(ServiceMonitoringError.Unknown(Some(ex)))
+          .recover { case NonFatal(ex) =>
+            Left(ServiceMonitoringError.Unknown(Some(ex)))
           }
       }
     } else EitherT.rightT(())

@@ -70,29 +70,28 @@ class ServiceMonitoringServiceSpec extends AnyFreeSpec with Matchers with TestMo
         arbitrary[MessageId],
         arbitrary[MessageType],
         arbitrary[CustomsOffice]
-      ) {
-        (movementId, messageId, messageType, customsOffice) =>
-          val mockConnector = mock[ServiceMonitoringConnector]
-          when(
-            mockConnector.outgoing(
-              MovementId(eqTo(movementId.value)),
-              MessageId(eqTo(messageId.value)),
-              eqTo(messageType),
-              CustomsOffice(eqTo(customsOffice.value))
-            )(any(), any())
-          )
-            .thenReturn(Future.successful((): Unit))
+      ) { (movementId, messageId, messageType, customsOffice) =>
+        val mockConnector = mock[ServiceMonitoringConnector]
+        when(
+          mockConnector.outgoing(
+            MovementId(eqTo(movementId.value)),
+            MessageId(eqTo(messageId.value)),
+            eqTo(messageType),
+            CustomsOffice(eqTo(customsOffice.value))
+          )(any(), any())
+        )
+          .thenReturn(Future.successful((): Unit))
 
-          val sut = new ServiceMonitoringServiceImpl(mockAppConfig, mockConnector)
-          whenReady(sut.outgoing(movementId, messageId, messageType, customsOffice).value) {
-            case Right(()) =>
-              verify(mockConnector, times(1))
-                .outgoing(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(messageType), CustomsOffice(eqTo(customsOffice.value)))(
-                  any(),
-                  any()
-                )
-            case Left(_) => fail("Expecting a Right of Unit")
-          }
+        val sut = new ServiceMonitoringServiceImpl(mockAppConfig, mockConnector)
+        whenReady(sut.outgoing(movementId, messageId, messageType, customsOffice).value) {
+          case Right(()) =>
+            verify(mockConnector, times(1))
+              .outgoing(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(messageType), CustomsOffice(eqTo(customsOffice.value)))(
+                any(),
+                any()
+              )
+          case Left(_) => fail("Expecting a Right of Unit")
+        }
       }
 
       "and the connector succeeds, return Left of Unexpected" in forAll(
@@ -100,30 +99,29 @@ class ServiceMonitoringServiceSpec extends AnyFreeSpec with Matchers with TestMo
         arbitrary[MessageId],
         arbitrary[MessageType],
         arbitrary[CustomsOffice]
-      ) {
-        (movementId, messageId, messageType, customsOffice) =>
-          val mockConnector = mock[ServiceMonitoringConnector]
-          val expected      = new IllegalStateException("error")
-          when(
-            mockConnector.outgoing(
-              MovementId(eqTo(movementId.value)),
-              MessageId(eqTo(messageId.value)),
-              eqTo(messageType),
-              CustomsOffice(eqTo(customsOffice.value))
-            )(any(), any())
-          )
-            .thenReturn(Future.failed(expected))
+      ) { (movementId, messageId, messageType, customsOffice) =>
+        val mockConnector = mock[ServiceMonitoringConnector]
+        val expected      = new IllegalStateException("error")
+        when(
+          mockConnector.outgoing(
+            MovementId(eqTo(movementId.value)),
+            MessageId(eqTo(messageId.value)),
+            eqTo(messageType),
+            CustomsOffice(eqTo(customsOffice.value))
+          )(any(), any())
+        )
+          .thenReturn(Future.failed(expected))
 
-          val sut = new ServiceMonitoringServiceImpl(mockAppConfig, mockConnector)
-          whenReady(sut.outgoing(movementId, messageId, messageType, customsOffice).value) {
-            case Left(ServiceMonitoringError.Unknown(Some(`expected`))) =>
-              verify(mockConnector, times(1))
-                .outgoing(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(messageType), CustomsOffice(eqTo(customsOffice.value)))(
-                  any(),
-                  any()
-                )
-            case _ => fail("Expecting a Left of an Unexpected")
-          }
+        val sut = new ServiceMonitoringServiceImpl(mockAppConfig, mockConnector)
+        whenReady(sut.outgoing(movementId, messageId, messageType, customsOffice).value) {
+          case Left(ServiceMonitoringError.Unknown(Some(`expected`))) =>
+            verify(mockConnector, times(1))
+              .outgoing(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(messageType), CustomsOffice(eqTo(customsOffice.value)))(
+                any(),
+                any()
+              )
+          case _ => fail("Expecting a Left of an Unexpected")
+        }
       }
 
     }

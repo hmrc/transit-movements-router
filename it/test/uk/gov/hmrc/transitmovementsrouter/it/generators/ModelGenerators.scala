@@ -121,8 +121,8 @@ trait ModelGenerators extends BaseGenerators {
   }
 
   implicit lazy val arbitraryEoriNumber: Arbitrary[EoriNumber] = Arbitrary {
-    Gen.alphaNumStr.map(
-      alphaNum => if (alphaNum.trim.isEmpty) EoriNumber("abc123") else EoriNumber(alphaNum) // guard against the empty string
+    Gen.alphaNumStr.map(alphaNum =>
+      if (alphaNum.trim.isEmpty) EoriNumber("abc123") else EoriNumber(alphaNum) // guard against the empty string
     )
   }
 

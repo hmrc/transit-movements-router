@@ -31,68 +31,66 @@ import scala.xml._
 
 class XmlParserSpec extends AnyFreeSpec with TestActorSystem with Matchers with TestModelGenerators {
 
-  MessageType.arrivalRequestValues.foreach {
-    messageType =>
-      "Arrival office node parser" - new Setup {
-        s"when provided with a valid ${messageType.code} message" in {
-          val stream       = createParsingEventStream(arrivalMessageWithCustomsOfficeNode(messageType))
-          val parsedResult = stream.via(XmlParser.customsOfficeExtractor(messageType)).runWith(Sink.head)
+  MessageType.arrivalRequestValues.foreach { messageType =>
+    "Arrival office node parser" - new Setup {
+      s"when provided with a valid ${messageType.code} message" in {
+        val stream       = createParsingEventStream(arrivalMessageWithCustomsOfficeNode(messageType))
+        val parsedResult = stream.via(XmlParser.customsOfficeExtractor(messageType)).runWith(Sink.head)
 
-          whenReady(parsedResult) {
-            _.toOption.get mustBe referenceNumber
-          }
-        }
-
-        s"when ${messageType.code} is provided without a reference number value" in {
-          val stream       = createParsingEventStream(arrivalMessageWithoutRefNumber(messageType))
-          val parsedResult = stream.via(XmlParser.customsOfficeExtractor(messageType)).runWith(Sink.head)
-
-          whenReady(parsedResult) {
-            _.mustBe(Left(NoElementFound("referenceNumber")))
-          }
-        }
-
-        s"when ${messageType.code} is provided without a customs office node" in {
-          val stream       = createParsingEventStream(arrivalMessageWithoutCustomsOfficeNode(messageType))
-          val parsedResult = stream.via(XmlParser.customsOfficeExtractor(messageType)).runWith(Sink.head)
-
-          whenReady(parsedResult) {
-            _.mustBe(Left(NoElementFound("referenceNumber")))
-          }
+        whenReady(parsedResult) {
+          _.toOption.get mustBe referenceNumber
         }
       }
+
+      s"when ${messageType.code} is provided without a reference number value" in {
+        val stream       = createParsingEventStream(arrivalMessageWithoutRefNumber(messageType))
+        val parsedResult = stream.via(XmlParser.customsOfficeExtractor(messageType)).runWith(Sink.head)
+
+        whenReady(parsedResult) {
+          _.mustBe(Left(NoElementFound("referenceNumber")))
+        }
+      }
+
+      s"when ${messageType.code} is provided without a customs office node" in {
+        val stream       = createParsingEventStream(arrivalMessageWithoutCustomsOfficeNode(messageType))
+        val parsedResult = stream.via(XmlParser.customsOfficeExtractor(messageType)).runWith(Sink.head)
+
+        whenReady(parsedResult) {
+          _.mustBe(Left(NoElementFound("referenceNumber")))
+        }
+      }
+    }
   }
 
-  MessageType.departureRequestValues.foreach {
-    messageType =>
-      "Departure office node parser" - new Setup {
-        s"when provided with a valid ${messageType.code} message it extracts the customs office" in {
-          val stream       = createParsingEventStream(messageWithoutMessageSender(messageType))
-          val parsedResult = stream.via(XmlParser.customsOfficeExtractor(messageType)).runWith(Sink.head)
+  MessageType.departureRequestValues.foreach { messageType =>
+    "Departure office node parser" - new Setup {
+      s"when provided with a valid ${messageType.code} message it extracts the customs office" in {
+        val stream       = createParsingEventStream(messageWithoutMessageSender(messageType))
+        val parsedResult = stream.via(XmlParser.customsOfficeExtractor(messageType)).runWith(Sink.head)
 
-          whenReady(parsedResult) {
-            _.toOption.get mustBe referenceNumber
-          }
-        }
-
-        s"when provided with a missing customs office node in ${messageType.code} message it returns NoElementFound" in {
-          val stream       = createParsingEventStream(messageWithoutDepartureCustomsOfficeNode(messageType))
-          val parsedResult = stream.via(XmlParser.customsOfficeExtractor(MessageType.DeclarationData)).runWith(Sink.head)
-
-          whenReady(parsedResult) {
-            _.mustBe(Left(NoElementFound("referenceNumber")))
-          }
-        }
-
-        s"when provided with a missing ReferenceNumber node in ${messageType.code} message it returns NoElementFound" in {
-          val stream       = createParsingEventStream(messageWithoutRefNumber(messageType))
-          val parsedResult = stream.via(XmlParser.customsOfficeExtractor(MessageType.DeclarationData)).runWith(Sink.head)
-
-          whenReady(parsedResult) {
-            _.mustBe(Left(NoElementFound("referenceNumber")))
-          }
+        whenReady(parsedResult) {
+          _.toOption.get mustBe referenceNumber
         }
       }
+
+      s"when provided with a missing customs office node in ${messageType.code} message it returns NoElementFound" in {
+        val stream       = createParsingEventStream(messageWithoutDepartureCustomsOfficeNode(messageType))
+        val parsedResult = stream.via(XmlParser.customsOfficeExtractor(MessageType.DeclarationData)).runWith(Sink.head)
+
+        whenReady(parsedResult) {
+          _.mustBe(Left(NoElementFound("referenceNumber")))
+        }
+      }
+
+      s"when provided with a missing ReferenceNumber node in ${messageType.code} message it returns NoElementFound" in {
+        val stream       = createParsingEventStream(messageWithoutRefNumber(messageType))
+        val parsedResult = stream.via(XmlParser.customsOfficeExtractor(MessageType.DeclarationData)).runWith(Sink.head)
+
+        whenReady(parsedResult) {
+          _.mustBe(Left(NoElementFound("referenceNumber")))
+        }
+      }
+    }
   }
 
   trait Setup {
