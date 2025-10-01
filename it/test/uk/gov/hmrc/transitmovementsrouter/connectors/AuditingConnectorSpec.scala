@@ -16,7 +16,7 @@
 
 package uk.gov.hmrc.transitmovementsrouter.connectors
 
-import com.github.tomakehurst.wiremock.client.WireMock._
+import com.github.tomakehurst.wiremock.client.WireMock.*
 import io.lemonlabs.uri.Url
 import org.apache.pekko.stream.scaladsl.Source
 import org.mockito.Mockito.when
@@ -45,7 +45,8 @@ import uk.gov.hmrc.http.test.HttpClientV2Support
 import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
 import uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuite
 import uk.gov.hmrc.transitmovementsrouter.it.generators.ModelGenerators
-import uk.gov.hmrc.transitmovementsrouter.models._
+import uk.gov.hmrc.transitmovementsrouter.models.*
+import uk.gov.hmrc.transitmovementsrouter.models.APIVersionHeader.v2_1
 import uk.gov.hmrc.transitmovementsrouter.models.requests.Details
 import uk.gov.hmrc.transitmovementsrouter.models.requests.Metadata
 import uk.gov.hmrc.transitmovementsrouter.utils.RouterHeaderNames.CLIENT_ID
@@ -112,12 +113,12 @@ class AuditingConnectorSpec
             Some(eori),
             Some(movementType),
             Some(messageType),
-            isTransitional = false
+            isTransitional = false,
+            versionHeader = APIVersionHeader.v2_1
           )
 
           // then the future should be ready
-          whenReady(future) { _ =>
-          }
+          whenReady(future) { _ => }
         }
 
         "return a successful future if the audit message was accepted with movementId, messageId & eoriNumber Optional header value" in forAll(
@@ -152,12 +153,12 @@ class AuditingConnectorSpec
             Some(eori),
             None,
             None,
-            isTransitional = false
+            isTransitional = false,
+            versionHeader = APIVersionHeader.v2_1
           )
 
           // then the future should be ready
-          whenReady(future) { _ =>
-          }
+          whenReady(future) { _ => }
         }
 
         "return a successful future if the audit message was accepted with movementType & messageType Optional header value" in forAll(
@@ -190,12 +191,12 @@ class AuditingConnectorSpec
             None,
             Some(movementType),
             Some(messageType),
-            isTransitional = false
+            isTransitional = false,
+            versionHeader = APIVersionHeader.v2_1
           )
 
           // then the future should be ready
-          whenReady(future) { _ =>
-          }
+          whenReady(future) { _ => }
         }
 
         "return a successful future if the audit message was accepted without any Optional header value" in {
@@ -223,12 +224,12 @@ class AuditingConnectorSpec
             None,
             None,
             None,
-            isTransitional = false
+            isTransitional = false,
+            versionHeader = APIVersionHeader.v2_1
           )
 
           // then the future should be ready
-          whenReady(future) { _ =>
-          }
+          whenReady(future) { _ => }
         }
 
         "return a failed future if the audit message was not accepted" - Seq(BAD_REQUEST, INTERNAL_SERVER_ERROR).foreach { statusCode =>
@@ -269,7 +270,8 @@ class AuditingConnectorSpec
               Some(eori),
               Some(movementType),
               Some(messageType),
-              isTransitional = false
+              isTransitional = false,
+              versionHeader = APIVersionHeader.v2_1
             )
 
             val result = future
@@ -282,8 +284,7 @@ class AuditingConnectorSpec
               }
 
             // then the future should be ready
-            whenReady(result) { _ =>
-            }
+            whenReady(result) { _ => }
           }
         }
 
@@ -331,12 +332,12 @@ class AuditingConnectorSpec
         eori,
         movementType,
         messageType,
-        Some(ClientId("1234"))
+        Some(ClientId("1234")),
+        APIVersionHeader.v2_1
       )
 
       // then the future should be ready
-      whenReady(future) { _ =>
-      }
+      whenReady(future) { _ => }
     }
 
     "return a failed future if the audit message was not accepted" - Seq(BAD_REQUEST, INTERNAL_SERVER_ERROR).foreach { statusCode =>
@@ -378,7 +379,8 @@ class AuditingConnectorSpec
           eori,
           movementType,
           messageType,
-          Some(ClientId("1234"))
+          Some(ClientId("1234")),
+          APIVersionHeader.v2_1
         )
 
         val result = future
@@ -391,8 +393,7 @@ class AuditingConnectorSpec
           }
 
         // then the future should be ready
-        whenReady(result) { _ =>
-        }
+        whenReady(result) { _ => }
       }
     }
 
