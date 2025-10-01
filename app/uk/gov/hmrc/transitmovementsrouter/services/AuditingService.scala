@@ -24,6 +24,7 @@ import play.api.Logging
 import play.api.libs.json.JsValue
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.transitmovementsrouter.connectors.AuditingConnector
+import uk.gov.hmrc.transitmovementsrouter.models.APIVersionHeader
 import uk.gov.hmrc.transitmovementsrouter.models.AuditType
 import uk.gov.hmrc.transitmovementsrouter.models.ClientId
 import uk.gov.hmrc.transitmovementsrouter.models.EoriNumber
@@ -47,7 +48,8 @@ trait AuditingService {
     enrolmentEORI: Option[EoriNumber],
     movementType: Option[MovementType],
     messageType: Option[MessageType],
-    clientId: Option[ClientId]
+    clientId: Option[ClientId],
+    versionHeader: APIVersionHeader
   )(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
@@ -64,7 +66,8 @@ trait AuditingService {
     movementType: Option[MovementType],
     messageType: Option[MessageType],
     clientId: Option[ClientId],
-    isTransitional: Boolean
+    isTransitional: Boolean,
+    versionHeader: APIVersionHeader
   )(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
@@ -85,7 +88,8 @@ class AuditingServiceImpl @Inject() (auditingConnector: AuditingConnector) exten
     movementType: Option[MovementType],
     messageType: Option[MessageType],
     clientId: Option[ClientId],
-    isTransitional: Boolean
+    isTransitional: Boolean,
+    versionHeader: APIVersionHeader
   )(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
@@ -102,7 +106,8 @@ class AuditingServiceImpl @Inject() (auditingConnector: AuditingConnector) exten
         movementType,
         messageType,
         clientId,
-        isTransitional
+        isTransitional,
+        versionHeader
       )
       .recover { case NonFatal(e) =>
         logger.warn("Unable to audit payload due to an exception", e)
@@ -116,13 +121,15 @@ class AuditingServiceImpl @Inject() (auditingConnector: AuditingConnector) exten
     enrolmentEORI: Option[EoriNumber],
     movementType: Option[MovementType],
     messageType: Option[MessageType],
-    clientId: Option[ClientId]
+    clientId: Option[ClientId],
+    versionHeader: APIVersionHeader
   )(implicit
     hc: HeaderCarrier,
     ec: ExecutionContext
   ): Future[Unit] =
-    auditingConnector.postStatus(auditType, payload, movementId, messageId, enrolmentEORI, movementType, messageType, clientId).recover { case NonFatal(e) =>
-      logger.warn("Unable to audit payload due to an exception", e)
+    auditingConnector.postStatus(auditType, payload, movementId, messageId, enrolmentEORI, movementType, messageType, clientId, versionHeader).recover {
+      case NonFatal(e) =>
+        logger.warn("Unable to audit payload due to an exception", e)
 
     }
 }

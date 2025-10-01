@@ -922,7 +922,8 @@ class MessageControllerSpec
           eqTo(None),
           eqTo(Some(messageType.movementType)),
           eqTo(Some(messageType)),
-          eqTo(None)
+          eqTo(None),
+          eqTo(APIVersionHeader.v2_1)
         )(any[HeaderCarrier], any[ExecutionContext])
       ).thenReturn(Future.successful(()))
 
@@ -935,7 +936,8 @@ class MessageControllerSpec
           eqTo(Some(eoriNumber)),
           eqTo(Some(messageType.movementType)),
           eqTo(Some(messageType)),
-          eqTo(clientId)
+          eqTo(clientId),
+          eqTo(APIVersionHeader.v2_1)
         )(any[HeaderCarrier], any[ExecutionContext])
       ).thenReturn(Future.successful(()))
 
@@ -965,7 +967,8 @@ class MessageControllerSpec
         eqTo(Some(messageType.movementType)),
         eqTo(Some(messageType)),
         eqTo(clientId),
-        eqTo(isTransitional)
+        eqTo(isTransitional),
+        eqTo(APIVersionHeader.v2_1)
       )(any[HeaderCarrier](), any[ExecutionContext]())
       verify(mockAuditingService, times(1)).auditStatusEvent(
         eqTo(NCTSToTraderSubmissionSuccessful),
@@ -975,7 +978,8 @@ class MessageControllerSpec
         eqTo(Some(eoriNumber)),
         eqTo(Some(messageType.movementType)),
         eqTo(Some(messageType)),
-        eqTo(clientId)
+        eqTo(clientId),
+        eqTo(APIVersionHeader.v2_1)
       )(any[HeaderCarrier], any[ExecutionContext])
 
       verify(mockAuditingService, times(0)).auditStatusEvent(
@@ -986,7 +990,8 @@ class MessageControllerSpec
         eqTo(None),
         eqTo(Some(messageType.movementType)),
         eqTo(Some(messageType)),
-        eqTo(None)
+        eqTo(None),
+        eqTo(APIVersionHeader.v2_1)
       )(any[HeaderCarrier], any[ExecutionContext])
     }
     "must return BAD_REQUEST when the X-Message-Type header is missing or body seems to not contain an appropriate root tag" in {
@@ -1045,7 +1050,8 @@ class MessageControllerSpec
           eqTo(None),
           eqTo(Some(MessageType.MrnAllocated.movementType)),
           eqTo(Some(MessageType.MrnAllocated)),
-          eqTo(None)
+          eqTo(None),
+          eqTo(APIVersionHeader.v2_1)
         )(any[HeaderCarrier], any[ExecutionContext])
       ).thenReturn(Future.successful(()))
 
@@ -1058,7 +1064,8 @@ class MessageControllerSpec
           eqTo(None),
           eqTo(Some(MessageType.MrnAllocated.movementType)),
           eqTo(Some(MessageType.MrnAllocated)),
-          eqTo(None)
+          eqTo(None),
+          eqTo(APIVersionHeader.v2_1)
         )(any[HeaderCarrier], any[ExecutionContext])
       ).thenReturn(Future.successful(()))
 
@@ -1079,7 +1086,8 @@ class MessageControllerSpec
         eqTo(None),
         eqTo(Some(MessageType.MrnAllocated.movementType)),
         eqTo(Some(MessageType.MrnAllocated)),
-        eqTo(None)
+        eqTo(None),
+        eqTo(APIVersionHeader.v2_1)
       )(any[HeaderCarrier], any[ExecutionContext])
       verify(mockAuditingService, times(1)).auditStatusEvent(
         eqTo(NCTSRequestedMissingMovement),
@@ -1089,7 +1097,8 @@ class MessageControllerSpec
         eqTo(None),
         eqTo(Some(MessageType.MrnAllocated.movementType)),
         eqTo(Some(MessageType.MrnAllocated)),
-        eqTo(None)
+        eqTo(None),
+        eqTo(APIVersionHeader.v2_1)
       )(any[HeaderCarrier], any[ExecutionContext])
 
       verify(mockAuditingService, times(0)).auditMessageEvent(
@@ -1103,7 +1112,8 @@ class MessageControllerSpec
         eqTo(Some(MessageType.MrnAllocated.movementType)),
         eqTo(Some(MessageType.MrnAllocated)),
         eqTo(None),
-        any()
+        any(),
+        eqTo(APIVersionHeader.v2_1)
       )(any[HeaderCarrier](), any[ExecutionContext]())
     }
 
@@ -1121,7 +1131,8 @@ class MessageControllerSpec
           eqTo(None),
           eqTo(Some(MessageType.MrnAllocated.movementType)),
           eqTo(Some(MessageType.DeclarationAmendment)),
-          eqTo(None)
+          eqTo(None),
+          eqTo(APIVersionHeader.v2_1)
         )(any[HeaderCarrier], any[ExecutionContext])
       ).thenReturn(Future.successful(()))
 
@@ -1134,7 +1145,8 @@ class MessageControllerSpec
           eqTo(None),
           eqTo(Some(MessageType.MrnAllocated.movementType)),
           eqTo(Some(MessageType.DeclarationAmendment)),
-          eqTo(None)
+          eqTo(None),
+          eqTo(APIVersionHeader.v2_1)
         )(any[HeaderCarrier], any[ExecutionContext])
       ).thenReturn(Future.successful(()))
 
@@ -1162,7 +1174,8 @@ class MessageControllerSpec
       eqTo(None),
       eqTo(Some(MessageType.MrnAllocated.movementType)),
       eqTo(Some(MessageType.MrnAllocated)),
-      eqTo(None)
+      eqTo(None),
+      eqTo(APIVersionHeader.v2_1)
     )(any[HeaderCarrier], any[ExecutionContext])
     verify(mockAuditingService, times(0)).auditStatusEvent(
       eqTo(NCTSRequestedMissingMovement),
@@ -1172,7 +1185,8 @@ class MessageControllerSpec
       eqTo(None),
       eqTo(Some(MessageType.MrnAllocated.movementType)),
       eqTo(Some(MessageType.MrnAllocated)),
-      eqTo(None)
+      eqTo(None),
+      eqTo(APIVersionHeader.v2_1)
     )(any[HeaderCarrier], any[ExecutionContext])
   }
 

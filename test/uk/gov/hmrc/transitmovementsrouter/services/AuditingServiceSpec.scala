@@ -18,7 +18,7 @@ package uk.gov.hmrc.transitmovementsrouter.services
 
 import org.apache.pekko.stream.scaladsl.Source
 import org.mockito.ArgumentMatchers.any
-import org.mockito.ArgumentMatchers.{eq => eqTo}
+import org.mockito.ArgumentMatchers.eq as eqTo
 import org.mockito.Mockito.reset
 import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
@@ -41,6 +41,7 @@ import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.transitmovementsrouter.connectors.AuditingConnector
 import uk.gov.hmrc.transitmovementsrouter.generators.TestModelGenerators
 import uk.gov.hmrc.transitmovementsrouter.models.AuditType.AmendmentAcceptance
+import uk.gov.hmrc.transitmovementsrouter.models.APIVersionHeader
 import uk.gov.hmrc.transitmovementsrouter.models.AuditType
 import uk.gov.hmrc.transitmovementsrouter.models.ClientId
 import uk.gov.hmrc.transitmovementsrouter.models.EoriNumber
@@ -93,7 +94,8 @@ class AuditingServiceSpec
               eqTo(movementType),
               eqTo(messageType),
               eqTo(clientId),
-              eqTo(isTransitional)
+              eqTo(isTransitional),
+              eqTo(APIVersionHeader.v2_1)
             )(any(), any())
           )
             .thenReturn(Future.successful(()))
@@ -110,7 +112,8 @@ class AuditingServiceSpec
               movementType,
               messageType,
               clientId,
-              isTransitional
+              isTransitional,
+              APIVersionHeader.v2_1
             )
           ) { _ =>
             verify(mockConnector, times(1)).postMessageType(
@@ -124,7 +127,8 @@ class AuditingServiceSpec
               eqTo(movementType),
               eqTo(messageType),
               eqTo(clientId),
-              eqTo(isTransitional)
+              eqTo(isTransitional),
+              eqTo(APIVersionHeader.v2_1)
             )(any(), any())
           }
         }
@@ -151,7 +155,8 @@ class AuditingServiceSpec
               eqTo(movementType),
               eqTo(messageType),
               eqTo(clientId),
-              eqTo(isTransitional)
+              eqTo(isTransitional),
+              eqTo(APIVersionHeader.v2_1)
             )(any(), any())
           ).thenReturn(Future.failed(exception))
 
@@ -173,7 +178,8 @@ class AuditingServiceSpec
               movementType,
               messageType,
               clientId,
-              isTransitional
+              isTransitional,
+              APIVersionHeader.v2_1
             )
           ) { _ =>
             verify(mockConnector, times(1)).postMessageType(
@@ -187,7 +193,8 @@ class AuditingServiceSpec
               eqTo(movementType),
               eqTo(messageType),
               eqTo(clientId),
-              eqTo(isTransitional)
+              eqTo(isTransitional),
+              eqTo(APIVersionHeader.v2_1)
             )(any(), any())
             verify(Harness.logger0, times(1)).warn(eqTo("Unable to audit payload due to an exception"), eqTo(exception))
           }
@@ -218,7 +225,8 @@ class AuditingServiceSpec
           eqTo(eoriNumber),
           eqTo(movementType),
           eqTo(messageType),
-          eqTo(Some(ClientId("2345")))
+          eqTo(Some(ClientId("2345"))),
+          eqTo(APIVersionHeader.v2_1)
         )(any(), any())
       )
         .thenReturn(Future.successful(()))
@@ -232,7 +240,8 @@ class AuditingServiceSpec
           eoriNumber,
           movementType,
           messageType,
-          Some(ClientId("2345"))
+          Some(ClientId("2345")),
+          APIVersionHeader.v2_1
         )
       ) { _ =>
         verify(mockConnector, times(1)).postStatus(
@@ -243,7 +252,8 @@ class AuditingServiceSpec
           eqTo(eoriNumber),
           eqTo(movementType),
           eqTo(messageType),
-          eqTo(Some(ClientId("2345")))
+          eqTo(Some(ClientId("2345"))),
+          eqTo(APIVersionHeader.v2_1)
         )(any(), any())
       }
     }
@@ -266,7 +276,8 @@ class AuditingServiceSpec
           eqTo(eoriNumber),
           eqTo(movementType),
           eqTo(messageType),
-          eqTo(Some(ClientId("2345")))
+          eqTo(Some(ClientId("2345"))),
+          eqTo(APIVersionHeader.v2_1)
         )(any(), any())
       ).thenReturn(Future.failed(exception))
 
@@ -285,7 +296,8 @@ class AuditingServiceSpec
           eoriNumber,
           movementType,
           messageType,
-          Some(ClientId("2345"))
+          Some(ClientId("2345")),
+          APIVersionHeader.v2_1
         )
       ) { _ =>
         verify(mockConnector, times(1)).postStatus(
@@ -296,7 +308,8 @@ class AuditingServiceSpec
           eqTo(eoriNumber),
           eqTo(movementType),
           eqTo(messageType),
-          eqTo(Some(ClientId("2345")))
+          eqTo(Some(ClientId("2345"))),
+          eqTo(APIVersionHeader.v2_1)
         )(any(), any())
         verify(Harness.logger0, times(1)).warn(eqTo("Unable to audit payload due to an exception"), eqTo(exception))
       }

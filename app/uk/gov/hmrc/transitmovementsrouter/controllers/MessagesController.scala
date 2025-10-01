@@ -49,6 +49,7 @@ import uk.gov.hmrc.transitmovementsrouter.controllers.stream.StreamingParsers
 import uk.gov.hmrc.transitmovementsrouter.models.AuditType.NCTSRequestedMissingMovement
 import uk.gov.hmrc.transitmovementsrouter.models.AuditType.NCTSToTraderSubmissionSuccessful
 import uk.gov.hmrc.transitmovementsrouter.models.*
+import uk.gov.hmrc.transitmovementsrouter.models.APIVersionHeader.v2_1
 import uk.gov.hmrc.transitmovementsrouter.models.requests.MessageUpdate
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanResponse.DownloadUrl
 import uk.gov.hmrc.transitmovementsrouter.models.responses.UpscanFailedResponse
@@ -237,7 +238,8 @@ class MessagesController @Inject() (
               None,
               Some(messageType.movementType),
               Some(messageType),
-              None
+              None,
+              APIVersionHeader.v2_1 // TODO: Fix this to get a response from transit movements to determine whether or not the version is 2.1 / 3.0
             )
           (err, Option(messageType))
         }
@@ -252,7 +254,8 @@ class MessagesController @Inject() (
           movementType = Some(messageType.movementType),
           messageType = Some(messageType),
           clientId = persistenceResponse.clientId,
-          isTransitional = persistenceResponse.isTransitional
+          isTransitional = persistenceResponse.isTransitional,
+          APIVersionHeader.v2_1 // TODO: Fix this to get a response from transit movements to determine whether or not the version is 2.1 / 3.0
         )
         _ = auditService.auditStatusEvent(
           NCTSToTraderSubmissionSuccessful,
@@ -262,7 +265,8 @@ class MessagesController @Inject() (
           enrolmentEORI = Some(persistenceResponse.eori),
           Some(messageType.movementType),
           Some(messageType),
-          clientId = persistenceResponse.clientId
+          clientId = persistenceResponse.clientId,
+          APIVersionHeader.v2_1 // TODO: Fix this to get a response from transit movements to determine whether or not the version is 2.1 / 3.0
         )
         _ = logIncomingSuccess(movementId, triggerId, persistenceResponse.messageId, messageType)
       } yield persistenceResponse)
