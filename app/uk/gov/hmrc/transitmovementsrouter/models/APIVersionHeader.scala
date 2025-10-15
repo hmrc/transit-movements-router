@@ -16,12 +16,31 @@
 
 package uk.gov.hmrc.transitmovementsrouter.models
 
+import play.api.libs.json.JsError
+import play.api.libs.json.JsObject
+import play.api.libs.json.JsResult
+import play.api.libs.json.JsSuccess
+import play.api.libs.json.JsValue
+import play.api.libs.json.OFormat
+
 enum APIVersionHeader(val value: String) {
   case v2_1 extends APIVersionHeader("2.1")
   case v3_0 extends APIVersionHeader("3.0")
 }
 
 object APIVersionHeader {
+
+  implicit val format: OFormat[APIVersionHeader] = new OFormat[APIVersionHeader] {
+    override def writes(o: APIVersionHeader): JsObject =
+      play.api.libs.json.Json.obj("apiVersion" -> o.value)
+
+    override def reads(json: JsValue): JsResult[APIVersionHeader] =
+      json.validate[String].map(fromString).flatMap {
+        case Some(version) => JsSuccess(version)
+        case None          => JsError("Invalid version")
+      }
+  }
+
   def fromString(value: String): Option[APIVersionHeader] =
     values.find(_.value == value)
 }

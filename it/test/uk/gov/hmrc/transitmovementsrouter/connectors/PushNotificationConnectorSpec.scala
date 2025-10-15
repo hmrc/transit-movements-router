@@ -50,6 +50,7 @@ import uk.gov.hmrc.transitmovementsrouter.connectors.PushNotificationsConnectorI
 import uk.gov.hmrc.transitmovementsrouter.it.base.TestActorSystem
 import uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuite
 import uk.gov.hmrc.transitmovementsrouter.it.generators.ModelGenerators
+import uk.gov.hmrc.transitmovementsrouter.models.APIVersionHeader.v2_1
 import uk.gov.hmrc.transitmovementsrouter.models.EoriNumber
 import uk.gov.hmrc.transitmovementsrouter.models.MessageId
 import uk.gov.hmrc.transitmovementsrouter.models.MessageType
@@ -78,7 +79,7 @@ class PushNotificationConnectorSpec
   val messageType: MessageType = arbitraryMessageType.arbitrary.sample.get
   val eoriNumber: EoriNumber   = arbitraryEoriNumber.arbitrary.sample.get
 
-  val persistenceResponse: PersistenceResponse = PersistenceResponse(messageId, eoriNumber, None, false, None)
+  val persistenceResponse: PersistenceResponse = PersistenceResponse(messageId, eoriNumber, None, None, v2_1)
 
   val messageReceivedUri: String =
     UrlPath.parse(s"/transit-movements-push-notifications/traders/movements/${movementId.value}/messages/${messageId.value}/messageReceived").toString()

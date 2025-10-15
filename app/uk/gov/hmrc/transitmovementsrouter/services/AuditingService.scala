@@ -66,7 +66,6 @@ trait AuditingService {
     movementType: Option[MovementType],
     messageType: Option[MessageType],
     clientId: Option[ClientId],
-    isTransitional: Boolean,
     versionHeader: APIVersionHeader
   )(implicit
     hc: HeaderCarrier,
@@ -88,7 +87,6 @@ class AuditingServiceImpl @Inject() (auditingConnector: AuditingConnector) exten
     movementType: Option[MovementType],
     messageType: Option[MessageType],
     clientId: Option[ClientId],
-    isTransitional: Boolean,
     versionHeader: APIVersionHeader
   )(implicit
     hc: HeaderCarrier,
@@ -106,7 +104,6 @@ class AuditingServiceImpl @Inject() (auditingConnector: AuditingConnector) exten
         movementType,
         messageType,
         clientId,
-        isTransitional,
         versionHeader
       )
       .recover { case NonFatal(e) =>

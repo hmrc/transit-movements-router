@@ -623,7 +623,7 @@ class MessagesControllerIntegrationSpec
             .willReturn(
               aResponse()
                 .withStatus(OK)
-                .withBody(Json.stringify(Json.obj("messageId" -> outputMessageId, "eori" -> eoriNumber, "clientId" -> clientId, "isTransitional" -> true)))
+                .withBody(Json.stringify(Json.obj("messageId" -> outputMessageId, "eori" -> eoriNumber, "clientId" -> clientId, "apiVersion" -> "2.1")))
             )
         )
 

@@ -20,7 +20,13 @@ import play.api.libs.json.Json
 import play.api.libs.json.OFormat
 import uk.gov.hmrc.transitmovementsrouter.models.formats.CommonFormats
 
-case class PersistenceResponse(messageId: MessageId, eori: EoriNumber, clientId: Option[ClientId], isTransitional: Boolean, sendNotification: Option[Boolean]) {
+case class PersistenceResponse(
+  messageId: MessageId,
+  eori: EoriNumber,
+  clientId: Option[ClientId],
+  sendNotification: Option[Boolean],
+  apiVersion: APIVersionHeader
+) {
   def shouldSendNotification: Boolean = sendNotification.getOrElse(true)
 }
 

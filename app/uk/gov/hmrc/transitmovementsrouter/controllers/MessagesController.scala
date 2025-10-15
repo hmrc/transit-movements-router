@@ -239,7 +239,7 @@ class MessagesController @Inject() (
               Some(messageType.movementType),
               Some(messageType),
               None,
-              APIVersionHeader.v2_1 // TODO: Fix this to get a response from transit movements to determine whether or not the version is 2.1 / 3.0
+              APIVersionHeader.v2_1
             )
           (err, Option(messageType))
         }
@@ -254,8 +254,7 @@ class MessagesController @Inject() (
           movementType = Some(messageType.movementType),
           messageType = Some(messageType),
           clientId = persistenceResponse.clientId,
-          isTransitional = persistenceResponse.isTransitional,
-          APIVersionHeader.v2_1 // TODO: Fix this to get a response from transit movements to determine whether or not the version is 2.1 / 3.0
+          persistenceResponse.apiVersion
         )
         _ = auditService.auditStatusEvent(
           NCTSToTraderSubmissionSuccessful,
@@ -266,7 +265,7 @@ class MessagesController @Inject() (
           Some(messageType.movementType),
           Some(messageType),
           clientId = persistenceResponse.clientId,
-          APIVersionHeader.v2_1 // TODO: Fix this to get a response from transit movements to determine whether or not the version is 2.1 / 3.0
+          persistenceResponse.apiVersion
         )
         _ = logIncomingSuccess(movementId, triggerId, persistenceResponse.messageId, messageType)
       } yield persistenceResponse)

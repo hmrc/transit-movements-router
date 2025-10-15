@@ -113,7 +113,6 @@ class AuditingConnectorSpec
             Some(eori),
             Some(movementType),
             Some(messageType),
-            isTransitional = false,
             versionHeader = APIVersionHeader.v2_1
           )
 
@@ -153,7 +152,6 @@ class AuditingConnectorSpec
             Some(eori),
             None,
             None,
-            isTransitional = false,
             versionHeader = APIVersionHeader.v2_1
           )
 
@@ -191,7 +189,6 @@ class AuditingConnectorSpec
             None,
             Some(movementType),
             Some(messageType),
-            isTransitional = false,
             versionHeader = APIVersionHeader.v2_1
           )
 
@@ -224,7 +221,6 @@ class AuditingConnectorSpec
             None,
             None,
             None,
-            isTransitional = false,
             versionHeader = APIVersionHeader.v2_1
           )
 
@@ -270,7 +266,6 @@ class AuditingConnectorSpec
               Some(eori),
               Some(movementType),
               Some(messageType),
-              isTransitional = false,
               versionHeader = APIVersionHeader.v2_1
             )
 

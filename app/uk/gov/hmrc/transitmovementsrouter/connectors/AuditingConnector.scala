@@ -70,7 +70,6 @@ trait AuditingConnector {
     movementType: Option[MovementType],
     messageType: Option[MessageType],
     clientId: Option[ClientId],
-    isTransitional: Boolean,
     versionHeader: APIVersionHeader
   )(implicit
     hc: HeaderCarrier,
@@ -115,7 +114,6 @@ class AuditingConnectorImpl @Inject() (httpClient: HttpClientV2, val metrics: Me
     movementType: Option[MovementType] = None,
     messageType: Option[MessageType] = None,
     clientId: Option[ClientId] = None,
-    isTransitional: Boolean,
     versionHeader: APIVersionHeader
   )(implicit
     hc: HeaderCarrier,
