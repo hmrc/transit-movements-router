@@ -4,13 +4,13 @@ object AppDependencies {
 
   private val catsVersion = "2.12.0"
   private val catsRetryVersion = "3.1.3"
-  private val boostrapPlayVersion = "9.11.0"
+  private val boostrapPlayVersion = "9.19.0"
 
   val compile: Seq[ModuleID] = Seq(
     "uk.gov.hmrc" %% "bootstrap-backend-play-30" % boostrapPlayVersion,
     "org.typelevel" %% "cats-core" % catsVersion,
     "com.github.cb372" %% "cats-retry" % catsRetryVersion,
-    "uk.gov.hmrc.objectstore" %% "object-store-client-play-30" % "2.1.0",
+    "uk.gov.hmrc.objectstore" %% "object-store-client-play-30" % "2.4.0",
     "com.github.cb372" %% "alleycats-retry" % catsRetryVersion,
     "org.apache.pekko" %% "pekko-slf4j" % "1.1.2",
     "org.apache.pekko" %% "pekko-connectors-xml" % "1.0.2",
