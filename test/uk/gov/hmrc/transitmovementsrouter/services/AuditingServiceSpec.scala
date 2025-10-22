@@ -66,7 +66,6 @@ class AuditingServiceSpec
   val sut                              = new AuditingServiceImpl(mockConnector)
   implicit val hc: HeaderCarrier       = HeaderCarrier()
   val smallMessageSize                 = 49999
-  val isTransitional: Boolean          = true
 
   override def beforeEach(): Unit =
     reset(mockConnector)
@@ -94,7 +93,6 @@ class AuditingServiceSpec
               eqTo(movementType),
               eqTo(messageType),
               eqTo(clientId),
-              eqTo(isTransitional),
               eqTo(APIVersionHeader.v2_1)
             )(any(), any())
           )
@@ -112,7 +110,6 @@ class AuditingServiceSpec
               movementType,
               messageType,
               clientId,
-              isTransitional,
               APIVersionHeader.v2_1
             )
           ) { _ =>
@@ -127,7 +124,6 @@ class AuditingServiceSpec
               eqTo(movementType),
               eqTo(messageType),
               eqTo(clientId),
-              eqTo(isTransitional),
               eqTo(APIVersionHeader.v2_1)
             )(any(), any())
           }
@@ -155,7 +151,6 @@ class AuditingServiceSpec
               eqTo(movementType),
               eqTo(messageType),
               eqTo(clientId),
-              eqTo(isTransitional),
               eqTo(APIVersionHeader.v2_1)
             )(any(), any())
           ).thenReturn(Future.failed(exception))
@@ -178,7 +173,6 @@ class AuditingServiceSpec
               movementType,
               messageType,
               clientId,
-              isTransitional,
               APIVersionHeader.v2_1
             )
           ) { _ =>
@@ -193,7 +187,6 @@ class AuditingServiceSpec
               eqTo(movementType),
               eqTo(messageType),
               eqTo(clientId),
-              eqTo(isTransitional),
               eqTo(APIVersionHeader.v2_1)
             )(any(), any())
             verify(Harness.logger0, times(1)).warn(eqTo("Unable to audit payload due to an exception"), eqTo(exception))

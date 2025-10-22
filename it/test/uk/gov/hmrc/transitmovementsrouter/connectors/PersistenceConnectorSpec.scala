@@ -18,7 +18,7 @@ package uk.gov.hmrc.transitmovementsrouter.connectors
 
 import org.apache.pekko.stream.scaladsl.Source
 import org.apache.pekko.util.ByteString
-import com.github.tomakehurst.wiremock.client.WireMock._
+import com.github.tomakehurst.wiremock.client.WireMock.*
 import com.github.tomakehurst.wiremock.stubbing.StubMapping
 import io.lemonlabs.uri.QueryString
 import io.lemonlabs.uri.Url
@@ -43,7 +43,8 @@ import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
 import uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuite
 import uk.gov.hmrc.transitmovementsrouter.it.generators.ModelGenerators
 import uk.gov.hmrc.transitmovementsrouter.models.MessageType.DeclarationAmendment
-import uk.gov.hmrc.transitmovementsrouter.models._
+import uk.gov.hmrc.transitmovementsrouter.models.*
+import uk.gov.hmrc.transitmovementsrouter.models.APIVersionHeader.v2_1
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.MessageNotFound
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.MovementNotFound
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.Unexpected
@@ -135,12 +136,12 @@ class PersistenceConnectorSpec
   "post" should {
     "return messageId when post is successful" in {
 
-      val body = Json.obj("messageId" -> messageId.value, "eori" -> eoriNumber, "clientId" -> Option(clientId), "isTransitional" -> true).toString()
+      val body = Json.obj("messageId" -> messageId.value, "eori" -> eoriNumber, "clientId" -> Option(clientId), "apiVersion" -> "2.1").toString()
 
       stubForPostBody(OK, Some(body))
       whenReady(connector.postBody(movementId, messageId, DeclarationAmendment, source).value) { x =>
         x.isRight mustBe true
-        x mustBe Right(PersistenceResponse(messageId, eoriNumber, Option(clientId), isTransitional = true, sendNotification = None))
+        x mustBe Right(PersistenceResponse(messageId, eoriNumber, Option(clientId), sendNotification = None, apiVersion = v2_1))
       }
     }
 

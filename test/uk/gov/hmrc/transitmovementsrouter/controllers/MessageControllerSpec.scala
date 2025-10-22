@@ -112,7 +112,6 @@ class MessageControllerSpec
   val movementType: MovementType = MovementType("departure")
   val movementId: MovementId     = MovementId("abcdef1234567890")
   val messageId: MessageId       = MessageId("0987654321fedcba")
-  val isTransitional: Boolean    = true
 
   val cc015cOfficeOfDepartureGB: NodeSeq =
     <ncts:CC015C PhaseID="NCTS5.0" xmlns:ncts="http://ncts.dgtaxud.ec">
@@ -895,15 +894,14 @@ class MessageControllerSpec
       arbitrary[MessageId],
       arbitrary[ResponseMessageType],
       Gen.option(arbitrary[ClientId]),
-      arbitrary[EoriNumber],
-      arbitrary[Boolean]
-    ) { (movementId, messageId, messageType, clientId, eoriNumber, isTransitional) =>
-      val persistenceResponse = PersistenceResponse(messageId, eoriNumber, clientId, isTransitional, None)
+      arbitrary[EoriNumber]
+    ) { (movementId, messageId, messageType, clientId, eoriNumber) =>
+      val persistenceResponse = PersistenceResponse(messageId, eoriNumber, clientId, None, APIVersionHeader.v2_1)
 
       when(mockMessageTypeExtractor.extract(any(), any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](messageType))
 
       when(mockPersistenceConnector.postBody(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(messageType), any())(any(), any()))
-        .thenReturn(EitherT.liftF(Future.successful(PersistenceResponse(messageId, eoriNumber, clientId, isTransitional, None))))
+        .thenReturn(EitherT.liftF(Future.successful(PersistenceResponse(messageId, eoriNumber, clientId, None, APIVersionHeader.v2_1))))
 
       when(
         mockPushNotificationsConnector
@@ -967,7 +965,6 @@ class MessageControllerSpec
         eqTo(Some(messageType.movementType)),
         eqTo(Some(messageType)),
         eqTo(clientId),
-        eqTo(isTransitional),
         eqTo(APIVersionHeader.v2_1)
       )(any[HeaderCarrier](), any[ExecutionContext]())
       verify(mockAuditingService, times(1)).auditStatusEvent(
@@ -1112,7 +1109,6 @@ class MessageControllerSpec
         eqTo(Some(MessageType.MrnAllocated.movementType)),
         eqTo(Some(MessageType.MrnAllocated)),
         eqTo(None),
-        any(),
         eqTo(APIVersionHeader.v2_1)
       )(any[HeaderCarrier](), any[ExecutionContext]())
     }
@@ -1202,7 +1198,7 @@ class MessageControllerSpec
     ) { (successUpscanResponse, movementId, messageId, messageType, clientId, eoriNumber) =>
       val source: Source[ByteString, ?] = singleUseStringSource("abc")
 
-      val persistenceResponse = PersistenceResponse(messageId, eoriNumber, clientId, isTransitional, None)
+      val persistenceResponse = PersistenceResponse(messageId, eoriNumber, clientId, None, APIVersionHeader.v2_1)
 
       when(mockUpscanConnector.streamFile(DownloadUrl(eqTo(successUpscanResponse.downloadUrl.value)))(any(), any(), any()))
         .thenReturn(EitherT.rightT[Future, Source[ByteString, ?]](source))
@@ -1210,7 +1206,7 @@ class MessageControllerSpec
       when(mockMessageTypeExtractor.extractFromBody(any())).thenReturn(EitherT.rightT[Future, MessageTypeExtractionError](messageType))
 
       when(mockPersistenceConnector.postBody(MovementId(eqTo(movementId.value)), MessageId(eqTo(messageId.value)), eqTo(messageType), any())(any(), any()))
-        .thenReturn(EitherT.fromEither[Future](Right(PersistenceResponse(messageId, eoriNumber, clientId, isTransitional, None))))
+        .thenReturn(EitherT.fromEither[Future](Right(PersistenceResponse(messageId, eoriNumber, clientId, None, APIVersionHeader.v2_1))))
 
       when(
         mockPushNotificationsConnector
