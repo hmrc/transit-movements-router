@@ -26,8 +26,6 @@ import uk.gov.hmrc.transitmovementsrouter.connectors.EISConnector
 import uk.gov.hmrc.transitmovementsrouter.connectors.EISConnectorProvider
 import uk.gov.hmrc.transitmovementsrouter.models._
 import uk.gov.hmrc.transitmovementsrouter.models.errors.RoutingError
-import cats.data.EitherT
-import cats.implicits._
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future

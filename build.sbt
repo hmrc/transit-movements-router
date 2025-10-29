@@ -17,7 +17,6 @@ lazy val microservice = Project(appName, file("."))
       "uk.gov.hmrc.transitmovementsrouter.models._"
     )
   )
-  .settings(resolvers += Resolver.jcenterRepo)
   .settings(CodeCoverageSettings.settings *)
   .settings(inThisBuild(buildSettings))
 
