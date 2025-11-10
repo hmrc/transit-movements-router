@@ -26,14 +26,9 @@ import org.scalatest.BeforeAndAfterEach
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
-import org.scalatest.time.SpanSugar.convertIntToGrainOfTime
 import org.scalatestplus.mockito.MockitoSugar
 import uk.gov.hmrc.http.test.HttpClientV2Support
 import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
-import uk.gov.hmrc.transitmovementsrouter.config.CircuitBreakerConfig
-import uk.gov.hmrc.transitmovementsrouter.config.EISInstanceConfig
-import uk.gov.hmrc.transitmovementsrouter.config.Headers
-import uk.gov.hmrc.transitmovementsrouter.config.RetryConfig
 
 import java.time.Clock
 import scala.concurrent.ExecutionContext.Implicits.global

@@ -12,12 +12,10 @@ lazy val microservice = Project(appName, file("."))
   .settings(
     PlayKeys.playDefaultPort := 9478,
     libraryDependencies ++= AppDependencies.compile ++ AppDependencies.test,
-    scalacOptions += "-Wconf:src=routes/.*:s",
     RoutesKeys.routesImport ++= Seq(
       "uk.gov.hmrc.transitmovementsrouter.models._"
     )
   )
-  .settings(resolvers += Resolver.jcenterRepo)
   .settings(CodeCoverageSettings.settings *)
   .settings(inThisBuild(buildSettings))
 
