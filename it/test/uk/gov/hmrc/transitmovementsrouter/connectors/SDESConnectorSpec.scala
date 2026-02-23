@@ -47,8 +47,6 @@ import uk.gov.hmrc.http.test.HttpClientV2Support
 import uk.gov.hmrc.objectstore.client.ObjectSummaryWithMd5
 import uk.gov.hmrc.transitmovementsrouter.it.base.TestActorSystem
 import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
-import uk.gov.hmrc.transitmovementsrouter.connectors.SDESConnector
-import uk.gov.hmrc.transitmovementsrouter.connectors.SDESConnectorImpl
 import uk.gov.hmrc.transitmovementsrouter.controllers.errors.PresentationError
 import uk.gov.hmrc.transitmovementsrouter.controllers.errors.StandardError
 import uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuite

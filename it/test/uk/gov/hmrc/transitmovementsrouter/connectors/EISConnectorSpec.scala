@@ -105,7 +105,7 @@ class EISConnectorSpec
     "localhost",
     wiremockPort,
     uriStub,
-    Headers("bearertokenhereGB"),
+    Headers("bearertokenhereGB", "mdtp", "application/xml"),
     CircuitBreakerConfig(
       3,
       5.seconds,
@@ -170,6 +170,7 @@ class EISConnectorSpec
             .withHeader("X-Conversation-Id", equalTo(expectedConversationId.value.toString))
             .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
             .withHeader(HeaderNames.CONTENT_TYPE, equalTo("application/xml"))
+            .withHeader(HeaderNames.X_FORWARDED_HOST, equalTo("mdtp"))
             .willReturn(aResponse().withStatus(codeToReturn))
             .willSetStateTo(targetState)
         )
@@ -220,6 +221,7 @@ class EISConnectorSpec
             .withHeader("X-Conversation-Id", equalTo(expectedConversationId.value.toString))
             .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
             .withHeader(HeaderNames.CONTENT_TYPE, equalTo("application/xml"))
+            .withHeader(HeaderNames.X_FORWARDED_HOST, equalTo("mdtp"))
             .willReturn(aResponse().withStatus(codeToReturn))
             .willSetStateTo(targetState)
         )
@@ -249,6 +251,7 @@ class EISConnectorSpec
             .withHeader("Date", equalTo("Thu, 13 Apr 2023 10:34:41 UTC"))
             .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
             .withHeader(HeaderNames.CONTENT_TYPE, equalTo("application/xml"))
+            .withHeader(HeaderNames.X_FORWARDED_HOST, equalTo("mdtp"))
             .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
             .withHeader("X-Conversation-Id", equalTo(expectedConversationId.value.toString))
             .inScenario("Standard Call")
@@ -283,6 +286,7 @@ class EISConnectorSpec
               .withHeader("Date", equalTo("Thu, 13 Apr 2023 10:34:41 UTC"))
               .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
               .withHeader(HeaderNames.CONTENT_TYPE, equalTo("application/xml"))
+              .withHeader(HeaderNames.X_FORWARDED_HOST, equalTo("mdtp"))
               .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
               .withHeader("X-Conversation-Id", equalTo(expectedConversationId.value.toString))
               .withHeader("X-Client-Id", equalTo("CLIENT_ABC"))
@@ -318,6 +322,7 @@ class EISConnectorSpec
               .withHeader("Authorization", equalTo("Bearer bearertokenhereGB"))
               .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
               .withHeader(HeaderNames.CONTENT_TYPE, equalTo("application/xml"))
+              .withHeader(HeaderNames.X_FORWARDED_HOST, equalTo("mdtp"))
               .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
               .withHeader("X-Conversation-Id", equalTo(expectedConversationId.value.toString))
               .willReturn(aResponse().withStatus(codeToReturn))
@@ -358,6 +363,7 @@ class EISConnectorSpec
             .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
             .withHeader("Date", equalTo("Thu, 13 Apr 2023 10:34:41 UTC"))
             .withHeader(HeaderNames.CONTENT_TYPE, equalTo("application/xml"))
+            .withHeader(HeaderNames.X_FORWARDED_HOST, equalTo("mdtp"))
             .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
             .withHeader("X-Conversation-Id", equalTo(expectedConversationId.value.toString))
             .willReturn(aResponse().withStatus(statusCode))
@@ -414,6 +420,7 @@ class EISConnectorSpec
         .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
         .withHeader("Date", equalTo("Thu, 13 Apr 2023 10:34:41 UTC"))
         .withHeader(HeaderNames.CONTENT_TYPE, equalTo("application/xml"))
+        .withHeader(HeaderNames.X_FORWARDED_HOST, equalTo("mdtp"))
         .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
         .withHeader("X-Conversation-Id", equalTo(expectedConversationId.value.toString))
         .willReturn(
@@ -466,6 +473,7 @@ class EISConnectorSpec
         .withHeader(HeaderNames.ACCEPT, equalTo("application/xml"))
         .withHeader("Date", equalTo("Thu, 13 Apr 2023 10:34:41 UTC"))
         .withHeader(HeaderNames.CONTENT_TYPE, equalTo("application/xml"))
+        .withHeader(HeaderNames.X_FORWARDED_HOST, equalTo("mdtp"))
         .withHeader("X-Correlation-Id", matching(RegexPatterns.UUID))
         .withHeader("X-Conversation-Id", equalTo(expectedConversationId.value.toString))
         .willReturn(

@@ -21,8 +21,13 @@ import play.api.ConfigLoader
 object Headers {
 
   implicit lazy val configLoader: ConfigLoader[Headers] = ConfigLoader { rootConfig => path =>
-    Headers(rootConfig.getConfig(path).getString("bearerToken"))
+    val config = rootConfig.getConfig(path)
+    Headers(
+      config.getString("bearerToken"),
+      config.getString("x-forwarded-host"),
+      config.getString("content-type")
+    )
   }
 
 }
-case class Headers(bearerToken: String)
+case class Headers(bearerToken: String, xForwardedHost: String, contentType: String)

@@ -94,7 +94,9 @@ class EISConnectorImpl(
         LocalReferenceNumber(element.getTextContent.trim)
       }
 
-  private lazy val authorization = s"Bearer ${eisInstanceConfig.headers.bearerToken}"
+  private lazy val authorization  = s"Bearer ${eisInstanceConfig.headers.bearerToken}"
+  private lazy val contentType    = eisInstanceConfig.headers.contentType
+  private lazy val xForwardedHost = eisInstanceConfig.headers.xForwardedHost
 
   // Used when setting a stream body -- forces the correct content type (default chooses application/octet-stream)
   implicit private val xmlSourceWriter: BodyWritable[Source[ByteString, ?]] = BodyWritable(SourceBody.apply, MimeTypes.XML)
@@ -177,6 +179,8 @@ class EISConnectorImpl(
             HeaderNames.AUTHORIZATION         -> authorization,
             RouterHeaderNames.CORRELATION_ID  -> correlationId,
             HeaderNames.ACCEPT                -> MimeTypes.XML,
+            HeaderNames.CONTENT_TYPE          -> contentType,
+            HeaderNames.X_FORWARDED_HOST      -> xForwardedHost,
             RouterHeaderNames.CONVERSATION_ID -> ConversationId(movementId, messageId).value.toString,
             HeaderNames.DATE                  -> nowFormatted()
           )
