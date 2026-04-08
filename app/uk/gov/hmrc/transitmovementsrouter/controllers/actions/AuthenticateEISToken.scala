@@ -75,7 +75,9 @@ class AuthenticateEISTokenImpl @Inject() (appConfig: AppConfig, parsers: BodyPar
       .map(v => obfuscatedToken(v))
       .getOrElse("empty")
 
-    logger.error(s"Bearer token mismatch: MDTP tokens: ${obfuscatedMdtpTokens.mkString(",")} EIS inbound token: $obfuscatedInboundEisToken")
+    logger.error(
+      s"Bearer token mismatch: MDTP tokens: ${obfuscatedMdtpTokens.mkString(",")} EIS inbound token: $obfuscatedInboundEisToken, prepended Bearer: ${authVal.contains("Bearer ")}"
+    )
   }
 
   private def createUnauthorisedResponse(headers: Headers): Result =
