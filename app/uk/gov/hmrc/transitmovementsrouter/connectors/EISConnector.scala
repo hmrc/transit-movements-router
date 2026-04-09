@@ -150,11 +150,9 @@ class EISConnectorImpl(
       // "explicitHeaders", so we need to use "headers" here and filter on what's returned.
       val messageType     = hc.headers(Seq(RouterHeaderNames.MESSAGE_TYPE)).headOption.map(_._2).getOrElse("undefined")
       lazy val logMessage =
-        s"""|transit-movements-router-eis
+        s"""|Posting NCTS message, routing to $code (${eisInstanceConfig.uri})
             |
-            |Posting NCTS message, routing to $code
-            |
-            |Message Metadata (not submitted to EIS):
+            |Movement Details:
             |
             |Movement ID: ${movementId.value}
             |Message ID: ${messageId.value}
