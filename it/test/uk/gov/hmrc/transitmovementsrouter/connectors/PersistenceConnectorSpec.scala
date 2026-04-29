@@ -83,6 +83,7 @@ class PersistenceConnectorSpec
 
   implicit val appConfig: AppConfig = mock[AppConfig]
   when(appConfig.internalAuthToken).thenReturn(token)
+  when(appConfig.defaultPhaseId).thenReturn("CustomPhaseId")
   when(appConfig.persistenceServiceBaseUrl).thenAnswer { _ =>
     Url.parse(server.baseUrl())
   }
@@ -168,7 +169,7 @@ class PersistenceConnectorSpec
 
       stubForPostBody(OK)
 
-      val failingSource = Source.single(ByteString.fromString("<abc>asdadsadads")).via(new EISMessageTransformersImpl().unwrap)
+      val failingSource = Source.single(ByteString.fromString("<abc>asdadsadads")).via(new EISMessageTransformersImpl(appConfig).unwrap)
 
       whenReady(connector.postBody(movementId, messageId, DeclarationAmendment, failingSource).value) { res =>
         res mustBe a[Left[Unexpected, ?]]

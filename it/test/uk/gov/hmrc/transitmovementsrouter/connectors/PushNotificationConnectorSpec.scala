@@ -94,6 +94,7 @@ class PushNotificationConnectorSpec
   when(mockAppConfig.transitMovementsPushNotificationsUrl).thenAnswer { _ =>
     Url.parse(server.baseUrl())
   }
+  when(mockAppConfig.defaultPhaseId).thenReturn("CustomPhaseId")
 
   implicit val hc: HeaderCarrier = HeaderCarrier()
 
@@ -206,7 +207,7 @@ class PushNotificationConnectorSpec
 
       xmlStub(ACCEPTED)
 
-      val failingSource = Source.single(ByteString.fromString("{}")).via(new EISMessageTransformersImpl().unwrap)
+      val failingSource = Source.single(ByteString.fromString("{}")).via(new EISMessageTransformersImpl(mockAppConfig).unwrap)
 
       whenReady(connector.postMessageReceived(movementId, persistenceResponse, messageType, failingSource).value) { res =>
         res mustBe a[Left[Unexpected, _]]
