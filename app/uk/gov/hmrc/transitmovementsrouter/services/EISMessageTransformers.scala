@@ -27,6 +27,8 @@ import org.apache.pekko.stream.scaladsl.Flow
 import org.apache.pekko.util.ByteString
 import com.google.inject.ImplementedBy
 import com.google.inject.Singleton
+import jakarta.inject.Inject
+import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
 import uk.gov.hmrc.transitmovementsrouter.services.state.UnwrappingState
 import uk.gov.hmrc.transitmovementsrouter.services.state.UnwrappingState.FoundMessageType
 import uk.gov.hmrc.transitmovementsrouter.services.state.UnwrappingState.LookingForMessageTypeElement
@@ -43,7 +45,7 @@ trait EISMessageTransformers {
 }
 
 @Singleton
-class EISMessageTransformersImpl extends EISMessageTransformers {
+class EISMessageTransformersImpl @Inject() (appConfig: AppConfig) extends EISMessageTransformers {
 
   private val WRAPPED_MESSAGE_TYPE_PREFIX = "txd"
   private val WRAPPED_MESSAGE_ROOT_PREFIX = "n1"
@@ -80,7 +82,7 @@ class EISMessageTransformersImpl extends EISMessageTransformers {
       val phaseId = attributes
         .find(a => a.name == "PhaseID")
         .map(_.value)
-        .getOrElse("NCTS5.1")
+        .getOrElse(appConfig.defaultPhaseId)
 
       (
         UnwrappingState.FoundMessageType(name),

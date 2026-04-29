@@ -49,6 +49,7 @@ class AppConfig @Inject() (config: Configuration, servicesConfig: CTCServicesCon
   lazy val logBodyOnEIS500: Boolean = config.get[Boolean]("microservice.services.eis.log-body-on-500")
   lazy val eisSizeLimit: Long       = config.underlying.getMemorySize("microservice.services.eis.message-size-limit").toBytes
   lazy val logIncoming: Boolean     = config.get[Boolean]("log-incoming-errors")
+  lazy val defaultPhaseId: String   = config.get[String]("default-phase-id")
 
   // SDES configuration
   lazy val sdesServiceBaseUrl: Url     = Url.parse(servicesConfig.baseUrl("secure-data-exchange-proxy"))

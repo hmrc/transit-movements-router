@@ -18,12 +18,15 @@ package uk.gov.hmrc.transitmovementsrouter.services
 
 import org.apache.pekko.stream.scaladsl.Source
 import org.apache.pekko.util.ByteString
+import org.mockito.Mockito.when
 import org.scalacheck.Gen
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
+import org.scalatestplus.mockito.MockitoSugar.mock
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 import uk.gov.hmrc.transitmovementsrouter.base.TestActorSystem
+import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.Failure
@@ -32,7 +35,9 @@ import scala.xml.XML
 
 class EISMessageTransformerSpec extends AnyFreeSpec with Matchers with ScalaFutures with TestActorSystem with ScalaCheckDrivenPropertyChecks {
 
-  val sut = new EISMessageTransformersImpl
+  val mockAppConfig: AppConfig = mock[AppConfig]
+  when(mockAppConfig.defaultPhaseId).thenReturn("CustomPhaseIdResponse")
+  val sut = new EISMessageTransformersImpl(mockAppConfig)
 
   "unwrap" - {
 
@@ -72,7 +77,7 @@ class EISMessageTransformerSpec extends AnyFreeSpec with Matchers with ScalaFutu
         }
 
       whenReady(result) { r =>
-        XML.loadString(r) mustBe <ncts:CC015C xmlns:ncts="http://ncts.dgtaxud.ec" PhaseID="NCTS5.1">
+        XML.loadString(r) mustBe <ncts:CC015C xmlns:ncts="http://ncts.dgtaxud.ec" PhaseID="CustomPhaseIdResponse">
             <messageSender>sender</messageSender>
             <messageReceiver>receiver</messageReceiver>
             <something>else</something>
