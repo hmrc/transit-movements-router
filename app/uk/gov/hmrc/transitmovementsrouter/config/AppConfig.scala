@@ -19,7 +19,9 @@ package uk.gov.hmrc.transitmovementsrouter.config
 import io.lemonlabs.uri.Url
 import io.lemonlabs.uri.UrlPath
 import play.api.Configuration
+import uk.gov.hmrc.transitmovementsrouter.models.Phase
 
+import java.time.LocalDateTime
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -46,10 +48,20 @@ class AppConfig @Inject() (config: Configuration, servicesConfig: CTCServicesCon
   lazy val objectStoreUrl: String =
     config.get[String]("microservice.services.object-store.sdes-host")
 
-  lazy val logBodyOnEIS500: Boolean = config.get[Boolean]("microservice.services.eis.log-body-on-500")
-  lazy val eisSizeLimit: Long       = config.underlying.getMemorySize("microservice.services.eis.message-size-limit").toBytes
-  lazy val logIncoming: Boolean     = config.get[Boolean]("log-incoming-errors")
-  lazy val defaultPhaseId: String   = config.get[String]("default-phase-id")
+  lazy val logBodyOnEIS500: Boolean                 = config.get[Boolean]("microservice.services.eis.log-body-on-500")
+  lazy val eisSizeLimit: Long                       = config.underlying.getMemorySize("microservice.services.eis.message-size-limit").toBytes
+  lazy val logIncoming: Boolean                     = config.get[Boolean]("log-incoming-errors")
+  private lazy val defaultedPhaseId: String         = config.get[String]("default-phase-id")
+  private lazy val timeBasedPhaseIdEnabled: Boolean = config.get[Boolean]("time-based-phase-id")
+  private lazy val phases: Seq[Phase]               = config.get[Seq[Phase]]("phases").sortBy(_.activeFrom)
+
+  def defaultPhaseId: String =
+    if (timeBasedPhaseIdEnabled) {
+      phases
+        .findLast(!_.activeFrom.isAfter(LocalDateTime.now))
+        .map(_.id)
+        .getOrElse(defaultedPhaseId)
+    } else defaultedPhaseId
 
   // SDES configuration
   lazy val sdesServiceBaseUrl: Url     = Url.parse(servicesConfig.baseUrl("secure-data-exchange-proxy"))
