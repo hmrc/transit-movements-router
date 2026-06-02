@@ -57,7 +57,7 @@ class EISMessageTransformersImpl @Inject() (appConfig: AppConfig) extends EISMes
   private val TRADER_CHANNEL_SUBMISSION   = "TraderChannelSubmission"
 
   private val WRAPPED_ATTRIBUTES: List[Attribute] = List(
-    Attribute("schemaLocation", "http://www.hmrc.gov.uk/eis/ncts5/v1 EIS_WrapperV10_TraderChannelSubmission-51.8.xsd", Some("xsi"), Some(XSI_NAMESPACE_URL))
+    Attribute("schemaLocation", "http://www.hmrc.gov.uk/eis/ncts5/v1 EIS_WrapperV12_TraderChannelSubmission-60.4.xsd", Some("xsi"), Some(XSI_NAMESPACE_URL))
   )
 
   private val WRAPPED_NAMESPACES: List[Namespace] = List(
