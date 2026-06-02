@@ -43,7 +43,7 @@ class EISMessageTransformerSpec extends AnyFreeSpec with Matchers with ScalaFutu
 
     "should successfully transform valid xml" in {
       val input =
-        """<n1:TraderChannelResponse xmlns:txd="http://ncts.dgtaxud.ec" xmlns:n1="http://www.hmrc.gov.uk/eis/ncts5/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.hmrc.gov.uk/eis/ncts5/v1 EIS_WrapperV10_TraderChannelSubmission-51.8.xsd"><txd:CC029C PhaseID="NCTS5.0">text</txd:CC029C></n1:TraderChannelResponse>"""
+        """<n1:TraderChannelResponse xmlns:txd="http://ncts.dgtaxud.ec" xmlns:n1="http://www.hmrc.gov.uk/eis/ncts5/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.hmrc.gov.uk/eis/ncts5/v1 EIS_WrapperV12_TraderChannelSubmission-60.4.xsd"><txd:CC029C PhaseID="NCTS5.0">text</txd:CC029C></n1:TraderChannelResponse>"""
 
       val result = Source
         .single(ByteString.fromString(input))
@@ -60,7 +60,7 @@ class EISMessageTransformerSpec extends AnyFreeSpec with Matchers with ScalaFutu
 
     "should successfully transform with more complex valid xml, without specifying the PhaseID" in {
       val input =
-        <n1:TraderChannelResponse xmlns:txd="http://ncts.dgtaxud.ec" xmlns:n1="http://www.hmrc.gov.uk/eis/ncts5/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.hmrc.gov.uk/eis/ncts5/v1 EIS_WrapperV10_TraderChannelSubmission-51.8.xsd">
+        <n1:TraderChannelResponse xmlns:txd="http://ncts.dgtaxud.ec" xmlns:n1="http://www.hmrc.gov.uk/eis/ncts5/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.hmrc.gov.uk/eis/ncts5/v1 EIS_WrapperV12_TraderChannelSubmission-60.4.xsd">
           <txd:CC015C>
             <messageSender>sender</messageSender>
             <messageReceiver>receiver</messageReceiver>
@@ -218,7 +218,7 @@ class EISMessageTransformerSpec extends AnyFreeSpec with Matchers with ScalaFutu
       whenReady(result) { r =>
           // format: off
           XML.loadString(r) mustBe
-            <n1:TraderChannelSubmission xmlns:txd="http://ncts.dgtaxud.ec" xmlns:n1="http://www.hmrc.gov.uk/eis/ncts5/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.hmrc.gov.uk/eis/ncts5/v1 EIS_WrapperV10_TraderChannelSubmission-51.8.xsd"><txd:CC029C PhaseID="NCTS5.0">text</txd:CC029C></n1:TraderChannelSubmission>
+            <n1:TraderChannelSubmission xmlns:txd="http://ncts.dgtaxud.ec" xmlns:n1="http://www.hmrc.gov.uk/eis/ncts5/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.hmrc.gov.uk/eis/ncts5/v1 EIS_WrapperV12_TraderChannelSubmission-60.4.xsd"><txd:CC029C PhaseID="NCTS5.0">text</txd:CC029C></n1:TraderChannelSubmission>
           // format: on
       }
     }
@@ -241,7 +241,7 @@ class EISMessageTransformerSpec extends AnyFreeSpec with Matchers with ScalaFutu
       whenReady(result) { r =>
           // format: off
           XML.loadString(r) mustBe
-            <n1:TraderChannelSubmission xmlns:txd="http://ncts.dgtaxud.ec" xmlns:n1="http://www.hmrc.gov.uk/eis/ncts5/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.hmrc.gov.uk/eis/ncts5/v1 EIS_WrapperV10_TraderChannelSubmission-51.8.xsd"><txd:CC029C PhaseID="NCTS5.0">text</txd:CC029C></n1:TraderChannelSubmission>
+            <n1:TraderChannelSubmission xmlns:txd="http://ncts.dgtaxud.ec" xmlns:n1="http://www.hmrc.gov.uk/eis/ncts5/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.hmrc.gov.uk/eis/ncts5/v1 EIS_WrapperV12_TraderChannelSubmission-60.4.xsd"><txd:CC029C PhaseID="NCTS5.0">text</txd:CC029C></n1:TraderChannelSubmission>
           // format: on
       }
     }
