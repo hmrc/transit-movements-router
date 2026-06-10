@@ -46,11 +46,10 @@ import play.mvc.Http.MimeTypes
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.test.HttpClientV2Support
 import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
-import uk.gov.hmrc.transitmovementsrouter.connectors.PushNotificationsConnectorImpl
 import uk.gov.hmrc.transitmovementsrouter.it.base.TestActorSystem
 import uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuite
 import uk.gov.hmrc.transitmovementsrouter.it.generators.ModelGenerators
-import uk.gov.hmrc.transitmovementsrouter.models.APIVersionHeader.v2_1
+import uk.gov.hmrc.transitmovementsrouter.models.APIVersionHeader.v3_0
 import uk.gov.hmrc.transitmovementsrouter.models.EoriNumber
 import uk.gov.hmrc.transitmovementsrouter.models.MessageId
 import uk.gov.hmrc.transitmovementsrouter.models.MessageType
@@ -79,7 +78,7 @@ class PushNotificationConnectorSpec
   val messageType: MessageType = arbitraryMessageType.arbitrary.sample.get
   val eoriNumber: EoriNumber   = arbitraryEoriNumber.arbitrary.sample.get
 
-  val persistenceResponse: PersistenceResponse = PersistenceResponse(messageId, eoriNumber, None, None, v2_1)
+  val persistenceResponse: PersistenceResponse = PersistenceResponse(messageId, eoriNumber, None, None, v3_0)
 
   val messageReceivedUri: String =
     UrlPath.parse(s"/transit-movements-push-notifications/traders/movements/${movementId.value}/messages/${messageId.value}/messageReceived").toString()
@@ -192,8 +191,8 @@ class PushNotificationConnectorSpec
         x.isLeft mustBe true
 
         statusCode match {
-          case NOT_FOUND             => x mustBe a[Left[MovementNotFound, _]]
-          case INTERNAL_SERVER_ERROR => x mustBe a[Left[Unexpected, _]]
+          case NOT_FOUND             => x mustBe a[Left[MovementNotFound, ?]]
+          case INTERNAL_SERVER_ERROR => x mustBe a[Left[Unexpected, ?]]
           case _                     => fail()
         }
 
@@ -210,7 +209,7 @@ class PushNotificationConnectorSpec
       val failingSource = Source.single(ByteString.fromString("{}")).via(new EISMessageTransformersImpl(mockAppConfig).unwrap)
 
       whenReady(connector.postMessageReceived(movementId, persistenceResponse, messageType, failingSource).value) { res =>
-        res mustBe a[Left[Unexpected, _]]
+        res mustBe a[Left[Unexpected, ?]]
         res.left.toOption.get.asInstanceOf[Unexpected].exception.isDefined
       }
     }
@@ -250,8 +249,8 @@ class PushNotificationConnectorSpec
         x.isLeft mustBe true
 
         statusCode match {
-          case NOT_FOUND             => x mustBe a[Left[MovementNotFound, _]]
-          case INTERNAL_SERVER_ERROR => x mustBe a[Left[Unexpected, _]]
+          case NOT_FOUND             => x mustBe a[Left[MovementNotFound, ?]]
+          case INTERNAL_SERVER_ERROR => x mustBe a[Left[Unexpected, ?]]
           case _                     => fail()
         }
 
@@ -285,8 +284,8 @@ class PushNotificationConnectorSpec
         x.isLeft mustBe true
 
         statusCode match {
-          case NOT_FOUND             => x mustBe a[Left[MovementNotFound, _]]
-          case INTERNAL_SERVER_ERROR => x mustBe a[Left[Unexpected, _]]
+          case NOT_FOUND             => x mustBe a[Left[MovementNotFound, ?]]
+          case INTERNAL_SERVER_ERROR => x mustBe a[Left[Unexpected, ?]]
           case _                     => fail()
         }
       }

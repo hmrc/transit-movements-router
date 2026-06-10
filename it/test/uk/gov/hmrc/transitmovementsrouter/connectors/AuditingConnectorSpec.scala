@@ -46,7 +46,7 @@ import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
 import uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuite
 import uk.gov.hmrc.transitmovementsrouter.it.generators.ModelGenerators
 import uk.gov.hmrc.transitmovementsrouter.models.*
-import uk.gov.hmrc.transitmovementsrouter.models.APIVersionHeader.v2_1
+import uk.gov.hmrc.transitmovementsrouter.models.APIVersionHeader.v3_0
 import uk.gov.hmrc.transitmovementsrouter.models.requests.Details
 import uk.gov.hmrc.transitmovementsrouter.models.requests.Metadata
 import uk.gov.hmrc.transitmovementsrouter.utils.RouterHeaderNames.CLIENT_ID
@@ -113,7 +113,7 @@ class AuditingConnectorSpec
             Some(eori),
             Some(movementType),
             Some(messageType),
-            versionHeader = APIVersionHeader.v2_1
+            versionHeader = APIVersionHeader.v3_0
           )
 
           // then the future should be ready
@@ -152,7 +152,7 @@ class AuditingConnectorSpec
             Some(eori),
             None,
             None,
-            versionHeader = APIVersionHeader.v2_1
+            versionHeader = APIVersionHeader.v3_0
           )
 
           // then the future should be ready
@@ -189,7 +189,7 @@ class AuditingConnectorSpec
             None,
             Some(movementType),
             Some(messageType),
-            versionHeader = APIVersionHeader.v2_1
+            versionHeader = APIVersionHeader.v3_0
           )
 
           // then the future should be ready
@@ -221,7 +221,7 @@ class AuditingConnectorSpec
             None,
             None,
             None,
-            versionHeader = APIVersionHeader.v2_1
+            versionHeader = APIVersionHeader.v3_0
           )
 
           // then the future should be ready
@@ -266,7 +266,7 @@ class AuditingConnectorSpec
               Some(eori),
               Some(movementType),
               Some(messageType),
-              versionHeader = APIVersionHeader.v2_1
+              versionHeader = APIVersionHeader.v3_0
             )
 
             val result = future
@@ -328,7 +328,7 @@ class AuditingConnectorSpec
         movementType,
         messageType,
         Some(ClientId("1234")),
-        APIVersionHeader.v2_1
+        APIVersionHeader.v3_0
       )
 
       // then the future should be ready
@@ -375,7 +375,7 @@ class AuditingConnectorSpec
           movementType,
           messageType,
           Some(ClientId("1234")),
-          APIVersionHeader.v2_1
+          APIVersionHeader.v3_0
         )
 
         val result = future

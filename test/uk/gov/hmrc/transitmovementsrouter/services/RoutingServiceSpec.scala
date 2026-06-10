@@ -42,7 +42,7 @@ import uk.gov.hmrc.transitmovementsrouter.connectors.*
 import uk.gov.hmrc.transitmovementsrouter.generators.TestModelGenerators
 import uk.gov.hmrc.transitmovementsrouter.models
 import uk.gov.hmrc.transitmovementsrouter.models.*
-import uk.gov.hmrc.transitmovementsrouter.models.APIVersionHeader.v2_1
+import uk.gov.hmrc.transitmovementsrouter.models.APIVersionHeader.v3_0
 
 import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
@@ -69,8 +69,8 @@ class RoutingServiceSpec
   "Submitting a payload" - {
 
     "given a valid response from connector" - {
-      when(mockMessageConnectorProvider.gbV2_1).thenReturn(mockMessageConnector)
-      when(mockMessageConnectorProvider.xiV2_1).thenReturn(mockMessageConnector)
+      when(mockMessageConnectorProvider.gbV3_0).thenReturn(mockMessageConnector)
+      when(mockMessageConnectorProvider.xiV3_0).thenReturn(mockMessageConnector)
 
       MessageType.departureRequestValues.foreach { messageType =>
         s"${messageType.code} should return valid response for a GB payload" in forAll(
@@ -99,7 +99,7 @@ class RoutingServiceSpec
             messageId,
             payload,
             CustomsOffice(officeOfDepartureXML._2),
-            APIVersionHeader.v2_1
+            APIVersionHeader.v3_0
           )
 
           whenReady(response.value, Timeout(2.seconds)) { r =>
@@ -124,7 +124,7 @@ class RoutingServiceSpec
             messageId,
             payload,
             CustomsOffice(officeOfDepartureXML._2),
-            APIVersionHeader.v2_1
+            APIVersionHeader.v3_0
           )
 
           whenReady(response.value, Timeout(2.seconds)) { r =>
@@ -164,7 +164,7 @@ class RoutingServiceSpec
           messageId,
           payload,
           CustomsOffice(officeOfDepartureXML._2),
-          APIVersionHeader.v2_1
+          APIVersionHeader.v3_0
         )
 
         whenReady(response.value.failed, Timeout(2.seconds)) { r =>
@@ -199,7 +199,7 @@ class RoutingServiceSpec
           messageId,
           payload,
           CustomsOffice(officeOfDepartureXML._2),
-          APIVersionHeader.v2_1
+          APIVersionHeader.v3_0
         )
 
         whenReady(response.value.failed, Timeout(2.seconds)) { r =>
@@ -235,7 +235,7 @@ class RoutingServiceSpec
         messageId,
         payload,
         CustomsOffice(officeOfDepartureXML._2),
-        APIVersionHeader.v2_1
+        APIVersionHeader.v3_0
       )
 
       whenReady(response.value.failed, Timeout(2.seconds)) { r =>
@@ -270,7 +270,7 @@ class RoutingServiceSpec
         messageId,
         payload,
         CustomsOffice(officeOfDepartureXML._2),
-        APIVersionHeader.v2_1
+        APIVersionHeader.v3_0
       )
 
       whenReady(response.value.failed, Timeout(2.seconds)) { r =>

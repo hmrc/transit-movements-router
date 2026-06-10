@@ -66,9 +66,7 @@ class RoutingServiceImpl @Inject() (
 
   private def eisConnectorSelector(customsOffice: CustomsOffice, versionHeader: APIVersionHeader): EISConnector =
     (customsOffice.isGB, versionHeader) match {
-      case (true, APIVersionHeader.v2_1)  => messageConnectorProvider.gbV2_1
       case (true, APIVersionHeader.v3_0)  => messageConnectorProvider.gbV3_0
-      case (false, APIVersionHeader.v2_1) => messageConnectorProvider.xiV2_1
       case (false, APIVersionHeader.v3_0) => messageConnectorProvider.xiV3_0
     }
 }
