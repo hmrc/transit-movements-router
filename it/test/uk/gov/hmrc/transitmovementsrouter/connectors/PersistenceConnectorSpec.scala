@@ -44,7 +44,7 @@ import uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuite
 import uk.gov.hmrc.transitmovementsrouter.it.generators.ModelGenerators
 import uk.gov.hmrc.transitmovementsrouter.models.MessageType.DeclarationAmendment
 import uk.gov.hmrc.transitmovementsrouter.models.*
-import uk.gov.hmrc.transitmovementsrouter.models.APIVersionHeader.v2_1
+import uk.gov.hmrc.transitmovementsrouter.models.APIVersionHeader.v3_0
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.MessageNotFound
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.MovementNotFound
 import uk.gov.hmrc.transitmovementsrouter.models.errors.PersistenceError.Unexpected
@@ -137,12 +137,12 @@ class PersistenceConnectorSpec
   "post" should {
     "return messageId when post is successful" in {
 
-      val body = Json.obj("messageId" -> messageId.value, "eori" -> eoriNumber, "clientId" -> Option(clientId), "apiVersion" -> "2.1").toString()
+      val body = Json.obj("messageId" -> messageId.value, "eori" -> eoriNumber, "clientId" -> Option(clientId), "apiVersion" -> "3.0").toString()
 
       stubForPostBody(OK, Some(body))
       whenReady(connector.postBody(movementId, messageId, DeclarationAmendment, source).value) { x =>
         x.isRight mustBe true
-        x mustBe Right(PersistenceResponse(messageId, eoriNumber, Option(clientId), sendNotification = None, apiVersion = v2_1))
+        x mustBe Right(PersistenceResponse(messageId, eoriNumber, Option(clientId), sendNotification = None, apiVersion = v3_0))
       }
     }
 

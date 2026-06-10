@@ -16,10 +16,8 @@
 
 package uk.gov.hmrc.transitmovementsrouter.connectors
 
-import org.apache.pekko.stream.scaladsl.Sink
 import com.github.tomakehurst.wiremock.client.WireMock.aResponse
 import com.github.tomakehurst.wiremock.client.WireMock.get
-import org.scalacheck.Gen
 import org.scalatest.concurrent.PatienceConfiguration
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.concurrent.ScalaFutures
@@ -29,11 +27,9 @@ import org.scalatest.time.SpanSugar.convertIntToGrainOfTime
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 import play.api.http.Status.INTERNAL_SERVER_ERROR
 import play.api.http.Status.NOT_FOUND
-import play.api.http.Status.OK
 import uk.gov.hmrc.transitmovementsrouter.models.errors.UpscanError.NotFound
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.test.HttpClientV2Support
-import uk.gov.hmrc.transitmovementsrouter.connectors.UpscanConnectorImpl
 import uk.gov.hmrc.transitmovementsrouter.it.base.TestActorSystem
 import uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuite
 import uk.gov.hmrc.transitmovementsrouter.models.errors.UpscanError
@@ -55,26 +51,6 @@ class UpscanConnectorSpec
   "streamFile" - {
 
     implicit val hc: HeaderCarrier = HeaderCarrier()
-
-//    "gets a stream when the file exists" in forAll(Gen.stringOfN(20, Gen.alphaNumChar)) {
-//      string =>
-//        server.stubFor(
-//          get("/test.xml")
-//            .willReturn(aResponse().withStatus(OK).withBody(string))
-//        )
-//
-//        val sut = new UpscanConnectorImpl(httpClientV2)
-//        val result = sut
-//          .streamFile(DownloadUrl(s"http://localhost:${server.port()}/test.xml"))
-//          .semiflatMap(
-//            stream => stream.reduce(_ ++ _).map(_.utf8String).runWith(Sink.head[String])
-//          )
-//
-//        whenReady(result.value, timeout) {
-//          case Right(result) => result mustBe string
-//          case a             => fail(s"Expected Right($string), got $a")
-//        }
-//    }
 
     "returns a NotFound error when the file does not exist" in {
       server.stubFor(

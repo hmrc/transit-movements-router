@@ -24,7 +24,6 @@ import play.api.libs.json.JsValue
 import play.api.libs.json.OFormat
 
 enum APIVersionHeader(val value: String) {
-  case v2_1 extends APIVersionHeader("2.1")
   case v3_0 extends APIVersionHeader("3.0")
 }
 

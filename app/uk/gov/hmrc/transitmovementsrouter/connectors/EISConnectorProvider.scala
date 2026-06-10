@@ -29,10 +29,6 @@ import scala.concurrent.ExecutionContext
 
 @ImplementedBy(classOf[EISConnectorProviderImpl])
 trait EISConnectorProvider {
-  def gbV2_1: EISConnector
-
-  def xiV2_1: EISConnector
-
   def gbV3_0: EISConnector
 
   def xiV3_0: EISConnector
@@ -47,8 +43,6 @@ class EISConnectorProviderImpl @Inject() (
 )(implicit ec: ExecutionContext, mat: Materializer)
     extends EISConnectorProvider {
 
-  lazy val gbV2_1: EISConnector = createConnector("GB", appConfig.eisGbV2_1)
-  lazy val xiV2_1: EISConnector = createConnector("XI", appConfig.eisXiV2_1)
   lazy val gbV3_0: EISConnector = createConnector("GB", appConfig.eisGbV3_0)
   lazy val xiV3_0: EISConnector = createConnector("XI", appConfig.eisXiV3_0)
 

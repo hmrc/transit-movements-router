@@ -93,7 +93,7 @@ class AuditingServiceSpec
               eqTo(movementType),
               eqTo(messageType),
               eqTo(clientId),
-              eqTo(APIVersionHeader.v2_1)
+              eqTo(APIVersionHeader.v3_0)
             )(any(), any())
           )
             .thenReturn(Future.successful(()))
@@ -110,7 +110,7 @@ class AuditingServiceSpec
               movementType,
               messageType,
               clientId,
-              APIVersionHeader.v2_1
+              APIVersionHeader.v3_0
             )
           ) { _ =>
             verify(mockConnector, times(1)).postMessageType(
@@ -124,7 +124,7 @@ class AuditingServiceSpec
               eqTo(movementType),
               eqTo(messageType),
               eqTo(clientId),
-              eqTo(APIVersionHeader.v2_1)
+              eqTo(APIVersionHeader.v3_0)
             )(any(), any())
           }
         }
@@ -151,7 +151,7 @@ class AuditingServiceSpec
               eqTo(movementType),
               eqTo(messageType),
               eqTo(clientId),
-              eqTo(APIVersionHeader.v2_1)
+              eqTo(APIVersionHeader.v3_0)
             )(any(), any())
           ).thenReturn(Future.failed(exception))
 
@@ -173,7 +173,7 @@ class AuditingServiceSpec
               movementType,
               messageType,
               clientId,
-              APIVersionHeader.v2_1
+              APIVersionHeader.v3_0
             )
           ) { _ =>
             verify(mockConnector, times(1)).postMessageType(
@@ -187,7 +187,7 @@ class AuditingServiceSpec
               eqTo(movementType),
               eqTo(messageType),
               eqTo(clientId),
-              eqTo(APIVersionHeader.v2_1)
+              eqTo(APIVersionHeader.v3_0)
             )(any(), any())
             verify(Harness.logger0, times(1)).warn(eqTo("Unable to audit payload due to an exception"), eqTo(exception))
           }
@@ -219,7 +219,7 @@ class AuditingServiceSpec
           eqTo(movementType),
           eqTo(messageType),
           eqTo(Some(ClientId("2345"))),
-          eqTo(APIVersionHeader.v2_1)
+          eqTo(APIVersionHeader.v3_0)
         )(any(), any())
       )
         .thenReturn(Future.successful(()))
@@ -234,7 +234,7 @@ class AuditingServiceSpec
           movementType,
           messageType,
           Some(ClientId("2345")),
-          APIVersionHeader.v2_1
+          APIVersionHeader.v3_0
         )
       ) { _ =>
         verify(mockConnector, times(1)).postStatus(
@@ -246,7 +246,7 @@ class AuditingServiceSpec
           eqTo(movementType),
           eqTo(messageType),
           eqTo(Some(ClientId("2345"))),
-          eqTo(APIVersionHeader.v2_1)
+          eqTo(APIVersionHeader.v3_0)
         )(any(), any())
       }
     }
@@ -270,7 +270,7 @@ class AuditingServiceSpec
           eqTo(movementType),
           eqTo(messageType),
           eqTo(Some(ClientId("2345"))),
-          eqTo(APIVersionHeader.v2_1)
+          eqTo(APIVersionHeader.v3_0)
         )(any(), any())
       ).thenReturn(Future.failed(exception))
 
@@ -290,7 +290,7 @@ class AuditingServiceSpec
           movementType,
           messageType,
           Some(ClientId("2345")),
-          APIVersionHeader.v2_1
+          APIVersionHeader.v3_0
         )
       ) { _ =>
         verify(mockConnector, times(1)).postStatus(
@@ -302,7 +302,7 @@ class AuditingServiceSpec
           eqTo(movementType),
           eqTo(messageType),
           eqTo(Some(ClientId("2345"))),
-          eqTo(APIVersionHeader.v2_1)
+          eqTo(APIVersionHeader.v3_0)
         )(any(), any())
         verify(Harness.logger0, times(1)).warn(eqTo("Unable to audit payload due to an exception"), eqTo(exception))
       }
