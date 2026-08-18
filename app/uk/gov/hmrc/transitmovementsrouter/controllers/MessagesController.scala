@@ -116,7 +116,9 @@ class MessagesController @Inject() (
       request: ValidatedVersionedRequest[Source[ByteString, ?]]
     ): EitherT[Future, PresentationError, Status] =
       for {
-        _ <- routingService.submitMessage(movementType, movementId, messageId, source, customsOffice, request.versionHeader).asPresentation
+        _ <- routingService
+          .submitMessage(movementType, movementId, messageId, source, customsOffice, request.versionHeader, request.headers.get("X-ACCEPT-REDIRECT"))
+          .asPresentation
         _ = statusMonitoringService.outgoing(movementId, messageId, messageType, customsOffice)
       } yield Created
 
