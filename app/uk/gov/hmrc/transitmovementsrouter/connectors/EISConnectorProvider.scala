@@ -30,10 +30,8 @@ import scala.concurrent.ExecutionContext
 @ImplementedBy(classOf[EISConnectorProviderImpl])
 trait EISConnectorProvider {
   def gbV3_0: EISConnector
-  def xiV3_0: EISConnector
 
-  def gbV3_1: EISConnector
-  def xiV3_1: EISConnector
+  def xiV3_0: EISConnector
 }
 
 @Singleton // singleton as the message connectors need to be singletons for the circuit breakers.
@@ -44,9 +42,6 @@ class EISConnectorProviderImpl @Inject() (
   clock: Clock
 )(implicit ec: ExecutionContext, mat: Materializer)
     extends EISConnectorProvider {
-
-  lazy val gbV3_1: EISConnector = createConnector("GB", appConfig.eisGbV3_1)
-  lazy val xiV3_1: EISConnector = createConnector("XI", appConfig.eisXiV3_1)
 
   lazy val gbV3_0: EISConnector = createConnector("GB", appConfig.eisGbV3_0)
   lazy val xiV3_0: EISConnector = createConnector("XI", appConfig.eisXiV3_0)

@@ -68,7 +68,7 @@ class RoutingServiceSpec
 
   "Submitting a payload" - {
 
-    "given a valid response from connector without optional header" - {
+    "given a valid response from connector" - {
       when(mockMessageConnectorProvider.gbV3_0).thenReturn(mockMessageConnector)
       when(mockMessageConnectorProvider.xiV3_0).thenReturn(mockMessageConnector)
 
@@ -99,8 +99,7 @@ class RoutingServiceSpec
             messageId,
             payload,
             CustomsOffice(officeOfDepartureXML._2),
-            APIVersionHeader.v3_0,
-            None
+            APIVersionHeader.v3_0
           )
 
           whenReady(response.value, Timeout(2.seconds)) { r =>
@@ -125,78 +124,7 @@ class RoutingServiceSpec
             messageId,
             payload,
             CustomsOffice(officeOfDepartureXML._2),
-            APIVersionHeader.v3_0,
-            None
-          )
-
-          whenReady(response.value, Timeout(2.seconds)) { r =>
-            r.mustBe(Right(()))
-            verify(mockEISMessageTransformer, times(1)).wrap
-          }
-        }
-
-      }
-    }
-
-    "given a valid response from connector with optional header" - {
-      when(mockMessageConnectorProvider.gbV3_1).thenReturn(mockMessageConnector)
-      when(mockMessageConnectorProvider.xiV3_1).thenReturn(mockMessageConnector)
-
-      MessageType.departureRequestValues.foreach { messageType =>
-        s"${messageType.code} should return valid response for a GB payload" in forAll(
-          arbitrary[MessageId],
-          arbitrary[MovementId],
-          messageWithDepartureOfficeNode(messageType, "GB")
-        ) { (messageId, movementId, officeOfDepartureXML) =>
-          when(
-            mockMessageConnector.post(
-              MovementId(anyString()),
-              MessageId(anyString()),
-              any[Source[ByteString, ?]],
-              any[HeaderCarrier]
-            )
-          )
-            .thenReturn(Future.successful(Right(())))
-
-          val mockEISMessageTransformer = mock[EISMessageTransformers]
-          when(mockEISMessageTransformer.wrap).thenAnswer(_ => Flow[ByteString])
-
-          val serviceUnderTest = new RoutingServiceImpl(mockEISMessageTransformer, mockMessageConnectorProvider)
-          val payload          = createStream(officeOfDepartureXML._1)
-          val response         = serviceUnderTest.submitMessage(
-            MovementType("departures"),
-            movementId,
-            messageId,
-            payload,
-            CustomsOffice(officeOfDepartureXML._2),
-            APIVersionHeader.v3_0,
-            Some("123")
-          )
-
-          whenReady(response.value, Timeout(2.seconds)) { r =>
-            r.mustBe(Right(()))
-            verify(mockEISMessageTransformer, times(1)).wrap
-          }
-        }
-
-        s"${messageType.code} should return valid response for a Xi payload" in forAll(
-          arbitrary[MessageId],
-          arbitrary[MovementId],
-          messageWithDepartureOfficeNode(messageType, "XI")
-        ) { (messageId, movementId, officeOfDepartureXML) =>
-          val mockEISMessageTransformer = mock[EISMessageTransformers]
-          when(mockEISMessageTransformer.wrap).thenAnswer(_ => Flow[ByteString])
-
-          val serviceUnderTest = new RoutingServiceImpl(mockEISMessageTransformer, mockMessageConnectorProvider)
-          val payload          = createStream(officeOfDepartureXML._1)
-          val response         = serviceUnderTest.submitMessage(
-            MovementType("departures"),
-            movementId,
-            messageId,
-            payload,
-            CustomsOffice(officeOfDepartureXML._2),
-            APIVersionHeader.v3_0,
-            Some("123")
+            APIVersionHeader.v3_0
           )
 
           whenReady(response.value, Timeout(2.seconds)) { r =>
@@ -236,8 +164,7 @@ class RoutingServiceSpec
           messageId,
           payload,
           CustomsOffice(officeOfDepartureXML._2),
-          APIVersionHeader.v3_0,
-          None
+          APIVersionHeader.v3_0
         )
 
         whenReady(response.value.failed, Timeout(2.seconds)) { r =>
@@ -272,8 +199,7 @@ class RoutingServiceSpec
           messageId,
           payload,
           CustomsOffice(officeOfDepartureXML._2),
-          APIVersionHeader.v3_0,
-          None
+          APIVersionHeader.v3_0
         )
 
         whenReady(response.value.failed, Timeout(2.seconds)) { r =>
@@ -309,8 +235,7 @@ class RoutingServiceSpec
         messageId,
         payload,
         CustomsOffice(officeOfDepartureXML._2),
-        APIVersionHeader.v3_0,
-        None
+        APIVersionHeader.v3_0
       )
 
       whenReady(response.value.failed, Timeout(2.seconds)) { r =>
@@ -345,8 +270,7 @@ class RoutingServiceSpec
         messageId,
         payload,
         CustomsOffice(officeOfDepartureXML._2),
-        APIVersionHeader.v3_0,
-        None
+        APIVersionHeader.v3_0
       )
 
       whenReady(response.value.failed, Timeout(2.seconds)) { r =>

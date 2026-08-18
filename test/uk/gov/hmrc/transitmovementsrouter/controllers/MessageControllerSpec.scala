@@ -270,8 +270,7 @@ class MessageControllerSpec
           any[String].asInstanceOf[MessageId],
           any[Source[ByteString, ?]],
           any[String].asInstanceOf[CustomsOffice],
-          eqTo(v3_0),
-          any()
+          eqTo(v3_0)
         )(any[HeaderCarrier], any[ExecutionContext])
       ).thenReturn(submitDeclarationEither)
 
@@ -338,8 +337,7 @@ class MessageControllerSpec
         any[String].asInstanceOf[MessageId],
         any[Source[ByteString, ?]],
         any[String].asInstanceOf[CustomsOffice],
-        eqTo(v3_0),
-        any()
+        eqTo(v3_0)
       )(any[HeaderCarrier], any[ExecutionContext])
 
       verify(mockSDESService, times(1)).send(
@@ -568,8 +566,7 @@ class MessageControllerSpec
           any[String].asInstanceOf[MessageId],
           any[Source[ByteString, ?]],
           any[String].asInstanceOf[CustomsOffice],
-          eqTo(v3_0),
-          any()
+          eqTo(v3_0)
         )(any[HeaderCarrier], any[ExecutionContext])
       ).thenReturn(
         EitherT[Future, RoutingError, Unit](
