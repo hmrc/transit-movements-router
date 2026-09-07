@@ -116,7 +116,6 @@ class MessagesController @Inject() (
       request: ValidatedVersionedRequest[Source[ByteString, ?]]
     ): EitherT[Future, PresentationError, Status] = {
       val optionalHeader = if (config.optionalHeader) request.headers.get("X-Accept-Redirect") else None
-      // println("optional header value" + optionalHeader.get)
       for {
         _ <- routingService.submitMessage(movementType, movementId, messageId, source, customsOffice, request.versionHeader, optionalHeader).asPresentation
         _ = statusMonitoringService.outgoing(movementId, messageId, messageType, customsOffice)
