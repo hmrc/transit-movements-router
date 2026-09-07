@@ -59,21 +59,21 @@ trait WiremockSuite extends BeforeAndAfterAll with BeforeAndAfterEach {
 }
 
 trait WiremockSuiteWithGuice extends WiremockSuite {
-  this: Suite with GuiceFakeApplicationFactory =>
+  this: Suite & GuiceFakeApplicationFactory =>
 
-  override def fakeApplication(): Application = appBuilder.build()
+  override def fakeApplication(): Application = appBuilder(true).build()
 
-  protected def appBuilder: GuiceApplicationBuilder =
+  protected def appBuilder(boolean: Boolean): GuiceApplicationBuilder =
     new GuiceApplicationBuilder()
       .configure(
-        "microservice.services.eis.gb_v2_1.port"                -> server.port().toString,
-        "microservice.services.eis.xi_v2_1.port"                -> server.port().toString,
+        "microservice.services.eis.gb_v3_0c.port"               -> server.port().toString,
+        "microservice.services.eis.xi_v3_0c.port"               -> server.port().toString,
         "microservice.services.eis.gb_v3_0.port"                -> server.port().toString,
         "microservice.services.eis.xi_v3_0.port"                -> server.port().toString,
         "microservice.services.ncts-monitoring.port"            -> server.port().toString,
         "microservice.services.secure-data-exchange-proxy.port" -> server.port().toString
       )
-      .overrides(bindings: _*)
+      .overrides(bindings*)
 
   protected lazy val injector: Injector = fakeApplication().injector
 

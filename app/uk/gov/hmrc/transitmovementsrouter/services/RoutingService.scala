@@ -39,7 +39,8 @@ trait RoutingService {
     messageId: MessageId,
     payload: Source[ByteString, ?],
     customsOffice: CustomsOffice,
-    versionHeader: APIVersionHeader
+    versionHeader: APIVersionHeader,
+    optionalHeader: Option[String]
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): EitherT[Future, RoutingError, Unit]
 
 }
@@ -57,16 +58,19 @@ class RoutingServiceImpl @Inject() (
     messageId: MessageId,
     payload: Source[ByteString, ?],
     customsOffice: CustomsOffice,
-    versionHeader: APIVersionHeader
+    versionHeader: APIVersionHeader,
+    optionalHeader: Option[String]
   )(implicit hc: HeaderCarrier, ec: ExecutionContext): EitherT[Future, RoutingError, Unit] =
     EitherT(
-      eisConnectorSelector(customsOffice, versionHeader)
+      eisConnectorSelector(customsOffice, versionHeader, optionalHeader)
         .post(movementId, messageId, payload.via(eisMessageTransformers.wrap), hc)
     )
 
-  private def eisConnectorSelector(customsOffice: CustomsOffice, versionHeader: APIVersionHeader): EISConnector =
-    (customsOffice.isGB, versionHeader) match {
-      case (true, APIVersionHeader.v3_0)  => messageConnectorProvider.gbV3_0
-      case (false, APIVersionHeader.v3_0) => messageConnectorProvider.xiV3_0
+  private def eisConnectorSelector(customsOffice: CustomsOffice, versionHeader: APIVersionHeader, optionalHeader: Option[String]): EISConnector =
+    (customsOffice.isGB, versionHeader, optionalHeader) match {
+      case (true, APIVersionHeader.v3_0, Some(_))  => logger.info("routing to optional header GB SITLS route"); messageConnectorProvider.gbV3_0c
+      case (false, APIVersionHeader.v3_0, Some(_)) => logger.info("routing to optional header XI SITLS route"); messageConnectorProvider.xiV3_0c
+      case (true, APIVersionHeader.v3_0, None)     => logger.info("routing to GB"); messageConnectorProvider.gbV3_0
+      case (false, APIVersionHeader.v3_0, None)    => logger.info("routing to XI"); messageConnectorProvider.xiV3_0
     }
 }
