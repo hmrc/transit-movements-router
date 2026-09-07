@@ -32,8 +32,8 @@ trait EISConnectorProvider {
   def gbV3_0: EISConnector
   def xiV3_0: EISConnector
 
-  def gbV3_0c: EISConnector // connector to test SITLS GB route
-  def xiV3_0c: EISConnector // connector to test SITLS XI route
+  def gbV3_0c: EISConnector // connector to test optional header GB route
+  def xiV3_0c: EISConnector // connector to test optional header XI route
 }
 
 @Singleton // singleton as the message connectors need to be singletons for the circuit breakers.

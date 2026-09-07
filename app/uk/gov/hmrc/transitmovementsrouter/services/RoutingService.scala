@@ -68,8 +68,8 @@ class RoutingServiceImpl @Inject() (
 
   private def eisConnectorSelector(customsOffice: CustomsOffice, versionHeader: APIVersionHeader, optionalHeader: Option[String]): EISConnector =
     (customsOffice.isGB, versionHeader, optionalHeader) match {
-      case (true, APIVersionHeader.v3_0, Some(_))  => logger.info("routing to optional header GB SITLS route"); messageConnectorProvider.gbV3_0c
-      case (false, APIVersionHeader.v3_0, Some(_)) => logger.info("routing to optional header XI SITLS route"); messageConnectorProvider.xiV3_0c
+      case (true, APIVersionHeader.v3_0, Some(_))  => logger.info("routing to optional header GB route"); messageConnectorProvider.gbV3_0c
+      case (false, APIVersionHeader.v3_0, Some(_)) => logger.info("routing to optional header XI route"); messageConnectorProvider.xiV3_0c
       case (true, APIVersionHeader.v3_0, None)     => logger.info("routing to GB"); messageConnectorProvider.gbV3_0
       case (false, APIVersionHeader.v3_0, None)    => logger.info("routing to XI"); messageConnectorProvider.xiV3_0
     }
