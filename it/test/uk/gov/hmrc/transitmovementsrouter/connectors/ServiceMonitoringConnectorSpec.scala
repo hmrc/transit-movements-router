@@ -32,15 +32,10 @@ import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.http.UpstreamErrorResponse
 import uk.gov.hmrc.http.test.HttpClientV2Support
 import uk.gov.hmrc.transitmovementsrouter.config.AppConfig
-import uk.gov.hmrc.transitmovementsrouter.connectors.ServiceMonitoringConnectorImpl
 import uk.gov.hmrc.transitmovementsrouter.it.base.TestActorSystem
 import uk.gov.hmrc.transitmovementsrouter.it.base.WiremockSuite
 import uk.gov.hmrc.transitmovementsrouter.it.generators.ModelGenerators
-import uk.gov.hmrc.transitmovementsrouter.models.ConversationId
-import uk.gov.hmrc.transitmovementsrouter.models.CustomsOffice
-import uk.gov.hmrc.transitmovementsrouter.models.MessageId
-import uk.gov.hmrc.transitmovementsrouter.models.MessageType
-import uk.gov.hmrc.transitmovementsrouter.models.MovementId
+import uk.gov.hmrc.transitmovementsrouter.models.*
 
 import java.time.Clock
 import java.time.LocalDateTime

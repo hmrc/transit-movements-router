@@ -88,7 +88,7 @@ trait ModelGenerators extends BaseGenerators {
       lastModified      = Instant.now()
       formattedDateTime = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").withZone(ZoneOffset.UTC).format(lastModified)
       contentLen <- Gen.chooseNum(100, 500)
-      hash       <- Gen.stringOfN(4, Gen.alphaChar).map(Md5Hash)
+      hash       <- Gen.stringOfN(4, Gen.alphaChar).map(Md5Hash.apply)
     } yield ObjectSummaryWithMd5(
       Path.Directory("common-transit-convention-traders").file(s"${movementId.value}-${messageId.value}-$formattedDateTime.xml"),
       contentLen,

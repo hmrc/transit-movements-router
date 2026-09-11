@@ -114,11 +114,13 @@ class MessagesController @Inject() (
     def viaEIS(messageType: MessageType, customsOffice: CustomsOffice, source: Source[ByteString, ?])(implicit
       hc: HeaderCarrier,
       request: ValidatedVersionedRequest[Source[ByteString, ?]]
-    ): EitherT[Future, PresentationError, Status] =
+    ): EitherT[Future, PresentationError, Status] = {
+      val optionalHeader = if (config.optionalHeader) request.headers.get("X-Accept-Redirect") else None
       for {
-        _ <- routingService.submitMessage(movementType, movementId, messageId, source, customsOffice, request.versionHeader).asPresentation
+        _ <- routingService.submitMessage(movementType, movementId, messageId, source, customsOffice, request.versionHeader, optionalHeader).asPresentation
         _ = statusMonitoringService.outgoing(movementId, messageId, messageType, customsOffice)
       } yield Created
+    }
 
     def viaSDES(source: Source[ByteString, ?])(implicit hc: HeaderCarrier): EitherT[Future, PresentationError, Status] =
       for {
