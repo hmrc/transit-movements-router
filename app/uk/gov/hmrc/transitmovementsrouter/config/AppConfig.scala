@@ -29,9 +29,7 @@ import javax.inject.Singleton
 class AppConfig @Inject() (config: Configuration, servicesConfig: CTCServicesConfig) {
 
   lazy val appName: String = config.get[String]("appName")
-
-  lazy val eisGbV2_1: EISInstanceConfig = config.get[EISInstanceConfig]("microservice.services.eis.gb_v2_1")
-  lazy val eisXiV2_1: EISInstanceConfig = config.get[EISInstanceConfig]("microservice.services.eis.xi_v2_1")
+  
   lazy val eisGbV3_0: EISInstanceConfig = config.get[EISInstanceConfig]("microservice.services.eis.gb_v3_0")
   lazy val eisXiV3_0: EISInstanceConfig = config.get[EISInstanceConfig]("microservice.services.eis.xi_v3_0")
 
