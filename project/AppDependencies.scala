@@ -3,15 +3,15 @@ import sbt.*
 object AppDependencies {
 
   private val catsVersion = "2.13.0"
-  private val catsRetryVersion = "3.1.3"
-  private val boostrapPlayVersion = "10.7.0"
-  private val pekkoVersion = "1.5.0"
+  private val catsRetryVersion = "4.0.0"
+  private val boostrapPlayVersion = "10.9.0"
+  private val pekkoVersion = "2.0.0"
 
   val compile: Seq[ModuleID] = Seq(
     "uk.gov.hmrc" %% "bootstrap-backend-play-30" % boostrapPlayVersion,
     "org.typelevel" %% "cats-core" % catsVersion,
     "com.github.cb372" %% "cats-retry" % catsRetryVersion,
-    "uk.gov.hmrc.objectstore" %% "object-store-client-play-30" % "2.5.0",
+    "uk.gov.hmrc.objectstore" %% "object-store-client-play-30" % "2.6.0",
     "com.github.cb372" %% "alleycats-retry" % catsRetryVersion,
     "org.apache.pekko" %% "pekko-slf4j" % pekkoVersion,
     "org.apache.pekko" %% "pekko-connectors-xml" % "1.3.0",
@@ -25,7 +25,7 @@ object AppDependencies {
   )
 
   val test: Seq[ModuleID] = Seq(
-    "org.scalacheck" %% "scalacheck" % "1.19.0",
+    "org.scalacheck" %% "scalacheck" % "1.20.0",
     "org.scalatestplus" %% "mockito-5-12" % "3.2.19.0",
     "org.scalatestplus" %% "scalacheck-1-18" % "3.2.19.0",
     "org.typelevel" %% "cats-core" % catsVersion,
